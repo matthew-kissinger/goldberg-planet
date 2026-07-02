@@ -17,6 +17,8 @@ import { MAT, type MaterialId, Terrain } from './terrain';
 export interface ColumnEdit {
   solid: Uint32Array;
   placed: Uint32Array;
+  /** material id per placed cell; allocated on first place (0/absent = legacy BUILT) */
+  mat?: Uint8Array;
 }
 
 const TOP_SENTINEL = -32768;
@@ -93,16 +95,19 @@ export class Columns {
     const e = this.materialize(id);
     e.solid[k >> 5] &= ~(1 << (k & 31));
     e.placed[k >> 5] &= ~(1 << (k & 31));
+    if (e.mat) e.mat[k] = 0;
     return true;
   }
 
-  /** add one cell (player-built). Returns false if already solid / out of range. */
-  place(id: number, k: number): boolean {
+  /** add one cell (player-built, with a material). Returns false if already solid / out of range. */
+  place(id: number, k: number, mat: MaterialId = MAT.BUILT): boolean {
     if (k < 0 || k >= this.layers.L - 1) return false;
     if (this.solidAt(id, k)) return false;
     const e = this.materialize(id);
     e.solid[k >> 5] |= 1 << (k & 31);
     e.placed[k >> 5] |= 1 << (k & 31);
+    if (!e.mat) e.mat = new Uint8Array(this.layers.L);
+    e.mat[k] = mat;
     return true;
   }
 
@@ -113,7 +118,10 @@ export class Columns {
   }
 
   materialAt(id: number, k: number): MaterialId {
-    if (this.placedAt(id, k)) return MAT.BUILT;
+    if (this.placedAt(id, k)) {
+      const m = this.edits.get(id)?.mat?.[k];
+      return (m || MAT.BUILT) as MaterialId;
+    }
     if (k >= this.layers.L - 1) return MAT.BEDROCK;
     const top = this.topLayerOf(id);
     const h = this.heightOf(id);
@@ -150,9 +158,11 @@ export class Columns {
 
   /** rough storage accounting for measurements/tests */
   storageBytes(): { indexBytes: number; editBytes: number; editedTiles: number } {
+    let matBytes = 0;
+    for (const e of this.edits.values()) if (e.mat) matBytes += e.mat.byteLength;
     return {
       indexBytes: this.tops.byteLength + this.heights.byteLength,
-      editBytes: this.edits.size * (this.words * 4 * 2 + 16),
+      editBytes: this.edits.size * (this.words * 4 * 2 + 16) + matBytes,
       editedTiles: this.edits.size,
     };
   }

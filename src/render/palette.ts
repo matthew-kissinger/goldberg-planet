@@ -24,7 +24,12 @@ const COLORS: Record<number, [number, number, number]> = {
   [MAT.BEDROCK]: lin(0x32323a),
   [MAT.BUILT]: lin(0x9aa7b8),
   [MAT.SEABED]: lin(0x6e6a4e),
+  [MAT.WOOD]: lin(0xa8763f),
 };
+
+/** tree part colors (linear), tinted per tree by the mesher */
+export const TRUNK_COLOR = lin(0x5d4128);
+export const LEAF_COLOR = lin(0x3d7a33);
 
 /**
  * Material color with a deterministic per-tile tint so the tile pattern reads,

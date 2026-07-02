@@ -1,17 +1,18 @@
 import * as THREE from 'three/webgpu';
 import { color, float, positionWorld, positionLocal, cameraPosition, normalWorld, normalize, uniform, attribute, vec3, time, mix, smoothstep as tslSmoothstep } from 'three/tsl';
-import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Goldberg } from './geo/goldberg';
 import { buildLayers, PLANET_RADIUS, WATER_SURFACE } from './world/layers';
-import { Terrain } from './world/terrain';
+import { Terrain, MAT, type MaterialId } from './world/terrain';
 import { Columns } from './world/columns';
+import { Trees } from './world/trees';
 import { Streamer } from './world/streamer';
 import { chunkKeyOfTile } from './world/chunks';
 import { FarSphere } from './render/farsphere';
+import { buildGeodesic } from './render/geodesic';
 import { Character } from './render/character';
 import { Player } from './player/player';
 import { Input } from './player/input';
-import { pick, type PickResult } from './edit/pick';
+import { pick, pickTree, type PickResult, type TreePick } from './edit/pick';
 import { Metrics } from './demo/metrics';
 import { Autopilot, OrbitDemo } from './demo/autopilot';
 import { Hud, splash, hideSplash } from './demo/hud';
@@ -23,8 +24,32 @@ const COARSE_M = 96;
 
 const DIST_MIN = 2.4;
 const DIST_MAX = 4200;
-const GLIDE_CAM_EXP = Math.log(9 / DIST_MIN) / Math.log(DIST_MAX / DIST_MIN);
+const PLANE_CAM_EXP = Math.log(15 / DIST_MIN) / Math.log(DIST_MAX / DIST_MIN);
 const SUN = new THREE.Vector3(0.62, 0.55, 0.56).normalize();
+const PLANE_WOOD_COST = 12;
+const WOOD_PER_TREE = 6;
+
+// hotbar: placeable materials, mined/chopped resources feed the counts
+const SLOTS: { name: string; mat: MaterialId; css: string }[] = [
+  { name: 'dirt', mat: MAT.DIRT, css: '#8a6242' },
+  { name: 'rock', mat: MAT.ROCK, css: '#7d7f85' },
+  { name: 'sand', mat: MAT.SAND, css: '#d8c48a' },
+  { name: 'snow', mat: MAT.SNOW, css: '#eef2f5' },
+  { name: 'wood', mat: MAT.WOOD, css: '#a8763f' },
+];
+const WOOD_SLOT = 4;
+
+/** which hotbar slot a mined cell's material feeds (grass crumbles to dirt, etc.) */
+function yieldSlot(mat: number): number {
+  switch (mat) {
+    case MAT.GRASS: case MAT.DIRT: return 0;
+    case MAT.ROCK: case MAT.BUILT: return 1;
+    case MAT.SAND: case MAT.SEABED: return 2;
+    case MAT.SNOW: return 3;
+    case MAT.WOOD: return 4;
+    default: return -1;
+  }
+}
 
 // boot-time yield: setTimeout, not rAF — rAF never fires in a backgrounded tab and
 // would stall boot; timers keep it moving and the splash repaints whenever visible
@@ -87,8 +112,9 @@ async function boot(): Promise<void> {
   const chunkMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
   const farMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0, metalness: 0 });
 
-  // --- streaming ---
-  const streamer = new Streamer(geo, layers, columns, scene, chunkMaterial);
+  // --- trees + streaming (trees are meshed into chunks, so they stream/release together) ---
+  const trees = new Trees(geo, columns, terrain, SEED);
+  const streamer = new Streamer(geo, layers, columns, scene, chunkMaterial, trees);
 
   // --- far sphere (sliced build behind the splash) ---
   const coarse = new Goldberg(COARSE_M);
@@ -101,19 +127,37 @@ async function boot(): Promise<void> {
   // --- ocean ---
   splash('filling the oceans…', 0.52);
   await raf();
-  const water = (() => {
-    // indexed sphere so per-vertex shore sampling is cheap (~41k verts, not 245k)
-    const geom = mergeVertices(new THREE.IcosahedronGeometry(WATER_SURFACE, 6));
-    const posAttr = geom.getAttribute('position');
-    const shore = new Float32Array(posAttr.count);
-    for (let i = 0; i < posAttr.count; i++) {
-      const x = posAttr.getX(i), y = posAttr.getY(i), z = posAttr.getZ(i);
-      const l = Math.hypot(x, y, z);
-      const h = terrain.heightAt(x / l, y / l, z / l);
-      // 1 at the waterline, 0 by 22 m of depth (or over land, where terrain covers it anyway)
-      shore[i] = Math.max(0, Math.min(1, 1 + h / 22));
+  const water = await (async () => {
+    // geodesic order 7: ~7.8 m triangle edges, close to tile scale, so the depth tint and
+    // foam band resolve individual coastline hexes instead of smearing across 16 m tris
+    const sphere = buildGeodesic(7);
+    const n = sphere.dirs.length / 3;
+    const positions = new Float32Array(sphere.dirs.length);
+    const shore = new Float32Array(n);
+    const SLICE = 24576;
+    for (let start = 0; start < n; start += SLICE) {
+      const end = Math.min(n, start + SLICE);
+      for (let i = start; i < end; i++) {
+        const x = sphere.dirs[i * 3], y = sphere.dirs[i * 3 + 1], z = sphere.dirs[i * 3 + 2];
+        positions[i * 3] = x * WATER_SURFACE;
+        positions[i * 3 + 1] = y * WATER_SURFACE;
+        positions[i * 3 + 2] = z * WATER_SURFACE;
+        // sample the SAME stepped surface the mesher draws — quantized to the layer grid —
+        // so the waterline reads exactly against the rendered hex terraces
+        const h = terrain.heightAt(x, y, z);
+        const stepTop = layers.topRadius(layers.layerOfRadius(PLANET_RADIUS + h));
+        const depth = WATER_SURFACE - stepTop; // >0 means submerged terrain here
+        shore[i] = Math.max(0, Math.min(1, 1 - depth / 22));
+      }
+      splash(`filling the oceans… ${Math.round(end / n * 100)}%`, 0.5 + 0.04 * (end / n));
+      await raf();
     }
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geom.setAttribute('normal', new THREE.BufferAttribute(sphere.dirs, 3));
     geom.setAttribute('shore', new THREE.BufferAttribute(shore, 1));
+    geom.setIndex(new THREE.BufferAttribute(sphere.index, 1));
+    geom.computeBoundingSphere();
 
     const mat = new THREE.MeshStandardNodeMaterial();
     const viewDir = normalize(cameraPosition.sub(positionWorld));
@@ -121,19 +165,26 @@ async function boot(): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const shoreAttr = float(attribute('shore', 'float') as any);
 
-    // slow crossing swells: +-18 cm of radial breathing, wavelengths ~40 m
+    // slow crossing swells (~40 m) plus a short chop (~7 m): ±19 cm of radial breathing
     const p = positionLocal;
-    const wave = p.dot(vec3(0.131, 0.112, 0.123)).add(time.mul(0.6)).sin()
+    const swell = p.dot(vec3(0.131, 0.112, 0.123)).add(time.mul(0.6)).sin()
       .add(p.dot(vec3(-0.104, 0.141, -0.092)).add(time.mul(0.97)).sin())
-      .mul(0.09);
+      .mul(0.08);
+    const chop = p.dot(vec3(0.55, 0.48, 0.51)).add(time.mul(1.5)).sin().mul(0.035);
+    const wave = swell.add(chop);
     mat.positionNode = p.add(p.normalize().mul(wave));
+
+    // fine moving ripple, used to break up the specular highlight (zen sparkle)
+    const r1 = p.dot(vec3(1.31, 1.13, 1.27)).add(time.mul(2.1)).sin();
+    const r2 = p.dot(vec3(-1.17, 1.29, -1.07)).add(time.mul(1.55)).sin();
+    const ripple = r1.mul(r2).abs();
 
     const deep = color(0x0a2e52);
     const shallow = color(0x1d7a96);
     const foam = tslSmoothstep(float(0.86), float(0.99), shoreAttr.add(wave.mul(0.25)));
     mat.colorNode = mix(deep, shallow, shoreAttr.pow(1.7)).add(color(0xcfe8ee).mul(foam).mul(0.5));
     mat.opacityNode = float(0.82).add(fresnel.pow(2.0).mul(0.14)).sub(shoreAttr.pow(2.0).mul(0.28)).add(foam.mul(0.3)).min(0.96);
-    mat.roughnessNode = float(0.14).add(foam.mul(0.4));
+    mat.roughnessNode = float(0.09).add(ripple.mul(0.16)).add(foam.mul(0.4));
     mat.metalnessNode = float(0.02);
     mat.transparent = true;
     mat.depthWrite = false;
@@ -191,22 +242,36 @@ async function boot(): Promise<void> {
 
   // --- player + input + demos ---
   const player = new Player(geo, layers, columns);
-  // spawn on land near pentagon 0 (BFS outward until comfortable grass altitude)
+  // spawn on land near pentagon 0: BFS outward for comfortable grass altitude, preferring
+  // a clearing at the edge of a wood so the survival loop (chop -> craft) is in view
   const spawnTile = (() => {
     const seen = new Set<number>([0]);
     const queue = [0];
+    let fallback = -1;
     while (queue.length > 0) {
       const t = queue.shift()!;
       const h = columns.heightOf(t);
-      if (h > 4 && h < 30) return t;
+      if (h > 4 && h < 30) {
+        if (fallback < 0) fallback = t;
+        let near = 0;
+        const deg = geo.degreeOf(t);
+        outer: for (let k = 0; k < deg; k++) {
+          const nb = geo.neighbor(t, k);
+          const dn = geo.degreeOf(nb);
+          for (let q = 0; q < dn; q++) {
+            if (trees.hasTree(geo.neighbor(nb, q)) && ++near >= 2) break outer;
+          }
+        }
+        if (near >= 2 && !trees.hasTree(t)) return t;
+      }
       const deg = geo.degreeOf(t);
       for (let k = 0; k < deg; k++) {
         const n = geo.neighbor(t, k);
         if (!seen.has(n)) { seen.add(n); queue.push(n); }
       }
-      if (seen.size > 30000) break;
+      if (seen.size > 40000) break;
     }
-    return 0;
+    return fallback >= 0 ? fallback : 0;
   })();
   player.spawnAt(spawnTile);
   const input = new Input(renderer.domElement);
@@ -246,18 +311,29 @@ async function boot(): Promise<void> {
   streamer.residencyDirty = false;
 
   hideSplash();
-  hud.flash(`${isWebGPU ? 'WebGPU' : 'WebGL2 fallback'} · seed ${SEED} · GP(${M},0) · ${geo.count.toLocaleString()} tiles`, 8);
+  hud.flash(`${isWebGPU ? 'WebGPU' : 'WebGL2 fallback'} · seed ${SEED} · GP(${M},0) · ${geo.count.toLocaleString()} tiles
+chop trees, mine, build — ${PLANE_WOOD_COST} wood crafts a plane (E)`, 10);
 
   // --- camera state ---
   let zoomExp = 0;
   let zoomExpTarget = 0;
   let zoomHold = false;       // scripted zoom: ignore wheel until released
-  let glideAutoZoom = false;  // pulled back automatically for the glider
+  let planeAutoZoom = false;  // pulled back automatically when boarding the plane
   let camDist = 0;
+  let camObstruct = Infinity; // obstruction cap on the camera boom (smoothly regrows)
+  const camUp = new THREE.Vector3(0, 1, 0);
   const camWorld = { x: 0, y: 0, z: 0 };
 
-  // --- edit state ---
+  // --- inventory + edit state ---
+  const counts = SLOTS.map(() => 0);
+  let hotbarSel = 0;
+  let planeCrafted = params.get('plane') === '1';
+  if (params.get('creative') === '1') {
+    for (let i = 0; i < counts.length; i++) counts[i] = 999;
+    planeCrafted = true;
+  }
   let lastPick: PickResult | null = null;
+  let treePick: TreePick | null = null;
   let mineTimer = 0;
   let placeTimer = 0;
   let edits = 0;
@@ -277,8 +353,21 @@ async function boot(): Promise<void> {
   const playerReach = (): number => (player.mode === 'fly' ? 60 : 9.5);
 
   const tryMine = (): void => {
+    // a tree in front of the terrain hit gets chopped instead
+    if (treePick && (!lastPick || treePick.dist < lastPick.dist)) {
+      if (trees.chop(treePick.tile)) {
+        counts[WOOD_SLOT] += WOOD_PER_TREE;
+        hud.flash(`+${WOOD_PER_TREE} wood (${counts[WOOD_SLOT]})`, 2);
+        rebuildAround(treePick.tile);
+        treePick = null;
+      }
+      return;
+    }
     if (!lastPick) return;
+    const mat = columns.materialAt(lastPick.hitTile, lastPick.hitLayer);
     if (columns.mine(lastPick.hitTile, lastPick.hitLayer)) {
+      const slot = yieldSlot(mat);
+      if (slot >= 0) counts[slot]++;
       edits++;
       rebuildAround(lastPick.hitTile);
     }
@@ -291,7 +380,12 @@ async function boot(): Promise<void> {
       const headK = Math.max(0, layers.layerOfRadius(player.radius() + 1.75));
       if (lastPick.prevLayer >= headK && lastPick.prevLayer <= feetK) return;
     }
-    if (columns.place(lastPick.prevTile, lastPick.prevLayer)) {
+    if (counts[hotbarSel] <= 0) {
+      hud.flash(`out of ${SLOTS[hotbarSel].name} — mine some first (LMB)`, 2.5);
+      return;
+    }
+    if (columns.place(lastPick.prevTile, lastPick.prevLayer, SLOTS[hotbarSel].mat)) {
+      counts[hotbarSel]--;
       edits++;
       rebuildAround(lastPick.prevTile);
     }
@@ -303,7 +397,27 @@ async function boot(): Promise<void> {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  let fWas = false, gWas = false, oWas = false;
+  let fWas = false, gWas = false, oWas = false, eWas = false;
+
+  const handlePlaneKey = (): void => {
+    if (player.mode === 'plane') {
+      player.exitPlane();
+      hud.flash('plane stowed — falling!', 2.5);
+      return;
+    }
+    if (!planeCrafted) {
+      if (counts[WOOD_SLOT] >= PLANE_WOOD_COST) {
+        counts[WOOD_SLOT] -= PLANE_WOOD_COST;
+        planeCrafted = true;
+        if (player.enterPlane()) hud.flash('plane crafted! mouse steers · W/S throttle · shift boost · E stows', 8);
+      } else {
+        hud.flash(`a plane needs ${PLANE_WOOD_COST} wood — you have ${counts[WOOD_SLOT]}. chop trees (LMB)`, 4);
+      }
+      return;
+    }
+    if (player.enterPlane()) hud.flash('airborne — level flight holds your height over the terrain', 4);
+    else hud.flash("can't take off while swimming", 2.5);
+  };
 
   // --- debug/eval hooks ---
   const setZoom = (e: number | null): void => {
@@ -313,7 +427,7 @@ async function boot(): Promise<void> {
   };
 
   (window as any).__world = {
-    geo, layers, columns, streamer, player, metrics, terrain,
+    geo, layers, columns, streamer, player, metrics, terrain, trees, input,
     stats: () => ({
       backend: isWebGPU ? 'webgpu' : 'webgl2',
       topoMs: geo.buildMs,
@@ -323,7 +437,9 @@ async function boot(): Promise<void> {
       edits,
       zoom: camDist,
       agl: player.altitudeAGL(),
-      gliding: player.gliding,
+      mode: player.mode,
+      planeCrafted,
+      wood: counts[WOOD_SLOT],
       spawnTile,
     }),
     startTraversal: () => autopilot.toggle(player),
@@ -331,6 +447,17 @@ async function boot(): Promise<void> {
     setZoom,
     look: (yawRad: number, pitchRad: number) => { player.applyLook(yawRad / 0.0023, pitchRad / 0.0023); },
     setFly: (on: boolean) => { player.mode = on ? 'fly' : 'walk'; },
+    grantPlane: () => { planeCrafted = true; },
+    give: (slot: number, n: number) => { counts[slot] = (counts[slot] ?? 0) + n; },
+    debugPick: () => ({ lastPick, treePick }),
+    camInfo: () => {
+      const eye = player.eye();
+      return {
+        camDist,
+        effDist: Math.hypot(camWorld.x - eye[0], camWorld.y - eye[1], camWorld.z - eye[2]),
+        camR: Math.hypot(camWorld.x, camWorld.y, camWorld.z),
+      };
+    },
 
     /** scripted edit benchmark: dig a crater around the player and raise a small tower */
     editTest: () => {
@@ -418,78 +545,37 @@ async function boot(): Promise<void> {
       };
     },
 
-    /** teleport to a steep peak and glide toward the steepest descent, capturing frame metrics */
-    gliderTest: async () => {
-      // prefer a tall-but-unclamped peak so slopes actually fall away from the summit
-      let bestId = 0, bestScore = -1e9;
-      const c = geo.centers;
-      const hOf = (id: number): number => terrain.heightAt(c[id * 3], c[id * 3 + 1], c[id * 3 + 2]);
-      for (let id = 0; id < geo.count; id += 41) {
-        const h = hOf(id);
-        if (h < 60 || h > 112) continue;
-        // score by local drop over the 1-ring: tall AND steep
-        let minN = h;
-        const deg = geo.degreeOf(id);
-        for (let k = 0; k < deg; k++) minN = Math.min(minN, hOf(geo.neighbor(id, k)));
-        const score = h + (h - minN) * 12;
-        if (score > bestScore) { bestScore = score; bestId = id; }
-      }
-      const bestH = hOf(bestId);
-      player.mode = 'walk';
-      player.spawnAt(bestId);
-      // face the steepest downhill in the 2-ring
-      let lowId = bestId, lowH = bestH;
-      const deg0 = geo.degreeOf(bestId);
-      for (let k = 0; k < deg0; k++) {
-        const n = geo.neighbor(bestId, k);
-        const dn = geo.degreeOf(n);
-        for (let q = 0; q < dn; q++) {
-          const nn = geo.neighbor(n, q);
-          const h = hOf(nn);
-          if (h < lowH) { lowH = h; lowId = nn; }
-        }
-      }
-      {
-        const dx = c[lowId * 3] - c[bestId * 3], dy = c[lowId * 3 + 1] - c[bestId * 3 + 1], dz = c[lowId * 3 + 2] - c[bestId * 3 + 2];
-        const [ux0, uy0, uz0] = player.up();
-        const d = dx * ux0 + dy * uy0 + dz * uz0;
-        let fx = dx - d * ux0, fy = dy - d * uy0, fz = dz - d * uz0;
-        const fl = Math.hypot(fx, fy, fz) || 1;
-        player.fwdX = fx / fl; player.fwdY = fy / fl; player.fwdZ = fz / fl;
-      }
-      player.pitch = -0.12;
-      player.vx = 0; player.vy = 0; player.vz = 0;
-      setZoom(GLIDE_CAM_EXP * 1.35);
-      await new Promise((r) => setTimeout(r, 1500)); // let chunks stream in under the peak
+    /** board the plane and fly straight for a while, capturing frame metrics + terrain-follow behavior */
+    planeTest: async (seconds = 20, throttle = 70) => {
+      planeCrafted = true;
+      if (!player.enterPlane()) return { error: 'in water' };
+      player.throttle = throttle;
+      player.pitch = 0;
       const start = [player.px, player.py, player.pz];
-      // running jump off the edge, then hold the wing open
-      const [ux, uy, uz] = player.up();
-      player.vx = ux * 7.4 + player.fwdX * 11;
-      player.vy = uy * 7.4 + player.fwdY * 11;
-      player.vz = uz * 7.4 + player.fwdZ * 11;
-      player.grounded = false;
-      player.forceGlide = true;
-      metrics.begin('glide');
+      metrics.begin('plane');
       const t0 = performance.now();
-      let minAGL = Infinity, maxSpeed = 0;
-      while (performance.now() - t0 < 25000) {
+      let minAGL = Infinity, maxSpeed = 0, maxAGL = 0;
+      const aglTrace: number[] = [];
+      while (performance.now() - t0 < seconds * 1000) {
         await new Promise((r) => setTimeout(r, 250));
-        minAGL = Math.min(minAGL, player.altitudeAGL());
+        const agl = player.altitudeAGL();
+        aglTrace.push(Math.round(agl));
+        minAGL = Math.min(minAGL, agl);
+        maxAGL = Math.max(maxAGL, agl);
         maxSpeed = Math.max(maxSpeed, Math.hypot(player.vx, player.vy, player.vz));
-        if (player.grounded || player.submerged > 0) break;
+        if (player.mode !== 'plane') break; // stowed itself (ground/water/wall)
       }
-      player.forceGlide = false;
       const rep = metrics.end();
       const r1 = Math.hypot(...start), r2 = player.radius();
       const dot = (start[0] * player.px + start[1] * player.py + start[2] * player.pz) / (r1 * r2);
       const distance = Math.acos(Math.min(1, Math.max(-1, dot))) * (r1 + r2) / 2;
-      setZoom(null);
       return {
-        peakHeight: bestH,
-        glideDistanceM: Math.round(distance),
-        endedBy: player.grounded ? 'landed' : player.submerged > 0 ? 'water' : 'timer',
+        distanceM: Math.round(distance),
+        stillFlying: player.mode === 'plane',
         minAGL: Math.round(minAGL * 10) / 10,
+        maxAGL: Math.round(maxAGL * 10) / 10,
         maxSpeed: Math.round(maxSpeed * 10) / 10,
+        aglTrace,
         capture: rep,
       };
     },
@@ -511,11 +597,15 @@ async function boot(): Promise<void> {
     const drained = input.drain();
 
     // key edges
-    const fDown = input.down('KeyF'), gDown = input.down('KeyG'), oDown = input.down('KeyO');
+    const fDown = input.down('KeyF'), gDown = input.down('KeyG'), oDown = input.down('KeyO'), eDown = input.down('KeyE');
     if (fDown && !fWas && !autopilot.active) player.toggleFly();
     if (gDown && !gWas) { autopilot.toggle(player); hud.flash(autopilot.active ? 'autopilot: circumnavigating…' : 'autopilot off', 4); }
     if (oDown && !oWas) { orbitDemo.start(); hud.flash('orbit pull-back demo…', 4); }
-    fWas = fDown; gWas = gDown; oWas = oDown;
+    if (eDown && !eWas && !autopilot.active) handlePlaneKey();
+    fWas = fDown; gWas = gDown; oWas = oDown; eWas = eDown;
+    for (let i = 0; i < SLOTS.length; i++) {
+      if (input.down(`Digit${i + 1}`)) hotbarSel = i;
+    }
 
     // look + move
     if (input.active() && !autopilot.active) player.applyLook(drained.dx, drained.dy);
@@ -527,24 +617,25 @@ async function boot(): Promise<void> {
       const upDown = (input.down('Space') ? 1 : 0) + (input.down('ControlLeft') || input.down('KeyC') ? -1 : 0);
       player.update(dt, {
         forward: fwd, strafe,
-        upDown: player.mode === 'fly' ? upDown : 0,
+        upDown: player.mode !== 'walk' ? upDown : 0,
         sprint: input.down('ShiftLeft'),
         jump: input.down('Space'),
-        glideHeld: input.down('Space'),
+        swimUp: input.down('Space'),
       });
+      if (player.planeStowed) hud.flash(player.submerged > 0.2 ? 'splashdown — plane stowed' : 'touched down — plane stowed', 3);
     }
 
     // user wheel always takes priority over scripted/auto zoom
-    if (drained.wheelTouched) { zoomHold = false; glideAutoZoom = false; }
+    if (drained.wheelTouched) { zoomHold = false; planeAutoZoom = false; }
 
-    // glider auto camera: ease out to third person when the wing opens, back on landing
+    // plane auto camera: ease out to a chase view on boarding, back in on stowing
     if (!zoomHold) {
-      if (player.gliding && camDist < 5 && !glideAutoZoom) {
-        glideAutoZoom = true;
-        zoomExpTarget = GLIDE_CAM_EXP;
+      if (player.mode === 'plane' && camDist < 6 && !planeAutoZoom) {
+        planeAutoZoom = true;
+        zoomExpTarget = PLANE_CAM_EXP;
       }
-      if (glideAutoZoom && !player.gliding && player.grounded) {
-        glideAutoZoom = false;
+      if (planeAutoZoom && player.mode !== 'plane') {
+        planeAutoZoom = false;
         zoomExpTarget = 0;
       }
     }
@@ -557,8 +648,10 @@ async function boot(): Promise<void> {
     } else {
       zoomExpTarget = Math.max(0, Math.min(1, zoomExpTarget + drained.wheel * 0.00045));
       zoomExp += (zoomExpTarget - zoomExp) * Math.min(1, dt * 7);
+      if (zoomExpTarget === 0 && zoomExp < 0.004) zoomExp = 0; // settle exactly into first person
     }
-    camDist = zoomExp < 0.012 ? 0 : DIST_MIN * Math.pow(DIST_MAX / DIST_MIN, zoomExp);
+    // continuous distance: ramps smoothly from 0 (no first/third-person jump cut)
+    camDist = zoomExp <= 0 ? 0 : DIST_MIN * Math.pow(DIST_MAX / DIST_MIN, zoomExp) * smoothstep(0, 0.05, zoomExp);
 
     // --- camera (all f64 until the very end) ---
     const [ux, uy, uz] = player.up();
@@ -570,6 +663,7 @@ async function boot(): Promise<void> {
     let cwx: number, cwy: number, cwz: number;
     let tx: number, ty: number, tz: number;
     if (camDist === 0) {
+      camObstruct = Infinity;
       cwx = eye[0]; cwy = eye[1]; cwz = eye[2];
       tx = eye[0] + vfx; ty = eye[1] + vfy; tz = eye[2] + vfz;
     } else {
@@ -582,30 +676,52 @@ async function boot(): Promise<void> {
       let oz = -vfz * (1 - bb) + uz * (0.12 * (1 - bb) + bb);
       const ol = Math.hypot(ox, oy, oz) || 1;
       ox /= ol; oy /= ol; oz /= ol;
-      cwx = eye[0] + ox * camDist;
-      cwy = eye[1] + oy * camDist;
-      cwz = eye[2] + oz * camDist;
-      const cr = Math.hypot(cwx, cwy, cwz);
-      const camTile = geo.tileOf(cwx, cwy, cwz);
-      const camGround = layers.topRadius(columns.groundLayerBelow(camTile, cr));
-      const minR = camGround + 1.2;
-      if (cr < minR) {
-        const s = minR / cr;
-        cwx *= s; cwy *= s; cwz *= s;
+      // camera boom obstruction: cast eye -> camera against the column field and pull in
+      // ahead of the first hit (fast), then regrow gently — never teleports, never clips
+      if (camDist < 60) {
+        if (frameIdx % 2 === 1) {
+          const hit = pick(geo, layers, columns, eye[0], eye[1], eye[2], ox, oy, oz, camDist + 0.4);
+          const allowed = hit ? Math.max(0.6, hit.dist - 0.75) : camDist;
+          camObstruct = allowed < camObstruct ? allowed : Math.min(allowed, camObstruct + (allowed - camObstruct) * Math.min(1, dt * 8));
+        }
+      } else {
+        camObstruct = Infinity;
+      }
+      const dEff = Math.min(camDist, camObstruct);
+      cwx = eye[0] + ox * dEff;
+      cwy = eye[1] + oy * dEff;
+      cwz = eye[2] + oz * dEff;
+      if (camDist >= 60) {
+        // high up, the cheap radial floor is enough (terrain can't reach the boom)
+        const cr = Math.hypot(cwx, cwy, cwz);
+        const camTile = geo.tileOf(cwx, cwy, cwz);
+        const camGround = layers.topRadius(columns.groundLayerBelow(camTile, cr));
+        const minR = camGround + 1.2;
+        if (cr < minR) {
+          const s = minR / cr;
+          cwx *= s; cwy *= s; cwz *= s;
+        }
       }
       tx = eye[0] * (1 - blend); ty = eye[1] * (1 - blend); tz = eye[2] * (1 - blend);
     }
     camWorld.x = cwx; camWorld.y = cwy; camWorld.z = cwz;
     camera.position.set(0, 0, 0);
     {
-      // as the view goes overhead the radial up degenerates against the view axis;
-      // roll screen-up toward the player's heading so "up" is where you're facing
+      // as the view goes overhead the radial up degenerates against the view axis; roll
+      // screen-up toward the player's heading — rate-limited so fast mouse turns at mid
+      // zoom can't whip the horizon (this was the "camera snaps around" source)
       const blend = camDist === 0 ? 0 : smoothstep(140, 2600, camDist) * 0.95;
       let cux = ux * (1 - blend) + player.fwdX * blend;
       let cuy = uy * (1 - blend) + player.fwdY * blend;
       let cuz = uz * (1 - blend) + player.fwdZ * blend;
       const cul = Math.hypot(cux, cuy, cuz) || 1;
-      camera.up.set(cux / cul, cuy / cul, cuz / cul);
+      cux /= cul; cuy /= cul; cuz /= cul;
+      const k = Math.min(1, dt * (camDist === 0 ? 30 : 7));
+      camUp.x += (cux - camUp.x) * k;
+      camUp.y += (cuy - camUp.y) * k;
+      camUp.z += (cuz - camUp.z) * k;
+      camUp.normalize();
+      camera.up.copy(camUp);
     }
     camera.lookAt(tx - cwx, ty - cwy, tz - cwz);
     const wantNear = Math.min(60, Math.max(0.09, camDist * 0.02));
@@ -637,7 +753,7 @@ async function boot(): Promise<void> {
     atmo.position.set(-camWorld.x, -camWorld.y, -camWorld.z);
     sun.position.set(SUN.x * 11000 - camWorld.x, SUN.y * 11000 - camWorld.y, SUN.z * 11000 - camWorld.z);
     sunTarget.position.set(-camWorld.x, -camWorld.y, -camWorld.z);
-    character.update(player, camWorld, camDist);
+    character.update(player, camWorld, camDist, dt);
 
     // --- picking + edits ---
     if (input.active() && camDist < 120 && frameIdx % 2 === 0) {
@@ -655,16 +771,20 @@ async function boot(): Promise<void> {
       } else {
         lastPick = null;
       }
+      // trees are pickable in front of (or instead of) terrain
+      treePick = pickTree(geo, layers, columns, trees, camWorld.x, camWorld.y, camWorld.z, dirx / dl, diry / dl, dirz / dl, reach + camDist);
     }
-    if (!input.active() || camDist >= 120) lastPick = null;
+    if (!input.active() || camDist >= 120) { lastPick = null; treePick = null; }
 
-    if (lastPick) {
+    const hlTree = treePick && (!lastPick || treePick.dist < lastPick.dist);
+    const hlTile = hlTree ? treePick!.tile : lastPick ? lastPick.hitTile : -1;
+    if (hlTile >= 0) {
       highlight.visible = true;
-      const deg = geo.degreeOf(lastPick.hitTile);
-      const r = layers.topRadius(lastPick.hitLayer) + 0.03;
+      const deg = geo.degreeOf(hlTile);
+      const r = (hlTree ? layers.topRadius(columns.topLayerOf(hlTile)) : layers.topRadius(lastPick!.hitLayer)) + 0.03;
       const corner = new Float64Array(3);
       for (let k = 0; k < deg; k++) {
-        geo.cornerUnit(lastPick.hitTile, k, corner);
+        geo.cornerUnit(hlTile, k, corner);
         highlightPos.setXYZ(k, corner[0] * r - camWorld.x, corner[1] * r - camWorld.y, corner[2] * r - camWorld.z);
       }
       for (let k = deg; k < 7; k++) {
@@ -679,7 +799,7 @@ async function boot(): Promise<void> {
     }
 
     mineTimer -= dt; placeTimer -= dt;
-    if ((drained.mine || (input.mineHeld && mineTimer <= 0)) && lastPick) { tryMine(); mineTimer = 0.17; }
+    if ((drained.mine || (input.mineHeld && mineTimer <= 0)) && (lastPick || treePick)) { tryMine(); mineTimer = 0.17; }
     if ((drained.place || (input.placeHeld && placeTimer <= 0)) && lastPick) { tryPlace(); placeTimer = 0.17; }
 
     // --- hud + metrics ---
@@ -692,20 +812,23 @@ async function boot(): Promise<void> {
       const agl = player.altitudeAGL();
       const speed = Math.hypot(player.vx, player.vy, player.vz);
       const modeLabel = autopilot.active ? 'autopilot'
-        : player.gliding ? 'GLIDING'
+        : player.mode === 'plane' ? 'PLANE'
         : player.submerged > 0.4 ? 'swimming'
         : player.mode;
       hud.setStats([
         `${isWebGPU ? 'WebGPU' : 'WebGL2'}  ${metrics.fpsEma.toFixed(0)} fps  ${metrics.frameMsEma.toFixed(1)} ms`,
         `mode ${modeLabel}${player.grounded ? ' (grounded)' : ''}  speed ${speed.toFixed(1)} m/s`,
+        player.mode === 'plane' ? `throttle ${player.throttle.toFixed(0)} m/s  holding ${player.holdAGL.toFixed(0)} m over terrain` : '',
         `alt ${agl.toFixed(1)} m AGL  h ${(player.radius() - PLANET_RADIUS).toFixed(1)} m  zoom ${camDist.toFixed(0)} m`,
         `tile ${player.tile}${geo.degreeOf(player.tile) === 5 ? ' *pentagon*' : ''}  seed ${SEED}`,
         `chunks ${s.resident} resident / ${s.queued} queued  ${(s.triangles / 1000).toFixed(0)}k tris`,
         `columns ${columns.generatedCount.toLocaleString()} / ${geo.count.toLocaleString()} generated  edits ${edits}`,
+        !planeCrafted ? `craft a plane: chop ${PLANE_WOOD_COST} wood, then press E (${counts[WOOD_SLOT]}/${PLANE_WOOD_COST})` : '',
         lastEditMs > 0 ? `last edit rebuild ${lastEditMs.toFixed(1)} ms` : '',
         input.lockUnavailable && !input.locked ? 'pointer lock unavailable here: DRAG to look' : '',
         metrics.active() ? `● capturing: ${metrics.active()}` : '',
       ].filter((l) => l !== ''));
+      hud.setHotbar(SLOTS.map((sl, i) => ({ name: sl.name, css: sl.css, count: counts[i] })), hotbarSel);
     }
 
     renderer.render(scene, camera);

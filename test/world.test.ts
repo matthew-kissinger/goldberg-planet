@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { Goldberg } from '../src/geo/goldberg';
 import { buildLayers, PLANET_RADIUS, BUILD_CEILING, CELL_H } from '../src/world/layers';
-import { Terrain } from '../src/world/terrain';
+import { Terrain, MAT } from '../src/world/terrain';
 import { Columns } from '../src/world/columns';
+import { Trees } from '../src/world/trees';
 import { enumerateChunks } from '../src/world/chunks';
 import { buildChunkMesh } from '../src/render/mesher';
 
@@ -138,6 +139,36 @@ describe('columns', () => {
     expect(cols.ceilingLayerAbove(id, rInPit)).toBe(top);
   });
 
+  it('placed cells remember their material, mine clears it, and replay regenerates it', () => {
+    const cols = fresh();
+    const id = 640;
+    const top = cols.topLayerOf(id);
+    expect(cols.place(id, top - 1, MAT.WOOD)).toBe(true);
+    expect(cols.materialAt(id, top - 1)).toBe(MAT.WOOD);
+    expect(cols.place(id, top - 2, MAT.SNOW)).toBe(true);
+    expect(cols.materialAt(id, top - 2)).toBe(MAT.SNOW);
+    expect(cols.place(id, top - 3)).toBe(true); // legacy default
+    expect(cols.materialAt(id, top - 3)).toBe(MAT.BUILT);
+    // mine clears the stored material; a new placement overwrites it
+    expect(cols.mine(id, top - 1)).toBe(true);
+    expect(cols.place(id, top - 1, MAT.DIRT)).toBe(true);
+    expect(cols.materialAt(id, top - 1)).toBe(MAT.DIRT);
+    // identical replay on a regenerated world reads back identically (persistence)
+    const cols2 = fresh();
+    cols2.place(id, top - 1, MAT.WOOD);
+    cols2.place(id, top - 2, MAT.SNOW);
+    cols2.place(id, top - 3);
+    cols2.mine(id, top - 1);
+    cols2.place(id, top - 1, MAT.DIRT);
+    expect(cols2.materialAt(id, top - 1)).toBe(MAT.DIRT);
+    expect(cols2.materialAt(id, top - 2)).toBe(MAT.SNOW);
+    expect(cols2.materialAt(id, top - 3)).toBe(MAT.BUILT);
+    // still sparse: one edited tile, mask words + one byte per layer
+    const s = cols.storageBytes();
+    expect(s.editedTiles).toBe(1);
+    expect(s.editBytes).toBeLessThanOrEqual(64 + layers.L + 32);
+  });
+
   it('storage is sparse: only edited tiles cost mask bytes, index scales with tile count', () => {
     const cols = fresh();
     for (let id = 500; id < 520; id++) cols.mine(id, cols.topLayerOf(id));
@@ -208,7 +239,7 @@ describe('chunks + mesher', () => {
       const top = cols.topLayerOf(victim);
       cols.mine(victim, top);
       cols.mine(victim, top + 2); // tunnel with a roof
-      cols.place(victim, top - 3); // floating block above
+      cols.place(victim, top - 3, MAT.WOOD); // floating wood block above
     };
     const colsA = new Columns(g, layers, new Terrain('persist'));
     ops(colsA);
@@ -225,6 +256,48 @@ describe('chunks + mesher', () => {
     expect(colsB.solidAt(victim, top + 1)).toBe(true);
     expect(colsB.solidAt(victim, top + 2)).toBe(false);
     expect(colsB.solidAt(victim, top - 3)).toBe(true);
+  });
+
+  it('trees are deterministic, mesh into chunks, chop out, and edits fell them', () => {
+    const terrain = new Terrain('woods');
+    const colsA = new Columns(g, layers, terrain);
+    const colsB = new Columns(g, layers, new Terrain('woods'));
+    const treesA = new Trees(g, colsA, terrain, 'woods');
+    const treesB = new Trees(g, colsB, new Terrain('woods'), 'woods');
+    const treeTiles: number[] = [];
+    for (let id = 0; id < g.count; id++) {
+      expect(treesA.hasTree(id)).toBe(treesB.hasTree(id)); // same seed, same forests
+      if (treesA.hasTree(id)) treeTiles.push(id);
+    }
+    // eslint-disable-next-line no-console
+    console.log(`trees on GP(${g.m},0) seed 'woods': ${treeTiles.length} / ${g.count} tiles`);
+    expect(treeTiles.length).toBeGreaterThan(0);
+
+    // a chunk containing a tree gains geometry; chopping removes exactly that tree
+    const chunks = enumerateChunks(g);
+    const treeTile = treeTiles[0];
+    const chunk = [...chunks.values()].find((c) => [...c.tiles].includes(treeTile))!;
+    const withTree = buildChunkMesh(chunk, g, layers, colsA, treesA)!;
+    const bare = buildChunkMesh(chunk, g, layers, colsA)!;
+    expect(withTree.triangles).toBeGreaterThan(bare.triangles);
+    expect(treesA.chop(treeTile)).toBe(true);
+    expect(treesA.chop(treeTile)).toBe(false); // already gone
+    const chopped = buildChunkMesh(chunk, g, layers, colsA, treesA)!;
+    expect(chopped.triangles).toBeLessThan(withTree.triangles);
+
+    // regenerated world + replayed chop set -> byte-identical mesh (persistence)
+    treesB.chop(treeTile);
+    const regen = buildChunkMesh(chunk, g, layers, colsB, treesB)!;
+    expect(regen.positions).toEqual(chopped.positions);
+    expect(regen.colors).toEqual(chopped.colors);
+
+    // editing a column fells its tree (no floating trunks over mined ground)
+    if (treeTiles.length > 1) {
+      const second = treeTiles[1];
+      colsA.mine(second, colsA.topLayerOf(second));
+      expect(treesA.hasTree(second)).toBe(false);
+      expect(treesB.hasTree(second)).toBe(true); // untouched world keeps it
+    }
   });
 
   it('mining a tile changes only geometry near that tile', () => {

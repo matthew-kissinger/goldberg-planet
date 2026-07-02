@@ -30,6 +30,23 @@
     }
     #splash .bar { width: 260px; height: 3px; background: #1a2230; }
     #splash .bar > div { height: 100%; width: 0%; background: #5b8fd6; transition: width 0.2s; }
+    #hotbar {
+      bottom: 10px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 5px;
+    }
+    #hotbar .slot {
+      width: 52px; height: 52px; position: relative; border-radius: 5px;
+      background: rgba(10, 14, 22, 0.55); border: 1.5px solid rgba(150, 165, 185, 0.35);
+      box-sizing: border-box;
+    }
+    #hotbar .slot.sel { border-color: #e8eef6; background: rgba(28, 36, 52, 0.7); }
+    #hotbar .swatch {
+      position: absolute; inset: 9px 9px 13px 9px; border-radius: 3px;
+      box-shadow: inset -2px -3px 0 rgba(0,0,0,0.25), inset 2px 2px 0 rgba(255,255,255,0.18);
+    }
+    #hotbar .key { position: absolute; top: 1px; left: 4px; font-size: 9px; color: #93a3b8; }
+    #hotbar .count { position: absolute; bottom: 1px; right: 4px; font-size: 11px; color: #eef3fa; }
+    #hotbar .name { position: absolute; bottom: 1px; left: 4px; font-size: 8px; color: #7e8ea3; }
   </style>
 </head>
 <body>
@@ -38,12 +55,14 @@
   <div id="stats" class="hud"></div>
   <div id="msg" class="hud"></div>
   <div id="crosshair" class="hud"></div>
-  <div id="help" class="hud">click     lock mouse (or drag to look) | WASD move
-space     jump - HOLD in air to GLIDE | swim up in water
-F         creative fly (space/ctrl up/down, shift boost)
+  <div id="hotbar" class="hud"></div>
+  <div id="help" class="hud">click     lock mouse (or drag to look) | WASD move | shift sprint
+space     jump | swim up in water
+LMB       mine / chop trees   RMB: build selected block (1-5)
+E         plane: craft with 12 wood, then board / stow anytime
+W/S       plane throttle | look up/down to climb and dive
 wheel     zoom: first person to whole-planet orbit and back
-LMB mine  | RMB build
-G         autopilot circumnavigation | O orbit pull-back demo</div>
+F         creative fly | G autopilot lap | O orbit demo</div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

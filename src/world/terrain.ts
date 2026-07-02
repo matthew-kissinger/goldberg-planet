@@ -14,7 +14,7 @@ import { createNoise3D, type NoiseFunction3D } from 'simplex-noise';
 import { hashString, mulberry32 } from '../util/prng';
 
 export const MAT = {
-  GRASS: 0, DIRT: 1, ROCK: 2, SAND: 3, SNOW: 4, BEDROCK: 5, BUILT: 6, SEABED: 7,
+  GRASS: 0, DIRT: 1, ROCK: 2, SAND: 3, SNOW: 4, BEDROCK: 5, BUILT: 6, SEABED: 7, WOOD: 8,
 } as const;
 export type MaterialId = (typeof MAT)[keyof typeof MAT];
 
@@ -79,6 +79,15 @@ export class Terrain {
     if (h < HEIGHT_MIN) h = HEIGHT_MIN;
     if (h > HEIGHT_MAX) h = HEIGHT_MAX;
     return h;
+  }
+
+  /**
+   * Forest density field in [0,1]: medium-frequency clusters so trees come in woods and
+   * glades rather than a uniform sprinkle. Same determinism contract as heightAt.
+   */
+  forestAt(x: number, y: number, z: number): number {
+    const f = this.fbm(this.n2, x * 4.3 - 17.1, y * 4.3 + 9.4, z * 4.3 + 3.2, 3);
+    return sm01((f + 0.05) / 0.55);
   }
 
   /** surface material for a column whose surface height is h meters (relative to sea level). */

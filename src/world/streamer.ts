@@ -13,6 +13,7 @@ import * as THREE from 'three/webgpu';
 import type { Goldberg } from '../geo/goldberg';
 import type { Layers } from './layers';
 import type { Columns } from './columns';
+import type { Trees } from './trees';
 import { enumerateChunks, type ChunkInfo } from './chunks';
 import { buildChunkMesh } from '../render/mesher';
 import { PLANET_RADIUS } from './layers';
@@ -55,6 +56,7 @@ export class Streamer {
     private readonly columns: Columns,
     private readonly scene: THREE.Scene,
     private readonly material: THREE.Material,
+    private readonly trees?: Trees,
   ) {
     this.all = enumerateChunks(geo);
     this.list = [...this.all.values()];
@@ -123,7 +125,7 @@ export class Streamer {
 
   buildChunk(info: ChunkInfo): void {
     const t0 = performance.now();
-    const data = buildChunkMesh(info, this.geo, this.layers, this.columns);
+    const data = buildChunkMesh(info, this.geo, this.layers, this.columns, this.trees);
     let mesh: THREE.Mesh | null = null;
     if (data) {
       const geom = new THREE.BufferGeometry();

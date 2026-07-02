@@ -9,9 +9,11 @@
  *
  * Movement states:
  *  - walk: gravity toward the core, jump with space
- *  - glide: hold space while airborne — an arcade wing. Nose down trades altitude for
- *    speed, flare bleeds speed for lift, velocity chases the view direction so mouse
- *    carving banks smoothly. Stows on landing, on release, or on water contact.
+ *  - plane: a small aircraft (E to board/stow). Heading follows the mouse; W/S set the
+ *    throttle. Flying level *holds altitude above the ground*, not above sea level — the
+ *    plane contours over hills and valleys, sampling the column field ahead so rising
+ *    terrain lifts it early. Pitching the view (or Space/Ctrl) climbs and descends.
+ *    Touching ground, water, or a wall stows the plane.
  *  - swim: buoyancy floats the player at the surface of the sea
  *  - fly: creative free-flight (F), kept for inspection/debugging
  */
@@ -21,7 +23,7 @@ import type { Layers } from '../world/layers';
 import type { Goldberg } from '../geo/goldberg';
 import { WATER_SURFACE } from '../world/layers';
 
-export type MoveMode = 'walk' | 'fly';
+export type MoveMode = 'walk' | 'fly' | 'plane';
 
 const EYE_HEIGHT = 1.65;
 const BODY_HEIGHT = 1.8;
@@ -35,12 +37,18 @@ const FLY_DRAG = 2.1;
 const FLY_BOOST = 3.2;
 const MAX_FALL = 55;
 
-// glider tuning: trim glide ratio ~9:1, dive to 42 m/s, mushy stall under 11 m/s
-const GLIDE_TRIM = 15;
-const GLIDE_MIN = 7;
-const GLIDE_MAX = 42;
-const GLIDE_SINK = 1.6;
-const GLIDE_STEER = 4.5;
+// plane tuning: throttle 16..88 m/s (shift boosts 1.4x), gentle velocity chase for
+// smooth carving, terrain-follow spring with a 1.5 s ground lookahead
+export const PLANE_MIN = 16;
+export const PLANE_MAX = 88;
+const PLANE_START = 42;
+const PLANE_THROTTLE_RATE = 24;
+const PLANE_CHASE = 1.6;
+const PLANE_STEER = 2.6;
+const PLANE_BOOST = 1.4;
+const PLANE_LOOKAHEAD_S = 1.5;
+const PLANE_AGL_MIN = 6;
+const PLANE_AGL_MAX = 1500;
 
 export interface PlayerInput {
   forward: number;
@@ -48,7 +56,7 @@ export interface PlayerInput {
   upDown: number;
   sprint: boolean;
   jump: boolean;
-  glideHeld: boolean;
+  swimUp: boolean;
 }
 
 export class Player {
@@ -59,12 +67,15 @@ export class Player {
   pitch = 0;
   mode: MoveMode = 'walk';
   grounded = false;
-  gliding = false;
   submerged = 0;                   // meters of body below the water surface
-  glideSpeed = GLIDE_TRIM;
   bank = 0;                        // smoothed roll for the character model
-  forceGlide = false;              // demo hook: behave as if space is held
   tile = 0;
+  // plane state
+  planeSpeed = 0;
+  throttle = PLANE_START;
+  holdAGL = 30;                    // terrain-follow altitude the plane maintains when level
+  /** set for one frame when the plane stows itself (ground/water/wall contact) */
+  planeStowed = false;
 
   constructor(
     private readonly geo: Goldberg,
@@ -136,8 +147,7 @@ export class Player {
   }
 
   toggleFly(): void {
-    this.mode = this.mode === 'walk' ? 'fly' : 'walk';
-    this.gliding = false;
+    this.mode = this.mode === 'fly' ? 'walk' : 'fly';
     if (this.mode === 'fly') {
       const [ux, uy, uz] = this.up();
       this.vx += ux * 3; this.vy += uy * 3; this.vz += uz * 3;
@@ -145,47 +155,86 @@ export class Player {
     }
   }
 
+  /** board the plane: hop into the air and spool up. Returns false if swimming. */
+  enterPlane(): boolean {
+    if (this.submerged > 0.3) return false;
+    this.mode = 'plane';
+    this.grounded = false;
+    this.pitch = Math.max(-0.25, Math.min(0.45, this.pitch));
+    const [ux, uy, uz] = this.up();
+    const v = Math.hypot(this.vx, this.vy, this.vz);
+    this.planeSpeed = Math.max(v, PLANE_MIN + 6);
+    this.throttle = Math.max(this.throttle, PLANE_START);
+    this.holdAGL = Math.max(PLANE_AGL_MIN + 8, Math.min(120, this.altitudeAGL() + 10));
+    // gentle hop so takeoff from flat ground clears the terrain-follow floor
+    this.vx = this.fwdX * this.planeSpeed * 0.6 + ux * 6;
+    this.vy = this.fwdY * this.planeSpeed * 0.6 + uy * 6;
+    this.vz = this.fwdZ * this.planeSpeed * 0.6 + uz * 6;
+    return true;
+  }
+
+  /** stow the plane (E again, or automatic on contact) */
+  exitPlane(): void {
+    if (this.mode === 'plane') this.mode = 'walk';
+  }
+
+  /** column-top surface radius (terrain + edits) under a unit direction */
+  private surfaceRadiusAt(dx: number, dy: number, dz: number): number {
+    const tile = this.geo.tileOf(dx, dy, dz);
+    return this.layers.topRadius(this.columns.groundLayerBelow(tile, this.layers.bounds[0]));
+  }
+
   update(dt: number, input: PlayerInput): void {
     const [ux, uy, uz] = this.up();
     this.reorthonormalize();
     const fx = this.fwdX, fy = this.fwdY, fz = this.fwdZ;
     const rx = fy * uz - fz * uy, ry = fz * ux - fx * uz, rz = fx * uy - fy * ux;
-    const glideHeld = input.glideHeld || this.forceGlide;
     const r0 = this.radius();
     this.submerged = Math.max(0, WATER_SURFACE - r0);
     const prevFwdX = fx, prevFwdY = fy, prevFwdZ = fz;
+    this.planeStowed = false;
 
-    // --- glider state transitions ---
-    if (this.mode === 'walk') {
-      const canGlide = !this.grounded && glideHeld && this.submerged <= 0 && this.altitudeAGL() > 1.2;
-      if (!this.gliding && canGlide) {
-        this.gliding = true;
-        // carry momentum into the wing
-        this.glideSpeed = Math.max(GLIDE_TRIM * 0.7, Math.min(GLIDE_MAX, Math.hypot(this.vx, this.vy, this.vz)));
-      }
-      if (this.gliding && (!glideHeld || this.grounded || this.submerged > 0)) {
-        this.gliding = false;
-      }
-    } else {
-      this.gliding = false;
-    }
+    if (this.mode === 'plane') {
+      // --- plane: mouse steers, throttle sets speed, level flight holds height-over-ground ---
+      this.throttle += input.forward * PLANE_THROTTLE_RATE * dt;
+      this.throttle = Math.max(PLANE_MIN, Math.min(PLANE_MAX, this.throttle));
+      const targetSpeed = this.throttle * (input.sprint ? PLANE_BOOST : 1);
+      this.planeSpeed += (targetSpeed - this.planeSpeed) * Math.min(1, PLANE_CHASE * dt);
 
-    if (this.mode === 'walk' && this.gliding) {
-      // --- glide: velocity chases the pitched view direction ---
-      const gp = Math.max(-1.0, Math.min(1.0, this.pitch));
-      const cosP = Math.cos(gp), sinP = Math.sin(gp);
-      const vfx = fx * cosP + ux * sinP, vfy = fy * cosP + uy * sinP, vfz = fz * cosP + uz * sinP;
-      const noseDown = -(vfx * ux + vfy * uy + vfz * uz); // >0 diving
-      this.glideSpeed += (noseDown * GRAVITY * 1.35 - (this.glideSpeed - GLIDE_TRIM) * 0.5) * dt;
-      this.glideSpeed = Math.max(GLIDE_MIN, Math.min(GLIDE_MAX, this.glideSpeed));
-      const sink = GLIDE_SINK + Math.max(0, 11 - this.glideSpeed) * 0.6;
-      const tx = vfx * this.glideSpeed - ux * sink;
-      const ty = vfy * this.glideSpeed - uy * sink;
-      const tz = vfz * this.glideSpeed - uz * sink;
-      const blend = Math.min(1, GLIDE_STEER * dt);
-      this.vx += (tx - this.vx) * blend;
-      this.vy += (ty - this.vy) * blend;
-      this.vz += (tz - this.vz) * blend;
+      // climb command: view pitch (deadzone so "looking around level" doesn't drift),
+      // plus Space/Ctrl as a keyboard alternative — adjusts the held ground clearance
+      let climb = Math.sin(this.pitch);
+      climb = Math.abs(climb) < 0.055 ? 0 : climb - Math.sign(climb) * 0.055;
+      climb += input.upDown * 0.5;
+      this.holdAGL += climb * this.planeSpeed * 1.15 * dt;
+      this.holdAGL = Math.max(PLANE_AGL_MIN, Math.min(PLANE_AGL_MAX, this.holdAGL));
+
+      // terrain follow: ground under us and ahead of us (columns, so builds count too)
+      const gHere = this.surfaceRadiusAt(ux, uy, uz);
+      let vtx = this.vx - (this.vx * ux + this.vy * uy + this.vz * uz) * ux;
+      let vty = this.vy - (this.vx * ux + this.vy * uy + this.vz * uz) * uy;
+      let vtz = this.vz - (this.vx * ux + this.vy * uy + this.vz * uz) * uz;
+      const vtl = Math.hypot(vtx, vty, vtz);
+      let gAhead = gHere;
+      if (vtl > 1) {
+        const lx = this.px + (vtx / vtl) * vtl * PLANE_LOOKAHEAD_S;
+        const ly = this.py + (vty / vtl) * vtl * PLANE_LOOKAHEAD_S;
+        const lz = this.pz + (vtz / vtl) * vtl * PLANE_LOOKAHEAD_S;
+        const ll = Math.hypot(lx, ly, lz) || 1;
+        gAhead = this.surfaceRadiusAt(lx / ll, ly / ll, lz / ll);
+      }
+      const floor = Math.max(gHere, gAhead, WATER_SURFACE);
+      const targetR = floor + this.holdAGL;
+      let vr = this.vx * ux + this.vy * uy + this.vz * uz;
+      const vrTarget = Math.max(-0.6 * this.planeSpeed, Math.min(0.8 * this.planeSpeed, (targetR - r0) * 1.1));
+      vr += (vrTarget - vr) * Math.min(1, 2.8 * dt);
+
+      // tangent velocity chases the transported heading
+      const blend = Math.min(1, PLANE_STEER * dt);
+      vtx += (fx * this.planeSpeed - vtx) * blend;
+      vty += (fy * this.planeSpeed - vty) * blend;
+      vtz += (fz * this.planeSpeed - vtz) * blend;
+      this.vx = vtx + vr * ux; this.vy = vty + vr * uy; this.vz = vtz + vr * uz;
     } else if (this.mode === 'walk') {
       const speed = (input.sprint ? SPRINT_SPEED : WALK_SPEED) * (this.submerged > 0.6 ? 0.5 : 1);
       const wx = (fx * input.forward + rx * input.strafe);
@@ -207,7 +256,7 @@ export class Player {
       if (this.submerged > 0) {
         const push = Math.min(this.submerged, 5);
         vr += (push * 10 - vr * 3) * dt;
-        if (glideHeld) vr += 7 * dt;
+        if (input.swimUp) vr += 7 * dt;
         tx2 *= Math.exp(-0.9 * dt); ty2 *= Math.exp(-0.9 * dt); tz2 *= Math.exp(-0.9 * dt);
       }
       this.vx = tx2 + vr * ux; this.vy = ty2 + vr * uy; this.vz = tz2 + vr * uz;
@@ -242,7 +291,7 @@ export class Player {
       const vr = this.vx * ux + this.vy * uy + this.vz * uz;
       this.px += ux * vr * dt; this.py += uy * vr * dt; this.pz += uz * vr * dt;
       this.vx = ux * vr; this.vy = uy * vr; this.vz = uz * vr;
-      this.gliding = false; // wing folds on impact
+      if (this.mode === 'plane') { this.exitPlane(); this.planeStowed = true; } // wall: stow
     } else {
       this.px = nx; this.py = ny; this.pz = nz;
       this.tile = newTile;
@@ -262,10 +311,16 @@ export class Player {
           this.vx -= vr * nux; this.vy -= vr * nuy; this.vz -= vr * nuz;
         }
         this.grounded = true;
-        this.gliding = false;
+        if (this.mode === 'plane') { this.exitPlane(); this.planeStowed = true; } // touched down
       }
     } else if (r - groundR > 0.06) {
       this.grounded = false;
+    }
+
+    // water contact stows the plane too
+    if (this.mode === 'plane' && this.submerged > 0.25) {
+      this.exitPlane();
+      this.planeStowed = true;
     }
 
     // head bump
@@ -294,7 +349,7 @@ export class Player {
     const turn = (prevFwdX * this.fwdY - prevFwdY * this.fwdX) * nuz
       + (prevFwdY * this.fwdZ - prevFwdZ * this.fwdY) * nux
       + (prevFwdZ * this.fwdX - prevFwdX * this.fwdZ) * nuy;
-    const targetBank = this.gliding ? Math.max(-0.7, Math.min(0.7, (turn / Math.max(dt, 1e-4)) * 0.35)) : 0;
-    this.bank += (targetBank - this.bank) * Math.min(1, 6 * dt);
+    const targetBank = this.mode === 'plane' ? Math.max(-0.85, Math.min(0.85, (turn / Math.max(dt, 1e-4)) * 0.5)) : 0;
+    this.bank += (targetBank - this.bank) * Math.min(1, 4.5 * dt);
   }
 }
