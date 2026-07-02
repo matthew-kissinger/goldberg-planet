@@ -339,13 +339,19 @@ chop trees, mine, build — ${PLANE_WOOD_COST} wood crafts a plane (E)`, 10);
   let edits = 0;
   let lastEditMs = 0;
 
+  // border-neighbor chunks only change seam walls, so they rebuild one per frame
+  // instead of stacking onto the edit frame (their lag is 7-20 ms — invisible)
+  const pendingRebuilds: number[] = [];
   const rebuildAround = (tileId: number): void => {
     const t0 = performance.now();
-    const keys = new Set<number>([chunkKeyOfTile(geo, tileId)]);
+    const primary = chunkKeyOfTile(geo, tileId);
+    if (streamer.resident.has(primary)) streamer.rebuildNow(primary);
     const deg = geo.degreeOf(tileId);
-    for (let k = 0; k < deg; k++) keys.add(chunkKeyOfTile(geo, geo.neighbor(tileId, k)));
-    for (const key of keys) {
-      if (streamer.resident.has(key)) streamer.rebuildNow(key);
+    for (let k = 0; k < deg; k++) {
+      const key = chunkKeyOfTile(geo, geo.neighbor(tileId, k));
+      if (key !== primary && streamer.resident.has(key) && !pendingRebuilds.includes(key)) {
+        pendingRebuilds.push(key);
+      }
     }
     lastEditMs = performance.now() - t0;
   };
@@ -545,6 +551,29 @@ chop trees, mine, build — ${PLANE_WOOD_COST} wood crafts a plane (E)`, 10);
       };
     },
 
+    /** paced dig benchmark: mine a wandering line of tiles at hold-LMB cadence, capture frames */
+    digTest: async (count = 14, periodMs = 190) => {
+      let t = player.tile;
+      const targets: number[] = [];
+      for (let i = 0; i < count; i++) {
+        t = geo.neighbor(t, i % geo.degreeOf(t));
+        targets.push(t);
+      }
+      metrics.begin('dig');
+      let mined = 0;
+      for (const id of targets) {
+        const top = columns.groundLayerBelow(id, layers.bounds[0]);
+        if (columns.mine(id, top)) {
+          mined++;
+          edits++;
+          rebuildAround(id);
+        }
+        await new Promise((r) => setTimeout(r, periodMs));
+      }
+      await new Promise((r) => setTimeout(r, 400)); // let deferred seam rebuilds drain
+      return { mined, capture: metrics.end() };
+    },
+
     /** board the plane and fly straight for a while, capturing frame metrics + terrain-follow behavior */
     planeTest: async (seconds = 20, throttle = 70) => {
       planeCrafted = true;
@@ -738,9 +767,14 @@ chop trees, mine, build — ${PLANE_WOOD_COST} wood crafts a plane (E)`, 10);
       streamer.refreshDesired(ux, uy, uz, agl);
     }
     const builtThisFrame = streamer.pump();
+    // deferred seam-neighbor rebuilds from edits: one per frame
+    if (pendingRebuilds.length > 0) {
+      const key = pendingRebuilds.shift()!;
+      if (streamer.resident.has(key)) streamer.rebuildNow(key);
+    }
     // far-sphere refilter is a 184k-tri scan + index re-upload: keep it off build frames
     // and cap it at 4 Hz — a briefly unfiltered far tri sits 6 m under a loaded chunk, invisible
-    if (streamer.residencyDirty && builtThisFrame === 0 && now - lastFarRefresh > 250) {
+    if (streamer.residencyDirty && builtThisFrame === 0 && pendingRebuilds.length === 0 && now - lastFarRefresh > 250) {
       farSphere.setResidentChunks(streamer.residentKeys());
       streamer.residencyDirty = false;
       lastFarRefresh = now;

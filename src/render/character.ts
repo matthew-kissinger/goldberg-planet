@@ -121,6 +121,12 @@ export class Character {
       this.prop.rotation.z = this.propAngle;
     }
 
-    this.group.position.set(player.px - camWorld.x, player.py - camWorld.y, player.pz - camWorld.z);
+    // subtract the step-up render offset so the body glides up terraces like the eye does
+    const s = player.stepSmooth;
+    this.group.position.set(
+      player.px - camWorld.x - this.upV.x * s,
+      player.py - camWorld.y - this.upV.y * s,
+      player.pz - camWorld.z - this.upV.z * s,
+    );
   }
 }

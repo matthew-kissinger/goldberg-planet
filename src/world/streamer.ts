@@ -144,15 +144,21 @@ export class Streamer {
     if (this.buildSamples.length < 5000) this.buildSamples.push(ms);
   }
 
-  /** Rebuild one chunk immediately (edits). */
+  /**
+   * Rebuild one chunk immediately (edits). The resident SET is unchanged by a rebuild,
+   * so this must NOT dirty the far-sphere filter — that refilter is a 184k-tri scan plus
+   * a full index re-upload, and letting edits trigger it was a per-edit frame spike.
+   */
   rebuildNow(key: number): void {
     const res = this.resident.get(key);
     const info = this.all.get(key);
     if (!info) return;
+    const wasDirty = this.residencyDirty;
     if (res) this.disposeResident(key, res);
     this.buildChunk(info);
     this.loads--; // rebuilds aren't loads
     this.releases--;
+    this.residencyDirty = wasDirty;
   }
 
   /** Per-frame: update camera-relative transforms (floating origin). */

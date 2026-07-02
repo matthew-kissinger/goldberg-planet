@@ -76,6 +76,12 @@ export class Player {
   holdAGL = 30;                    // terrain-follow altitude the plane maintains when level
   /** set for one frame when the plane stows itself (ground/water/wall contact) */
   planeStowed = false;
+  /**
+   * Rendering-only smoothing for terrace steps: physics snaps the body up a full layer
+   * when walking onto a step (collision must be exact), and this accumulates that pop
+   * so the eye/camera and character model glide up over ~100 ms instead of teleporting.
+   */
+  stepSmooth = 0;
 
   constructor(
     private readonly geo: Goldberg,
@@ -111,7 +117,8 @@ export class Player {
 
   eye(): [number, number, number] {
     const [ux, uy, uz] = this.up();
-    return [this.px + ux * EYE_HEIGHT, this.py + uy * EYE_HEIGHT, this.pz + uz * EYE_HEIGHT];
+    const h = EYE_HEIGHT - this.stepSmooth;
+    return [this.px + ux * h, this.py + uy * h, this.pz + uz * h];
   }
 
   applyLook(dx: number, dy: number): void {
@@ -193,6 +200,9 @@ export class Player {
     this.submerged = Math.max(0, WATER_SURFACE - r0);
     const prevFwdX = fx, prevFwdY = fy, prevFwdZ = fz;
     this.planeStowed = false;
+    // bleed off the step-up render offset (~100 ms glide)
+    this.stepSmooth *= Math.exp(-16 * dt);
+    if (this.stepSmooth < 0.01) this.stepSmooth = 0;
 
     if (this.mode === 'plane') {
       // --- plane: mouse steers, throttle sets speed, level flight holds height-over-ground ---
@@ -305,12 +315,17 @@ export class Player {
     const vr = this.vx * nux + this.vy * nuy + this.vz * nuz;
     if (r <= groundR + 0.02) {
       if (vr <= 0.01 || this.grounded) {
+        const wasGrounded = this.grounded;
         const scale = (groundR + 0.001) / r;
         this.px *= scale; this.py *= scale; this.pz *= scale;
         if (vr < 0) {
           this.vx -= vr * nux; this.vy -= vr * nuy; this.vz -= vr * nuz;
         }
         this.grounded = true;
+        // walking up a step (not landing from a fall): remember the pop for render smoothing
+        if (wasGrounded && scale > 1) {
+          this.stepSmooth = Math.min(1.45, this.stepSmooth + r * (scale - 1));
+        }
         if (this.mode === 'plane') { this.exitPlane(); this.planeStowed = true; } // touched down
       }
     } else if (r - groundR > 0.06) {
