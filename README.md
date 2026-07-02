@@ -4,7 +4,7 @@ A browser prototype of a walkable, swimmable, flyable, mineable, buildable spher
 whose surface is a true Goldberg polyhedron — hexagons plus exactly twelve pentagons —
 continuous from a footstep on a beach to the whole planet hanging in space.
 
-**Play it: <https://matthew-kissinger.github.io/sphere-planet/>**
+**Play it: <https://matthew-kissinger.github.io/goldberg-planet/>**
 
 Best in a WebGPU browser (Chrome/Edge); it falls back to WebGL2 automatically everywhere else.
 Chop twelve wood, press E, and fly around the world.
