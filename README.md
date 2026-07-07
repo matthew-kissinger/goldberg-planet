@@ -347,21 +347,26 @@ Hearth Journal, and pay a small glow-crystal reward.
 The player avatar has its first Hearth and Horizon equipment pass and its first named art
 direction: **Soft-Facet Wayfarer**. Pull the camera back and the procedural fallback model
 now uses sampled SDF blend-shell body and limb meshes, faceted normals, shader breathing,
-squash-and-stretch action beats, a hood rim, scarf, rounded pack, satchel, boots, selected
-blocks or build kits in hand, crafted tools on the backpack, and short poses for walking,
-sprinting, jumping, swimming, plane mode, chopping, mining, building, crafting, fishing,
-farming, cooking, preserving, resting, and pentagon discovery. This is the runtime contract for the
-future authored player model and prop set. Root-cellar kits and provision crates now join
-the visible cache/withdraw poses. Cave-anchor kits, rope coils, and the cave-reading pose now
-join the expedition prop set. Drying-rack kits, trail ration bundles, and expedition stew
-bowls or packed pots are now
-part of that visible prop contract, alongside compost sacks, compost-bin kits, rain-cistern
-water jars, pack frames, storm cloaks, weather-vane kits, and the cooking, eating,
-spring-tapping, composting, fertilizing, irrigating, forecast-reading, weather-bracing, and
-hood-pull poses. The cycle docs now treat the authored character model, equippable
-props, socket map, and animation packet as a formal deliverable for every survival slice,
-including collapse, bedroll wake-up, spawn-rescue, route-planning, and pentagon landmark
-approach poses.
+squash-and-stretch action beats, a hood rim, scarf, rounded pack, bedroll, satchel, boots,
+mittens, selected blocks or build kits in hand, crafted tools on the backpack, and short poses
+for walking, sprinting, jumping, swimming, plane mode, chopping, mining, building, crafting,
+fishing, farming, cooking, preserving, resting, pickup handoffs, native-defense beats, and
+pentagon discovery. Workbench, campfire, chest, bedroll, waystone, and plane-frame carries now
+have specific silhouettes instead of the generic pack fallback, and plane mode includes a
+named seated pilot/yoke silhouette. `Character.stats()`, F3, browser diagnostics, and
+`render_game_to_text` expose the avatar's named readability parts, prop sockets, held/stowed
+props, and action coverage; `npm run proof:character` captures desktop, laptop, tablet,
+phone, gamepad, and WebGL fallback screenshots. This is the runtime contract for the future
+authored player model and prop set. Root-cellar kits and provision crates now join the visible
+cache/withdraw poses. Cave-anchor kits, rope coils, and the cave-reading pose now join the
+expedition prop set. Drying-rack kits, trail ration bundles, and expedition stew bowls or
+packed pots are now part of that visible prop contract, alongside compost sacks,
+compost-bin kits, rain-cistern water jars, pack frames, storm cloaks, weather-vane kits, and
+the cooking, eating, spring-tapping, composting, fertilizing, irrigating, forecast-reading,
+weather-bracing, and hood-pull poses. The cycle docs now treat the authored character model,
+equippable props, socket map, and animation packet as a formal deliverable for every survival
+slice, including collapse, bedroll wake-up, spawn-rescue, route-planning, and pentagon
+landmark approach poses.
 
 Functional houses now have their first real shelter check. A home bedroll only becomes a full
 shelter when the neighboring hex cluster includes enough roof bundles, a door, lit campfire,
@@ -475,7 +480,7 @@ water, or a cliff stows it; E brings it back mid-fall.
 - GitHub Pages deploys from the `main` branch workflow in `.github/workflows/deploy.yml`.
   The app is static: no server secrets, runtime API keys, or backend configuration are expected.
 
-Test suite: 247 tests — icosahedron invariants; 10m²+2 counts with exactly 12 pentagons;
+Test suite: 267 tests — icosahedron invariants; 10m²+2 counts with exactly 12 pentagons;
 neighbor symmetry; CCW winding and bit-identical shared corners; id round-trips; seam
 agreement; `tileOf` vs brute force; layer-grid inverses; terrain determinism and
 ocean/land/mountain balance; column edit semantics incl. tunnels and immutable bedrock;
@@ -512,8 +517,9 @@ pins, pentagon resource pins, pentagon insight prep effects, Route Slate pin ran
 Weather, fishing, and forage rules cover the first domain effects for storm-seat air,
 snow-dial cold, salt-tide fish runs, and root-vault seed pods.
 Expedition planning rules cover route range, packed-food readiness including trail rations and stocked root-cellar provisions, shelter/rest
-readiness, tool/light requirements, storm timing, weather-vane storm timing, and plane recommendations. Character equipment rules cover tool selection, visible held build props,
-structure interaction props, and backpack tool ordering.
+readiness, tool/light requirements, storm timing, weather-vane storm timing, and plane recommendations. Character equipment and renderer rules cover tool selection, visible held build props,
+structure interaction props, backpack tool ordering, named Soft-Facet silhouette parts,
+prop sockets, action-pose coverage, held/stowed prop visibility, and seated plane-pilot cues.
 Native-life rules cover harmless moss-puffs, shell-skitters, reedback grazers, cave
 blinkers, bramblebacks, cave bell-jaws, scree-snappers, storm burrs, and sea-cave Tide
 Lurkers with non-generic tending, warding, pressure, telegraph, and grounded reward

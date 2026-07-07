@@ -11,6 +11,7 @@
     "proof:audio-music": "node scripts/proof-audio-music.mjs",
     "proof:kiln-assets": "node scripts/proof-kiln-asset-pack.mjs",
     "proof:route-markers": "node scripts/proof-route-marker-readability.mjs",
+    "proof:character": "node scripts/proof-character-readability.mjs",
     "proof:panel-ownership": "node scripts/proof-panel-ownership.mjs",
     "proof:hearth-contract": "node scripts/proof-hearth-contract.mjs",
     "proof:d2-caves": "node scripts/proof-d2-threshold-spaces.mjs",

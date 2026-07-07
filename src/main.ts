@@ -4404,6 +4404,7 @@ async function boot(): Promise<void> {
       seasonAfterglow: seasonAfterglowDiagnostics(),
       character: character.state(),
       characterIntent: characterVisualState(),
+      characterRenderer: character.stats(),
       naturalVoid: currentNaturalVoid(),
       landmarks: { ...progressionState(), insights: pentagonInsights(), domain: currentPentagonDomain(), site: currentPentagonSite(), siteWork: currentPentagonSiteWork(), siteThreshold: currentPentagonSiteThreshold(), siteThresholdEffect: currentPentagonSiteThresholdEffect(), thresholdTerrain: lastThresholdTerrainAction, thresholdChambers: thresholdChamberDiagnostics(), siteCompletions: [...completedPentagonSites], siteCompletionsCount: completedPentagonSites.size, sites: pentagonExpeditionSites(pentagonTiles, discoveredPentagons), thresholds: pentagonSiteThresholds(pentagonTiles, discoveredPentagons, completedPentagonSites), resources: domainResourceDiagnostics(), skyfall: skyfallDiagnostics(), murmurs: murmurDiagnostics(), strangerSeasons: strangerSeasonDiagnostics(), seasonAfterglow: seasonAfterglowDiagnostics(), nearby: pentagonLandmark(nearbyLandmarkTile() ?? -1, pentagonTiles, discoveredPentagons), lastAction: lastLandmarkAction },
       structures: structures.length,
@@ -4419,6 +4420,7 @@ async function boot(): Promise<void> {
     setFly: (on: boolean) => { player.mode = on ? 'fly' : 'walk'; },
     characterState: () => character.state(),
     characterIntent: () => characterVisualState(),
+    characterRenderer: () => character.stats(),
     audio: () => audio.state(),
     controls: () => ({ ux: uxManager.snapshot(), gamepad: gamepad.snapshot(), touch: touch.enabled, inputActive: input.active(), aimActive: input.active() || gamepad.active(), panels: currentPanelOwnership() }),
     injectGamepad: (frame: Partial<GamepadFrame>, frames = 2) => {
@@ -5003,6 +5005,7 @@ async function boot(): Promise<void> {
         caveResonances: caveResonanceDiagnostics(),
         audio: audio.state(),
         controls: { ux: uxManager.snapshot(), gamepad: gamepad.snapshot(), touch: touch.enabled, panels: currentPanelOwnership() },
+        characterRenderer: character.stats(),
         mineProgress: mineProgressDiagnostics(),
         survival: { ...survivalSnapshot(), time: { ...timeState }, pack: packBurden() },
       };
@@ -5088,6 +5091,7 @@ async function boot(): Promise<void> {
     },
     character: character.state(),
     characterIntent: characterVisualState(),
+    characterRenderer: character.stats(),
     landmarks: {
       progress: progressionState(),
       insights: pentagonInsights(),
@@ -5635,6 +5639,7 @@ async function boot(): Promise<void> {
         const mouthStats = caveMouthRenderer.stats();
         const routeStats = routeRenderer.stats();
         const characterState = character.state();
+        const characterStats = character.stats();
         const gamepadState = gamepad.snapshot();
         const audioState = audio.state();
         const tools = toolSummary(craftedItems, toolWear);
@@ -5653,7 +5658,7 @@ async function boot(): Promise<void> {
           `columns ${columns.generatedCount.toLocaleString()} / ${geo.count.toLocaleString()} · edits ${edits}`,
           `pack ${burden.label} · ${burden.detail}${burden.staminaDrain > 0 ? ` · drain ${burden.staminaDrain.toFixed(2)}` : ''}${burden.sprintBlocked ? ' · sprint blocked' : ''}`,
           `tools ${tools.owned.map((tool) => tool.label).join(' · ') || 'hands'}${tools.repairKits > 0 ? ` · repair kits ${tools.repairKits}` : ''} · reach ${playerReach().toFixed(1)}`,
-          `character ${characterState.action} · held ${characterState.held} · back ${characterState.backProps.join(',') || 'none'}`,
+          `character ${characterState.action} · held ${characterState.held} · back ${characterState.backProps.join(',') || 'none'} · silhouette ${characterStats.silhouetteParts} · sockets ${characterStats.propSockets.length}`,
           `audio ${audioState.muted ? 'muted' : audioState.unlocked ? 'on' : 'locked'} · loaded ${audioState.loaded.length} · music ${audioState.musicStarted ? audioState.musicPlaying ? 'playing' : audioState.musicQueued ? 'waiting' : 'paused' : 'idle'}${audioState.musicTrack ? ` ${audioState.musicTrack}` : ''} · last ${audioState.lastEvent ?? 'none'}${audioState.errors.length ? ` · errors ${audioState.errors.length}` : ''}`,
           `structures ${structures.length} · prop meshes ${propStats.meshes} · route marker roles ${propStats.routeReadabilityRoles}/${propStats.routeSilhouettes} · ${home.label}${cisternWater > 0 ? ` · cistern water ${cisternWater}` : ''}${cellarProvisions > 0 ? ` · cellar provisions ${cellarProvisions}` : ''}`,
           `food bait ${food.bait} · seeds ${food.seeds} · compost ${food.compost} · berries ${food.berries} · mushroom/herb/kelp/reeds ${food.caveMushroom}/${food.snowHerb}/${food.kelp}/${food.reeds} · raw/cooked fish ${food.rawFish}/${food.cookedFish} · traps ${trapReady}/${trapStats.length} ready · nets ${netReady}/${netStats.length} ready · meals/rations/stews ${food.campMeal}/${food.trailRation}/${food.expeditionStew} · cellar ${food.cellarProvisions}`,

@@ -7,7 +7,7 @@
 import * as THREE from 'three/webgpu';
 import { attribute, color, float, positionLocal, time, vec3 } from 'three/tsl';
 import type { Player } from '../player/player';
-import { CHARACTER_PROP_IDS, type CharacterPropId, type CharacterVisualState } from '../sim/equipment';
+import { CHARACTER_PROP_IDS, type CharacterAction, type CharacterPropId, type CharacterVisualState } from '../sim/equipment';
 
 const PROP_COLORS: Record<CharacterPropId, number> = {
   hands: 0xd8dee8,
@@ -73,6 +73,45 @@ const PROP_COLORS: Record<CharacterPropId, number> = {
 };
 
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
+
+const CHARACTER_ACTION_POSE_COVERAGE: readonly CharacterAction[] = [
+  'idle',
+  'move',
+  'sprint',
+  'jump',
+  'swim',
+  'plane',
+  'mine',
+  'chop',
+  'build',
+  'craft',
+  'fish',
+  'farm',
+  'cook',
+  'pickup',
+  'ward',
+  'shoot',
+  'brace',
+  'stagger',
+  'sleep',
+  'discover',
+  'interact',
+] as const;
+
+export interface CharacterRendererStats {
+  visible: boolean;
+  meshes: number;
+  silhouetteParts: number;
+  propSockets: string[];
+  readabilityRoles: string[];
+  supportedActions: CharacterAction[];
+  actionPoseCoverage: number;
+  heldProp: CharacterPropId;
+  heldPropMeshes: number;
+  backPropsVisible: CharacterPropId[];
+  backPropMeshes: number;
+  normalDistanceReady: boolean;
+}
 
 type SdfVolume = {
   center: [number, number, number];
@@ -219,6 +258,11 @@ export class Character {
       m.castShadow = false;
       m.receiveShadow = true;
       return m;
+    };
+
+    const markRole = <T extends THREE.Object3D>(object: T, role: string): T => {
+      object.userData.characterReadabilityRole = role;
+      return object;
     };
 
     const colorMat = (id: CharacterPropId): THREE.MeshStandardMaterial => mat(PROP_COLORS[id] ?? 0xffffff, 0.72, 0.03);
@@ -399,6 +443,40 @@ export class Character {
         g.add(mesh(cyl6, metalMat, [0, 0.5, 0], [0.12, 0.08, 0.12], 'waterJarRim'));
         return g;
       }
+      if (id === 'workbench') {
+        g.add(mesh(box, woodMat, [0, 0.28, 0], [0.48, 0.18, 0.32], 'workbenchCarryTop'));
+        g.add(mesh(box, mat(0x5b3a22), [-0.18, 0.08, -0.1], [0.055, 0.28, 0.055], 'workbenchCarryLeg'));
+        g.add(mesh(box, mat(0x5b3a22), [0.18, 0.08, 0.1], [0.055, 0.28, 0.055], 'workbenchCarryLeg'));
+        g.add(mesh(box, metalMat, [0.12, 0.41, -0.05], [0.18, 0.05, 0.06], 'workbenchCarryTool'));
+        g.add(mesh(box, strapMat, [0, 0.22, -0.2], [0.52, 0.045, 0.035], 'workbenchCarryStrap'));
+        return g;
+      }
+      if (id === 'campfire') {
+        for (let i = 0; i < 3; i++) {
+          const log = mesh(cyl6, woodMat, [(i - 1) * 0.08, 0.18, 0], [0.04, 0.42, 0.04], 'campfireCarryLog');
+          log.rotation.z = Math.PI / 2 + (i - 1) * 0.34;
+          g.add(log);
+        }
+        g.add(mesh(cone8, glowMat, [0, 0.36, -0.02], [0.12, 0.28, 0.12], 'campfireCarryFlame'));
+        g.add(mesh(box, strapMat, [0, 0.12, -0.18], [0.34, 0.045, 0.035], 'campfireCarryTie'));
+        return g;
+      }
+      if (id === 'chest') {
+        g.add(mesh(box, mat(0x8a5a33), [0, 0.22, 0], [0.46, 0.3, 0.32], 'chestCarryBox'));
+        g.add(mesh(cyl8, mat(0xa56d3a), [0, 0.39, 0], [0.24, 0.28, 0.24], 'chestCarryRoundedLid'));
+        g.add(mesh(box, metalMat, [0, 0.28, -0.19], [0.14, 0.12, 0.035], 'chestCarryLatch'));
+        g.add(mesh(box, strapMat, [0, 0.23, -0.22], [0.5, 0.045, 0.035], 'chestCarryStrap'));
+        return g;
+      }
+      if (id === 'bedroll') {
+        const roll = mesh(cyl8, mat(0x8fb0d0), [0, 0.28, 0], [0.24, 0.54, 0.24], 'bedrollCarryRoll');
+        roll.rotation.z = Math.PI / 2;
+        g.add(roll);
+        g.add(mesh(box, creamMat, [0, 0.28, -0.2], [0.44, 0.07, 0.05], 'bedrollCarryBlanketEdge'));
+        g.add(mesh(box, strapMat, [-0.16, 0.28, -0.25], [0.035, 0.32, 0.035], 'bedrollCarryLeftTie'));
+        g.add(mesh(box, strapMat, [0.16, 0.28, -0.25], [0.035, 0.32, 0.035], 'bedrollCarryRightTie'));
+        return g;
+      }
       if (id === 'bait' || id === 'seeds' || id === 'compost' || id === 'berries' || id === 'caveMushroom' || id === 'snowHerb' || id === 'kelp' || id === 'rawFish' || id === 'cookedFish' || id === 'campMeal' || id === 'trailRation' || id === 'expeditionStew') {
         g.add(mesh(sphere8, colorMat(id), [0, 0.2, 0], [0.18, 0.16, 0.18], 'foodBundle'));
         if (id === 'seeds' || id === 'bait') g.add(mesh(box, mat(0x6c4d2d), [0, 0.12, 0], [0.32, 0.2, 0.12], id === 'bait' ? 'baitPouch' : 'seedPouch'));
@@ -547,6 +625,23 @@ export class Character {
         g.add(ribbon);
         return g;
       }
+      if (id === 'waystone') {
+        g.add(mesh(dodeca, mat(0x5f6e7f), [0, 0.24, 0], [0.2, 0.34, 0.16], 'waystoneCarryBody'));
+        g.add(mesh(sphere8, mat(0x87a9d6, 0.28, 0.04, 0x447fb8), [0, 0.48, -0.02], [0.11, 0.11, 0.09], 'waystoneCarryCore'));
+        g.add(mesh(box, mat(0xd7c58f, 0.5, 0.02, 0x9d7f2a), [0, 0.25, -0.14], [0.3, 0.04, 0.03], 'waystoneCarryGlyphBar'));
+        g.add(mesh(box, strapMat, [0, 0.15, -0.2], [0.38, 0.045, 0.035], 'waystoneCarryStrap'));
+        return g;
+      }
+      if (id === 'planeFrame') {
+        const rib = mesh(cyl6, woodMat, [0, 0.28, 0], [0.025, 0.72, 0.025], 'planeFrameCarryRib');
+        rib.rotation.z = Math.PI / 2;
+        const wing = mesh(box, wingMat, [0, 0.4, -0.02], [0.56, 0.055, 0.2], 'planeFrameCarryWing');
+        const cowlHint = mesh(cyl8, hullMat, [0.28, 0.28, -0.02], [0.12, 0.16, 0.12], 'planeFrameCarryCowl');
+        cowlHint.rotation.x = Math.PI / 2;
+        g.add(rib, wing, cowlHint);
+        g.add(mesh(box, strapMat, [0, 0.18, -0.18], [0.52, 0.045, 0.035], 'planeFrameCarryStrap'));
+        return g;
+      }
       const pack = mesh(box, colorMat(id), [0, 0.2, 0], [0.38, 0.26, 0.28], 'propPack');
       pack.rotation.y = 0.18;
       g.add(pack);
@@ -568,44 +663,56 @@ export class Character {
       makeShellMaterial(0x6fa69b),
     );
     wayfarerShell.name = 'wayfarerSdfBlendShell';
+    markRole(wayfarerShell, 'fused soft-facet body shell');
     wayfarerShell.receiveShadow = true;
     this.pilotBody.add(wayfarerShell);
 
-    const bellyPatch = mesh(dodeca, creamMat, [0, 0.92, -0.31], [0.34, 0.36, 0.08], 'wayfarerBellyPatch');
+    const bellyPatch = markRole(mesh(dodeca, creamMat, [0, 0.92, -0.31], [0.34, 0.36, 0.08], 'wayfarerBellyPatch'), 'bright front belly patch');
     bellyPatch.rotation.x = -0.08;
-    const hoodRim = mesh(torus, creamMat, [0, 1.39, -0.29], [1.05, 0.68, 0.6], 'wayfarerHoodRim');
+    const hoodRim = markRole(mesh(torus, creamMat, [0, 1.39, -0.29], [1.05, 0.68, 0.6], 'wayfarerHoodRim'), 'oversized hood rim');
     hoodRim.rotation.x = Math.PI / 2;
-    const face = mesh(box, faceMat, [0, 1.38, -0.365], [0.28, 0.14, 0.035], 'wayfarerFacePlate');
-    const eyeL = mesh(box, eyeMat, [-0.075, 1.4, -0.389], [0.045, 0.035, 0.018], 'wayfarerEyeL');
-    const eyeR = mesh(box, eyeMat, [0.075, 1.4, -0.389], [0.045, 0.035, 0.018], 'wayfarerEyeR');
-    const faceNose = mesh(cone8, faceMat, [0, 1.35, -0.407], [0.04, 0.09, 0.04], 'wayfarerNose');
+    const face = markRole(mesh(box, faceMat, [0, 1.38, -0.365], [0.28, 0.14, 0.035], 'wayfarerFacePlate'), 'warm face plate');
+    const eyeL = markRole(mesh(box, eyeMat, [-0.075, 1.4, -0.389], [0.045, 0.035, 0.018], 'wayfarerEyeL'), 'left glowing eye');
+    const eyeR = markRole(mesh(box, eyeMat, [0.075, 1.4, -0.389], [0.045, 0.035, 0.018], 'wayfarerEyeR'), 'right glowing eye');
+    const faceNose = markRole(mesh(cone8, faceMat, [0, 1.35, -0.407], [0.04, 0.09, 0.04], 'wayfarerNose'), 'small goofy nose');
     faceNose.rotation.x = -Math.PI / 2;
-    const capPebble = mesh(dodeca, rustMat, [0.08, 1.77, -0.02], [0.11, 0.13, 0.1], 'wayfarerCapPebble');
+    const capPebble = markRole(mesh(dodeca, rustMat, [0.08, 1.77, -0.02], [0.11, 0.13, 0.1], 'wayfarerCapPebble'), 'asymmetric cap pebble');
     capPebble.rotation.z = -0.22;
-    const scarf = mesh(torus, rustMat, [-0.06, 1.16, -0.08], [1.35, 0.74, 0.64], 'wayfarerScarfLoop');
+    const hoodEarL = markRole(mesh(dodeca, creamMat, [-0.24, 1.55, -0.24], [0.09, 0.14, 0.055], 'wayfarerHoodEarL'), 'left soft hood ear');
+    hoodEarL.rotation.z = -0.32;
+    const hoodEarR = markRole(mesh(dodeca, creamMat, [0.24, 1.55, -0.24], [0.09, 0.14, 0.055], 'wayfarerHoodEarR'), 'right soft hood ear');
+    hoodEarR.rotation.z = 0.32;
+    const scarf = markRole(mesh(torus, rustMat, [-0.06, 1.16, -0.08], [1.35, 0.74, 0.64], 'wayfarerScarfLoop'), 'rust scarf loop');
     scarf.rotation.x = Math.PI / 2;
     scarf.rotation.z = 0.12;
-    const scarfTail = mesh(box, rustMat, [-0.26, 1.02, -0.24], [0.08, 0.36, 0.045], 'wayfarerScarfTail');
+    const scarfTail = markRole(mesh(box, rustMat, [-0.26, 1.02, -0.24], [0.08, 0.36, 0.045], 'wayfarerScarfTail'), 'fluttering scarf tail');
     scarfTail.rotation.z = -0.26;
-    const diagonalStrap = mesh(box, strapMat, [0.17, 0.95, -0.34], [0.065, 0.62, 0.045], 'wayfarerDiagonalStrap');
+    const scarfPin = markRole(mesh(sphere8, glowMat, [-0.18, 1.14, -0.34], [0.045, 0.045, 0.03], 'wayfarerScarfPin'), 'warm scarf pin');
+    const diagonalStrap = markRole(mesh(box, strapMat, [0.17, 0.95, -0.34], [0.065, 0.62, 0.045], 'wayfarerDiagonalStrap'), 'diagonal carry strap');
     diagonalStrap.rotation.z = 0.48;
-    const belt = mesh(box, strapMat, [0, 0.61, -0.05], [0.52, 0.09, 0.3], 'toolBelt');
-    const beltBuckle = mesh(box, metalMat, [0.02, 0.62, -0.26], [0.13, 0.075, 0.04], 'beltBuckle');
-    const satchel = mesh(dodeca, mat(0x6b4a2f), [-0.36, 0.76, -0.02], [0.21, 0.25, 0.14], 'sideSatchel');
+    const belt = markRole(mesh(box, strapMat, [0, 0.61, -0.05], [0.52, 0.09, 0.3], 'toolBelt'), 'tool belt');
+    const beltBuckle = markRole(mesh(box, metalMat, [0.02, 0.62, -0.26], [0.13, 0.075, 0.04], 'beltBuckle'), 'front belt buckle');
+    const satchel = markRole(mesh(dodeca, mat(0x6b4a2f), [-0.36, 0.76, -0.02], [0.21, 0.25, 0.14], 'sideSatchel'), 'left side satchel');
     satchel.rotation.z = -0.08;
-    const satchelFlap = mesh(box, strapMat, [-0.36, 0.86, -0.11], [0.2, 0.045, 0.13], 'sideSatchelFlap');
+    const satchelFlap = markRole(mesh(box, strapMat, [-0.36, 0.86, -0.11], [0.2, 0.045, 0.13], 'sideSatchelFlap'), 'satchel flap');
     satchelFlap.rotation.z = -0.08;
-    this.pilotBody.add(bellyPatch, hoodRim, face, eyeL, eyeR, faceNose, capPebble, scarf, scarfTail, diagonalStrap, belt, beltBuckle, satchel, satchelFlap);
+    this.pilotBody.add(bellyPatch, hoodRim, face, eyeL, eyeR, faceNose, capPebble, hoodEarL, hoodEarR, scarf, scarfTail, scarfPin, diagonalStrap, belt, beltBuckle, satchel, satchelFlap);
 
-    const backpack = mesh(dodeca, coatDark, [0, 0.98, 0.36], [0.34, 0.46, 0.17], 'roundedBackpack');
+    const backpack = markRole(mesh(dodeca, coatDark, [0, 0.98, 0.36], [0.34, 0.46, 0.17], 'roundedBackpack'), 'rounded backpack silhouette');
     backpack.rotation.x = 0.08;
-    const backPatch = mesh(dodeca, creamMat, [0, 1.02, 0.53], [0.18, 0.24, 0.055], 'wayfarerBackPatch');
+    const backPatch = markRole(mesh(dodeca, creamMat, [0, 1.02, 0.53], [0.18, 0.24, 0.055], 'wayfarerBackPatch'), 'rear bright back patch');
     backPatch.rotation.x = 0.16;
-    const backStrap = mesh(box, rustMat, [-0.08, 1.02, 0.56], [0.045, 0.42, 0.04], 'wayfarerBackStrap');
+    const backStrap = markRole(mesh(box, rustMat, [-0.08, 1.02, 0.56], [0.045, 0.42, 0.04], 'wayfarerBackStrap'), 'rear rust strap');
     backStrap.rotation.z = -0.28;
-    this.pilotBody.add(backpack, backPatch, backStrap);
+    const bedroll = markRole(mesh(cyl8, creamMat, [0, 1.42, 0.43], [0.22, 0.36, 0.22], 'wayfarerTopBedroll'), 'top bedroll roll');
+    bedroll.rotation.z = Math.PI / 2;
+    const bedrollTie = markRole(mesh(box, strapMat, [0, 1.42, 0.66], [0.36, 0.045, 0.035], 'wayfarerBedrollTie'), 'bedroll tie');
+    this.pilotBody.add(backpack, backPatch, backStrap, bedroll, bedrollTie);
     this.backSocket.position.set(0, 1.08, 0.48);
     this.backSocket.rotation.x = 0.18;
+    this.rightSocket.userData.characterPropSocket = 'right hand';
+    this.leftSocket.userData.characterPropSocket = 'left hand';
+    this.backSocket.userData.characterPropSocket = 'back pack';
     this.pilotBody.add(this.backSocket);
 
     const makeArm = (sign: 1 | -1, socket: THREE.Group): THREE.Group => {
@@ -620,9 +727,13 @@ export class Character {
         makeShellMaterial(0xe6d59b, 0.8, 0.02),
       );
       armShell.name = sign > 0 ? 'rightSdfBlendArm' : 'leftSdfBlendArm';
+      markRole(armShell, sign > 0 ? 'right soft-facet arm' : 'left soft-facet arm');
       arm.add(armShell);
-      arm.add(mesh(dodeca, coatDark, [0, -0.03, 0], [0.12, 0.12, 0.1], 'shoulderPad'));
-      arm.add(mesh(box, strapMat, [0, -0.67, -0.045], [0.13, 0.045, 0.09], 'wristWrap'));
+      arm.add(markRole(mesh(dodeca, coatDark, [0, -0.03, 0], [0.12, 0.12, 0.1], sign > 0 ? 'rightShoulderPad' : 'leftShoulderPad'), sign > 0 ? 'right shoulder pad' : 'left shoulder pad'));
+      arm.add(markRole(mesh(box, strapMat, [0, -0.67, -0.045], [0.13, 0.045, 0.09], sign > 0 ? 'rightWristWrap' : 'leftWristWrap'), sign > 0 ? 'right wrist wrap' : 'left wrist wrap'));
+      const mitten = markRole(mesh(dodeca, rustMat, [0, -0.85, -0.09], [0.13, 0.09, 0.12], sign > 0 ? 'rightWayfarerMitten' : 'leftWayfarerMitten'), sign > 0 ? 'right oversized mitten' : 'left oversized mitten');
+      mitten.rotation.x = -0.12;
+      arm.add(mitten);
       socket.position.set(0, -0.88, -0.1);
       socket.rotation.set(0.25, 0, sign * 0.08);
       arm.add(socket);
@@ -643,11 +754,13 @@ export class Character {
         makeShellMaterial(0x375663, 0.86, 0.02),
       );
       legShell.name = sign > 0 ? 'rightSdfBlendLeg' : 'leftSdfBlendLeg';
+      markRole(legShell, sign > 0 ? 'right soft-facet leg' : 'left soft-facet leg');
       leg.add(legShell);
-      const boot = mesh(dodeca, propMat, [0, -0.66, -0.09], [0.18, 0.1, 0.25], 'boot');
+      const boot = markRole(mesh(dodeca, propMat, [0, -0.66, -0.09], [0.18, 0.1, 0.25], sign > 0 ? 'rightBoot' : 'leftBoot'), sign > 0 ? 'right chunky boot' : 'left chunky boot');
       boot.rotation.x = -0.08;
       leg.add(boot);
-      leg.add(mesh(sphere8, metalMat, [0, -0.3, -0.08], [0.07, 0.045, 0.035], 'kneePad'));
+      leg.add(markRole(mesh(sphere8, metalMat, [0, -0.3, -0.08], [0.07, 0.045, 0.035], sign > 0 ? 'rightKneePad' : 'leftKneePad'), sign > 0 ? 'right knee pad' : 'left knee pad'));
+      leg.add(markRole(mesh(box, creamMat, [0, -0.68, -0.28], [0.13, 0.04, 0.06], sign > 0 ? 'rightBootToe' : 'leftBootToe'), sign > 0 ? 'right bright boot toe' : 'left bright boot toe'));
     };
     setupLeg(this.rightLeg, 1);
     setupLeg(this.leftLeg, -1);
@@ -657,11 +770,15 @@ export class Character {
       if (id !== 'hands') {
         const held = makeProp(id);
         held.visible = false;
+        held.userData.characterPropKind = id;
+        held.userData.characterPropMount = 'right hand';
         this.rightSocket.add(held);
         this.heldProps.set(id, held);
 
         const back = makeProp(id);
         back.visible = false;
+        back.userData.characterPropKind = id;
+        back.userData.characterPropMount = 'back pack';
         back.scale.setScalar(0.72);
         this.backSocket.add(back);
         this.backProps.set(id, back);
@@ -691,6 +808,20 @@ export class Character {
     shield.position.set(0, 1.5, -0.82);
     shield.rotation.x = 0.42;
     this.plane.add(shield);
+
+    const seatedPilot = new THREE.Group();
+    seatedPilot.name = 'wayfarerSeatedPilot';
+    seatedPilot.position.set(0, 0.88, -0.58);
+    const seatedBody = markRole(mesh(dodeca, coatDark, [0, 0.08, 0.03], [0.22, 0.24, 0.18], 'seatedWayfarerBody'), 'plane seated body');
+    const seatedHood = markRole(mesh(dodeca, creamMat, [0, 0.38, -0.05], [0.19, 0.17, 0.15], 'seatedWayfarerHood'), 'plane seated hood');
+    const seatedFace = markRole(mesh(box, faceMat, [0, 0.37, -0.18], [0.15, 0.07, 0.025], 'seatedWayfarerFace'), 'plane seated face');
+    const seatedEye = markRole(mesh(box, eyeMat, [0, 0.39, -0.198], [0.11, 0.018, 0.012], 'seatedWayfarerEyeBand'), 'plane seated eye band');
+    const yoke = markRole(mesh(torus, metalMat, [0, 0.14, -0.22], [0.62, 0.48, 0.62], 'seatedPilotYoke'), 'plane steering yoke');
+    yoke.rotation.x = Math.PI / 2;
+    const handL = markRole(mesh(dodeca, rustMat, [-0.13, 0.12, -0.19], [0.055, 0.045, 0.045], 'seatedPilotHandL'), 'left steering mitten');
+    const handR = markRole(mesh(dodeca, rustMat, [0.13, 0.12, -0.19], [0.055, 0.045, 0.045], 'seatedPilotHandR'), 'right steering mitten');
+    seatedPilot.add(seatedBody, seatedHood, seatedFace, seatedEye, yoke, handL, handR);
+    this.plane.add(seatedPilot);
 
     for (const sign of [1, -1]) {
       const halfGeo = new THREE.BoxGeometry(3.0, 0.09, 1.15);
@@ -762,6 +893,47 @@ export class Character {
     return {
       ...this.lastState,
       backProps: [...this.lastState.backProps],
+    };
+  }
+
+  stats(): CharacterRendererStats {
+    const readabilityRoles = new Set<string>();
+    const propSockets = new Set<string>();
+    let meshes = 0;
+    this.group.traverse((part) => {
+      if ((part as THREE.Mesh).isMesh) meshes++;
+      const role = part.userData.characterReadabilityRole;
+      if (typeof role === 'string') readabilityRoles.add(role);
+      const socket = part.userData.characterPropSocket;
+      if (typeof socket === 'string') propSockets.add(socket);
+    });
+    const countMeshes = (root: THREE.Object3D | undefined): number => {
+      if (!root) return 0;
+      let count = 0;
+      root.traverse((part) => {
+        if ((part as THREE.Mesh).isMesh) count++;
+      });
+      return count;
+    };
+    const heldProp = [...this.heldProps.entries()].find(([, obj]) => obj.visible)?.[0] ?? 'hands';
+    const backPropsVisible = [...this.backProps.entries()].filter(([, obj]) => obj.visible).map(([id]) => id);
+    const heldPropMeshes = heldProp === 'hands' ? 0 : countMeshes(this.heldProps.get(heldProp));
+    const backPropMeshes = backPropsVisible.reduce((sum, id) => sum + countMeshes(this.backProps.get(id)), 0);
+    return {
+      visible: this.group.visible,
+      meshes,
+      silhouetteParts: readabilityRoles.size,
+      propSockets: [...propSockets].sort(),
+      readabilityRoles: [...readabilityRoles].sort(),
+      supportedActions: [...CHARACTER_ACTION_POSE_COVERAGE],
+      actionPoseCoverage: CHARACTER_ACTION_POSE_COVERAGE.length,
+      heldProp,
+      heldPropMeshes,
+      backPropsVisible,
+      backPropMeshes,
+      normalDistanceReady: readabilityRoles.size >= 28
+        && propSockets.size >= 3
+        && CHARACTER_ACTION_POSE_COVERAGE.length >= 18,
     };
   }
 
