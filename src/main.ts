@@ -19,6 +19,7 @@ import { SkyfallRenderer } from './render/skyfall';
 import { CaveMouthRenderer } from './render/caveMouths';
 import { RouteRenderer } from './render/routes';
 import { MurmurRenderer } from './render/murmurs';
+import { SeasonAfterglowRenderer } from './render/seasonAfterglow';
 import { ResourceDropRenderer } from './render/resourceDrops';
 import { NativeLifeRenderer } from './render/nativeLife';
 import { Player } from './player/player';
@@ -161,7 +162,14 @@ import {
   observeMurmur,
   type MurmurSite,
 } from './sim/murmurs';
-import { strangerSeasonForecast, type StrangerSeasonWindow } from './sim/eventSeasons';
+import {
+  normalizeSeasonAfterglowReadings,
+  readSeasonAfterglow,
+  seasonAfterglowForWindow,
+  strangerSeasonForecast,
+  type StrangerSeasonAfterglow,
+  type StrangerSeasonWindow,
+} from './sim/eventSeasons';
 import { buildHearthJournal } from './sim/journal';
 import {
   addRoutePlanLeg,
@@ -542,6 +550,7 @@ async function boot(): Promise<void> {
   const harvestedDomainResources = new Set(normalizeDomainHarvests(loadedSave?.progression?.domainHarvests));
   const harvestedSkyfalls = new Set(normalizeSkyfallHarvests(loadedSave?.progression?.skyfallHarvests));
   const observedMurmurs = new Set(normalizeMurmurObservations(loadedSave?.progression?.murmurObservations));
+  const seasonAfterglowReadings = new Set(normalizeSeasonAfterglowReadings(loadedSave?.progression?.seasonAfterglowReadings));
   const observedThresholdChambers = new Set(normalizeThresholdChamberObservations(loadedSave?.progression?.thresholdChamberObservations));
   const observedCaveResonances = new Set(normalizeCaveResonanceObservations(loadedSave?.progression?.caveResonanceObservations));
   const tendedNativeCreatures = new Set(normalizeNativeCreatureTends(loadedSave?.progression?.nativeCreatureTends));
@@ -552,6 +561,7 @@ async function boot(): Promise<void> {
   const caveMouthRenderer = new CaveMouthRenderer(scene);
   const routeRenderer = new RouteRenderer(scene);
   const murmurRenderer = new MurmurRenderer(scene);
+  const seasonAfterglowRenderer = new SeasonAfterglowRenderer(scene);
   const resourceDropRenderer = new ResourceDropRenderer(scene);
   const nativeLifeRenderer = new NativeLifeRenderer(scene);
   resourceDropRenderer.setDrops(resourceDrops);
@@ -628,6 +638,7 @@ async function boot(): Promise<void> {
   let lastDomainResourceAction = '';
   let lastSkyfallAction = '';
   let lastMurmurAction = '';
+  let lastSeasonAfterglowAction = '';
   let lastNativeLifeAction = '';
   let lastNavigationAction = '';
   let lastToolAction = '';
@@ -872,7 +883,7 @@ async function boot(): Promise<void> {
       craftedItems,
       drops: resourceDrops,
       structures,
-      progression: { pentagons: [...discoveredPentagons], siteCompletions: [...completedPentagonSites], domainHarvests: [...harvestedDomainResources], skyfallHarvests: [...harvestedSkyfalls], murmurObservations: [...observedMurmurs], thresholdChamberObservations: [...observedThresholdChambers], caveResonanceObservations: [...observedCaveResonances], nativeCreatureTends: [...tendedNativeCreatures], nativeCreatureWards: [...wardedNativeCreatures], routePlan: activeRoutePlan, toolWear },
+      progression: { pentagons: [...discoveredPentagons], siteCompletions: [...completedPentagonSites], domainHarvests: [...harvestedDomainResources], skyfallHarvests: [...harvestedSkyfalls], murmurObservations: [...observedMurmurs], seasonAfterglowReadings: [...seasonAfterglowReadings], thresholdChamberObservations: [...observedThresholdChambers], caveResonanceObservations: [...observedCaveResonances], nativeCreatureTends: [...tendedNativeCreatures], nativeCreatureWards: [...wardedNativeCreatures], routePlan: activeRoutePlan, toolWear },
       time: timeState,
       weather: weatherState,
       survival: survivalState,
@@ -1440,6 +1451,39 @@ async function boot(): Promise<void> {
       },
     } : null;
   };
+  const currentSeasonAfterglow = (): StrangerSeasonAfterglow | null =>
+    seasonAfterglowForWindow(currentStrangerSeason(), seasonAfterglowReadings);
+  const nearbySeasonAfterglow = (): StrangerSeasonAfterglow | null => {
+    const afterglow = currentSeasonAfterglow();
+    if (!afterglow || afterglow.read) return null;
+    return tileSetAround(player.tile, 1).has(afterglow.tile) ? afterglow : null;
+  };
+  const currentRouteSeasonAfterglowSignal = () => {
+    const afterglow = currentSeasonAfterglow();
+    if (!afterglow) return null;
+    const distanceM = greatCircleDistanceMeters(geo.centers, player.tile, afterglow.tile, PLANET_RADIUS);
+    const bearingDeg = chartBearingDegrees(geo.centers, geo.frameOf(player.tile), player.tile, [player.fwdX, player.fwdY, player.fwdZ], afterglow.tile);
+    return {
+      tile: afterglow.tile,
+      id: afterglow.id,
+      label: afterglow.label,
+      detail: afterglow.detail,
+      note: afterglow.note,
+      routeHint: afterglow.routeHint,
+      read: afterglow.read,
+      distanceM,
+      distanceLabel: formatChartDistance(distanceM),
+      turn: chartTurnLabel(bearingDeg),
+      focusMinutes: afterglow.focusMinutes,
+    };
+  };
+  const seasonAfterglowDiagnostics = () => ({
+    current: currentSeasonAfterglow(),
+    nearby: nearbySeasonAfterglow(),
+    readings: [...seasonAfterglowReadings],
+    renderer: seasonAfterglowRenderer.stats(),
+    lastAction: lastSeasonAfterglowAction,
+  });
   const seasonGuideForTile = (
     kind: 'skyfall' | 'murmur',
     tile: number,
@@ -1508,8 +1552,10 @@ async function boot(): Promise<void> {
   };
   const isSeasonActionRouteSignal = (signal: ReturnType<typeof routePlanSignal> | null): signal is NonNullable<ReturnType<typeof routePlanSignal>> =>
     !!signal
-    && (signal.sourceKind === 'skyfall' || signal.sourceKind === 'murmur')
-    && signal.label.startsWith('Season ');
+    && (
+      signal.sourceKind === 'seasonAfterglow'
+      || ((signal.sourceKind === 'skyfall' || signal.sourceKind === 'murmur') && signal.label.startsWith('Season '))
+    );
   const strangerSeasonDiagnostics = () => ({
     current: currentStrangerSeason(),
     forecast: currentStrangerSeasons(),
@@ -1549,6 +1595,7 @@ async function boot(): Promise<void> {
     nearbyDomainResource() !== null ||
     nearbySkyfall() !== null ||
     nearbyMurmur() !== null ||
+    nearbySeasonAfterglow() !== null ||
     nearbyNativeCreature() !== null ||
     rangedNativeHazard() !== null ||
     itemCount(counts, craftedItems, 'fishingRod') > 0 ||
@@ -1853,6 +1900,10 @@ async function boot(): Promise<void> {
   };
 
   const useHorizonChart = (): boolean => {
+    if (craftingOpen) {
+      craftingOpen = false;
+      refreshCraftingHud();
+    }
     const chartAvailable = horizonChartCount() > 0;
     const signal = chartAvailable ? horizonChartSignal() : null;
     const beacon = visibleHearthBeaconSignal();
@@ -1894,6 +1945,10 @@ async function boot(): Promise<void> {
   };
 
   const pinCurrentRoute = (): boolean => {
+    if (craftingOpen) {
+      craftingOpen = false;
+      refreshCraftingHud();
+    }
     const seasonalGuides = currentSeasonRouteGuides();
     const unplannedGuides = currentUnplannedRouteGuides();
     const localNativeLead = unplannedGuides[0]?.kind === 'nativeHazard' || unplannedGuides[0]?.kind === 'nativeLife';
@@ -2210,6 +2265,58 @@ async function boot(): Promise<void> {
     hud.flash(`${result.message}${routeAdvance ? ` · ${routeAdvance.message}` : seasonChainFlash()}`, routeAdvance || chain?.linked ? 4.8 : 4);
     hud.setRouteSlate(currentRouteSlate(), 5);
     if (journalOpen) hud.setJournal(currentHearthJournal(), true);
+    return true;
+  };
+
+  const completeSeasonAfterglowRouteStop = (afterglow: StrangerSeasonAfterglow): string => {
+    const signal = routePlanSignal(
+      activeRoutePlan,
+      geo.centers,
+      geo.frameOf(player.tile),
+      player.tile,
+      [player.fwdX, player.fwdY, player.fwdZ],
+      PLANET_RADIUS,
+    );
+    if (!signal || signal.sourceKind !== 'seasonAfterglow' || signal.targetTile !== afterglow.tile || signal.complete) return '';
+    const arrival = markRoutePlanLegReached(activeRoutePlan, timeState.day, timeState.minute);
+    if (!arrival.changed) return '';
+    activeRoutePlan = arrival.plan;
+    markSaveDirty();
+    return ` · ${arrival.message}`;
+  };
+
+  const trySeasonAfterglow = (): boolean => {
+    const afterglow = nearbySeasonAfterglow();
+    if (!afterglow) return false;
+    if (player.mode === 'plane') {
+      lastSeasonAfterglowAction = 'season afterglow:in plane';
+      playAudio('uiDeny');
+      hud.flash('land before reading the season afterglow', 2.5);
+      return true;
+    }
+    const result = readSeasonAfterglow(seasonAfterglowReadings, afterglow);
+    lastSeasonAfterglowAction = result.message;
+    if (!result.ok) {
+      triggerCharacterAction('discover', 'map', 0.55);
+      playAudio('uiConfirm');
+      hud.flash(result.message, 2.8);
+      refreshUseButton();
+      return true;
+    }
+    survivalState.trailFocus = Math.max(Math.trunc(survivalState.trailFocus ?? 0), afterglow.focusMinutes);
+    survivalState.stamina = Math.min(100, survivalState.stamina + afterglow.stamina);
+    survivalState.exposure = Math.max(0, survivalState.exposure - afterglow.exposureRelief);
+    lastSurvivalAction = `season afterglow focus: ${afterglow.focusMinutes}m · +${afterglow.stamina} stamina · -${afterglow.exposureRelief} exposure`;
+    const routeStop = completeSeasonAfterglowRouteStop(afterglow);
+    lastNavigationAction = `season afterglow: ${afterglow.label} · ${afterglow.routeHint}${routeStop}`;
+    triggerCharacterAction('discover', 'echoLantern', 1.05);
+    playAudio('landmarkAwaken');
+    markSaveDirty();
+    seasonAfterglowRenderer.setAfterglow(currentSeasonAfterglow());
+    hud.flash(`${result.message} · +${afterglow.stamina} stamina · -${afterglow.exposureRelief} exposure${routeStop}`, 5);
+    hud.setRouteSlate(currentRouteSlate(), 6);
+    if (journalOpen) hud.setJournal(currentHearthJournal(), true);
+    refreshUseButton();
     return true;
   };
 
@@ -2985,6 +3092,7 @@ async function boot(): Promise<void> {
     waystones: waystoneRouteSignals(),
     skyfall: currentRouteSkyfallSignal(),
     murmur: currentRouteMurmurSignal(),
+    seasonAfterglow: currentRouteSeasonAfterglowSignal(),
     seasonGuides: currentSeasonRouteGuides(),
     nativeLife: currentRouteNativeLifeSignals(),
   });
@@ -2998,6 +3106,7 @@ async function boot(): Promise<void> {
     waystones: waystoneRouteSignals(),
     skyfall: currentRouteSkyfallSignal(),
     murmur: currentRouteMurmurSignal(),
+    seasonAfterglow: currentRouteSeasonAfterglowSignal(),
     seasonGuides: currentSeasonRouteGuides(),
     nativeLife: currentRouteNativeLifeSignals(),
   });
@@ -3075,6 +3184,7 @@ async function boot(): Promise<void> {
       skyfall: currentRouteSkyfallSignal(),
       murmur: currentRouteMurmurSignal(),
       season: currentRouteSeasonSignal(),
+      seasonAfterglow: currentRouteSeasonAfterglowSignal(),
       nativeLife: currentRouteNativeLifeSignals(),
     });
   };
@@ -3104,6 +3214,7 @@ async function boot(): Promise<void> {
     const murmurs = murmurDiagnostics();
     const murmurRoute = currentRouteMurmurSignal();
     const season = currentRouteSeasonSignal();
+    const afterglow = currentRouteSeasonAfterglowSignal();
     const cave = nearbyCaveSignal();
     const caveResonance = currentRouteCaveResonanceSignal();
     const fish = currentFishSchool();
@@ -3230,6 +3341,11 @@ async function boot(): Promise<void> {
         seasonChainLabel: season?.chain?.payoffLabel,
         seasonChainDetail: season?.chain ? `${season.chain.progressLabel} · ${season.chain.payoffDetail}` : undefined,
         seasonChainComplete: season?.chain?.linked,
+        seasonAfterglowLabel: afterglow?.label,
+        seasonAfterglowDetail: afterglow ? `${afterglow.distanceLabel} ${afterglow.turn} · ${afterglow.detail}` : undefined,
+        seasonAfterglowNote: afterglow?.note,
+        seasonAfterglowRead: afterglow?.read,
+        seasonAfterglowFocusMinutes: afterglow?.focusMinutes,
         recentMurmurs,
         caveSignal: caveLabel,
         caveDetail,
@@ -3578,6 +3694,35 @@ async function boot(): Promise<void> {
     return site;
   };
 
+  const spawnAtSeasonAfterglow = () => {
+    const afterglow = currentSeasonAfterglow();
+    if (!afterglow) return null;
+    player.spawnAt(afterglow.tile);
+    player.mode = 'walk';
+    player.vx = 0;
+    player.vy = 0;
+    player.vz = 0;
+    streamer.refreshDesired(...player.up(), player.altitudeAGL());
+    refreshUseButton();
+    return seasonAfterglowDiagnostics();
+  };
+
+  const completeCurrentSeasonChord = () => {
+    const season = currentStrangerSeason();
+    if (!season?.skyfall) return null;
+    harvestedSkyfalls.add(season.skyfall.id);
+    for (const site of season.murmurs) observedMurmurs.add(site.id);
+    skyfallRenderer.setSites(currentSkyfallSites());
+    murmurRenderer.setSites(currentMurmurSites());
+    seasonAfterglowRenderer.setAfterglow(currentSeasonAfterglow());
+    lastNavigationAction = `debug completed season chord: ${currentSeasonAfterglow()?.label ?? season.label}`;
+    markSaveDirty();
+    refreshUseButton();
+    hud.setRouteSlate(currentRouteSlate(), 6);
+    if (journalOpen) hud.setJournal(currentHearthJournal(), true);
+    return seasonAfterglowDiagnostics();
+  };
+
   const tryDismantleStructure = (id?: number): boolean => {
     const target = id !== undefined
       ? structures.find((s) => s.id === Math.trunc(id)) ?? null
@@ -3622,6 +3767,7 @@ async function boot(): Promise<void> {
         if (tryDomainResource()) return true;
         if (trySkyfall()) return true;
         if (tryMurmur()) return true;
+        if (trySeasonAfterglow()) return true;
         if (tryNativeCreature()) return true;
         if (tryRangedNativeWard()) return true;
         if (tryThresholdChamber()) return true;
@@ -3776,7 +3922,7 @@ async function boot(): Promise<void> {
       controls: { ux: uxManager.snapshot(), gamepad: gamepad.snapshot(), touch: touch.enabled, inputActive: input.active(), aimActive: input.active() || gamepad.active() },
       survival: { ...survivalSnapshot(), time: { ...timeState }, state: { ...survivalState }, pack: packBurden(), lastAction: lastSurvivalAction },
       caves: { current: currentNaturalVoid(), signal: nearbyCaveSignal(), resonance: caveResonanceDiagnostics(), mouths: caveMouthDiagnostics(), pressure: currentCavePressure(), lastAction: lastCaveAction, echoLantern: itemCount(counts, craftedItems, 'echoLantern') },
-      navigation: { horizonChart: horizonChartCount(), signal: visibleHorizonChartSignal(), hearthBeacon: visibleHearthBeaconSignal(), routePlan: currentRoutePlanSignal(), savedRoutePlan: activeRoutePlan, waystones: waystoneRouteSignals(), caveAnchors: caveAnchorRouteSignals(), weatherVane: weatherVaneForecast(), domain: currentPentagonDomain(), site: currentRouteSiteSignal(), thresholdChamber: currentRouteThresholdChamberSignal(), resource: currentRouteResourceSignal(), skyfall: currentRouteSkyfallSignal(), murmur: currentRouteMurmurSignal(), season: currentRouteSeasonSignal(), seasonRoute: currentSeasonRouteGuides(), guide: currentRouteGuide(), plan: horizonExpeditionPlan(), slate: currentRouteSlate(), lastAction: lastNavigationAction },
+      navigation: { horizonChart: horizonChartCount(), signal: visibleHorizonChartSignal(), hearthBeacon: visibleHearthBeaconSignal(), routePlan: currentRoutePlanSignal(), savedRoutePlan: activeRoutePlan, waystones: waystoneRouteSignals(), caveAnchors: caveAnchorRouteSignals(), weatherVane: weatherVaneForecast(), domain: currentPentagonDomain(), site: currentRouteSiteSignal(), thresholdChamber: currentRouteThresholdChamberSignal(), resource: currentRouteResourceSignal(), skyfall: currentRouteSkyfallSignal(), murmur: currentRouteMurmurSignal(), season: currentRouteSeasonSignal(), seasonAfterglow: currentRouteSeasonAfterglowSignal(), seasonRoute: currentSeasonRouteGuides(), guide: currentRouteGuide(), plan: horizonExpeditionPlan(), slate: currentRouteSlate(), lastAction: lastNavigationAction },
       journal: { open: journalOpen, state: currentHearthJournal() },
       storage: { open: openChestId !== null, chestId: openChestId, state: currentChestStorage() },
       domainResources: domainResourceDiagnostics(),
@@ -3785,10 +3931,11 @@ async function boot(): Promise<void> {
       murmurs: murmurDiagnostics(),
       nativeLife: nativeLifeDiagnostics(),
       strangerSeasons: strangerSeasonDiagnostics(),
+      seasonAfterglow: seasonAfterglowDiagnostics(),
       character: character.state(),
       characterIntent: characterVisualState(),
       naturalVoid: currentNaturalVoid(),
-      landmarks: { ...progressionState(), insights: pentagonInsights(), domain: currentPentagonDomain(), site: currentPentagonSite(), siteWork: currentPentagonSiteWork(), siteThreshold: currentPentagonSiteThreshold(), siteThresholdEffect: currentPentagonSiteThresholdEffect(), thresholdTerrain: lastThresholdTerrainAction, thresholdChambers: thresholdChamberDiagnostics(), siteCompletions: [...completedPentagonSites], siteCompletionsCount: completedPentagonSites.size, sites: pentagonExpeditionSites(pentagonTiles, discoveredPentagons), thresholds: pentagonSiteThresholds(pentagonTiles, discoveredPentagons, completedPentagonSites), resources: domainResourceDiagnostics(), skyfall: skyfallDiagnostics(), murmurs: murmurDiagnostics(), strangerSeasons: strangerSeasonDiagnostics(), nearby: pentagonLandmark(nearbyLandmarkTile() ?? -1, pentagonTiles, discoveredPentagons), lastAction: lastLandmarkAction },
+      landmarks: { ...progressionState(), insights: pentagonInsights(), domain: currentPentagonDomain(), site: currentPentagonSite(), siteWork: currentPentagonSiteWork(), siteThreshold: currentPentagonSiteThreshold(), siteThresholdEffect: currentPentagonSiteThresholdEffect(), thresholdTerrain: lastThresholdTerrainAction, thresholdChambers: thresholdChamberDiagnostics(), siteCompletions: [...completedPentagonSites], siteCompletionsCount: completedPentagonSites.size, sites: pentagonExpeditionSites(pentagonTiles, discoveredPentagons), thresholds: pentagonSiteThresholds(pentagonTiles, discoveredPentagons, completedPentagonSites), resources: domainResourceDiagnostics(), skyfall: skyfallDiagnostics(), murmurs: murmurDiagnostics(), strangerSeasons: strangerSeasonDiagnostics(), seasonAfterglow: seasonAfterglowDiagnostics(), nearby: pentagonLandmark(nearbyLandmarkTile() ?? -1, pentagonTiles, discoveredPentagons), lastAction: lastLandmarkAction },
       structures: structures.length,
       home: homeScore(structures, geo),
       lastStructureAction,
@@ -3940,7 +4087,7 @@ async function boot(): Promise<void> {
     caveMouths: () => caveMouthDiagnostics(),
     echoLantern: () => useEchoLantern(),
     horizonChart: () => useHorizonChart(),
-    navigation: () => ({ horizonChart: horizonChartCount(), signal: visibleHorizonChartSignal(), hearthBeacon: visibleHearthBeaconSignal(), routePlan: currentRoutePlanSignal(), savedRoutePlan: activeRoutePlan, waystones: waystoneRouteSignals(), caveAnchors: caveAnchorRouteSignals(), weatherVane: weatherVaneForecast(), domain: currentPentagonDomain(), site: currentRouteSiteSignal(), thresholdChamber: currentRouteThresholdChamberSignal(), resource: currentRouteResourceSignal(), skyfall: currentRouteSkyfallSignal(), murmur: currentRouteMurmurSignal(), season: currentRouteSeasonSignal(), seasonRoute: currentSeasonRouteGuides(), strangerSeasons: strangerSeasonDiagnostics(), guide: currentRouteGuide(), routeRenderer: routeRenderer.stats(), plan: horizonExpeditionPlan(), slate: currentRouteSlate(), lastAction: lastNavigationAction }),
+    navigation: () => ({ horizonChart: horizonChartCount(), signal: visibleHorizonChartSignal(), hearthBeacon: visibleHearthBeaconSignal(), routePlan: currentRoutePlanSignal(), savedRoutePlan: activeRoutePlan, waystones: waystoneRouteSignals(), caveAnchors: caveAnchorRouteSignals(), weatherVane: weatherVaneForecast(), domain: currentPentagonDomain(), site: currentRouteSiteSignal(), thresholdChamber: currentRouteThresholdChamberSignal(), resource: currentRouteResourceSignal(), skyfall: currentRouteSkyfallSignal(), murmur: currentRouteMurmurSignal(), season: currentRouteSeasonSignal(), seasonAfterglow: currentRouteSeasonAfterglowSignal(), seasonRoute: currentSeasonRouteGuides(), strangerSeasons: strangerSeasonDiagnostics(), guide: currentRouteGuide(), routeRenderer: routeRenderer.stats(), plan: horizonExpeditionPlan(), slate: currentRouteSlate(), lastAction: lastNavigationAction }),
     routePlan: () => ({ saved: activeRoutePlan, signal: currentRoutePlanSignal() }),
     pinRoute: () => pinCurrentRoute(),
     clearRoutePlan: () => clearRoutePlan(),
@@ -3963,6 +4110,10 @@ async function boot(): Promise<void> {
     gatherSkyfall: () => trySkyfall(),
     murmurs: () => murmurDiagnostics(),
     observeMurmur: () => tryMurmur(),
+    seasonAfterglow: () => seasonAfterglowDiagnostics(),
+    completeCurrentSeasonChord,
+    spawnAtSeasonAfterglow,
+    readSeasonAfterglow: () => trySeasonAfterglow(),
     nativeLife: () => nativeLifeDiagnostics(),
     tendNativeLife: () => tryNativeCreature(),
     spawnAtNativeLife: (kindOrRings: NativeCreatureKind | number = 'mossPuff', maybeRings = 48) => {
@@ -4076,7 +4227,7 @@ async function boot(): Promise<void> {
       nearby: pentagonLandmark(nearbyLandmarkTile() ?? -1, pentagonTiles, discoveredPentagons),
       renderer: landmarkRenderer.stats(),
       lastAction: lastLandmarkAction,
-      chart: { horizonChart: horizonChartCount(), signal: visibleHorizonChartSignal(), hearthBeacon: visibleHearthBeaconSignal(), routePlan: currentRoutePlanSignal(), waystones: waystoneRouteSignals(), caveAnchors: caveAnchorRouteSignals(), weatherVane: weatherVaneForecast(), domain: currentPentagonDomain(), site: currentRouteSiteSignal(), thresholdChamber: currentRouteThresholdChamberSignal(), resource: currentRouteResourceSignal(), skyfall: currentRouteSkyfallSignal(), murmur: currentRouteMurmurSignal(), season: currentRouteSeasonSignal(), seasonRoute: currentSeasonRouteGuides(), guide: currentRouteGuide(), slate: currentRouteSlate(), lastAction: lastNavigationAction },
+      chart: { horizonChart: horizonChartCount(), signal: visibleHorizonChartSignal(), hearthBeacon: visibleHearthBeaconSignal(), routePlan: currentRoutePlanSignal(), waystones: waystoneRouteSignals(), caveAnchors: caveAnchorRouteSignals(), weatherVane: weatherVaneForecast(), domain: currentPentagonDomain(), site: currentRouteSiteSignal(), thresholdChamber: currentRouteThresholdChamberSignal(), resource: currentRouteResourceSignal(), skyfall: currentRouteSkyfallSignal(), murmur: currentRouteMurmurSignal(), season: currentRouteSeasonSignal(), seasonAfterglow: currentRouteSeasonAfterglowSignal(), seasonRoute: currentSeasonRouteGuides(), guide: currentRouteGuide(), slate: currentRouteSlate(), lastAction: lastNavigationAction },
     }),
     craft: (recipeId: string) => craftSelected(recipeId),
     crafting: () => ({ open: craftingOpen, crafted: { ...craftedItems }, recipes: craftingRows(), ledger: packLedger() }),
@@ -4110,7 +4261,7 @@ async function boot(): Promise<void> {
         craftedItems,
         drops: resourceDrops,
         structures,
-        progression: { pentagons: [...discoveredPentagons], siteCompletions: [...completedPentagonSites], domainHarvests: [...harvestedDomainResources], skyfallHarvests: [...harvestedSkyfalls], murmurObservations: [...observedMurmurs], thresholdChamberObservations: [...observedThresholdChambers], caveResonanceObservations: [...observedCaveResonances], nativeCreatureTends: [...tendedNativeCreatures], nativeCreatureWards: [...wardedNativeCreatures], routePlan: activeRoutePlan, toolWear },
+        progression: { pentagons: [...discoveredPentagons], siteCompletions: [...completedPentagonSites], domainHarvests: [...harvestedDomainResources], skyfallHarvests: [...harvestedSkyfalls], murmurObservations: [...observedMurmurs], seasonAfterglowReadings: [...seasonAfterglowReadings], thresholdChamberObservations: [...observedThresholdChambers], caveResonanceObservations: [...observedCaveResonances], nativeCreatureTends: [...tendedNativeCreatures], nativeCreatureWards: [...wardedNativeCreatures], routePlan: activeRoutePlan, toolWear },
         time: timeState,
         weather: weatherState,
         survival: survivalState,
@@ -4145,6 +4296,8 @@ async function boot(): Promise<void> {
         observedMurmurs.clear();
         for (const id of normalizeMurmurObservations(save.progression?.murmurObservations)) observedMurmurs.add(id);
         murmurRenderer.setSites(currentMurmurSites());
+        seasonAfterglowReadings.clear();
+        for (const id of normalizeSeasonAfterglowReadings(save.progression?.seasonAfterglowReadings)) seasonAfterglowReadings.add(id);
         observedThresholdChambers.clear();
         for (const id of normalizeThresholdChamberObservations(save.progression?.thresholdChamberObservations)) observedThresholdChambers.add(id);
         observedCaveResonances.clear();
@@ -4159,6 +4312,7 @@ async function boot(): Promise<void> {
         Object.assign(timeState, normalizeTimeState(save.time));
         Object.assign(weatherState, normalizeWeatherState(save.weather));
         Object.assign(survivalState, normalizeSurvivalState(save.survival));
+        seasonAfterglowRenderer.setAfterglow(currentSeasonAfterglow());
         refreshUseButton();
         hotbarSel = Math.max(0, Math.min(SLOTS.length - 1, save.hotbarSel));
         planeCrafted = save.planeCrafted;
@@ -4349,14 +4503,15 @@ async function boot(): Promise<void> {
         streamer: streamer.stats(),
         character: character.state(),
         characterIntent: characterVisualState(),
-        landmarks: { ...progressionState(), insights: pentagonInsights(), site: currentPentagonSite(), siteWork: currentPentagonSiteWork(), siteThreshold: currentPentagonSiteThreshold(), siteThresholdEffect: currentPentagonSiteThresholdEffect(), thresholdTerrain: lastThresholdTerrainAction, thresholdChambers: thresholdChamberDiagnostics(), siteCompletions: [...completedPentagonSites], siteCompletionsCount: completedPentagonSites.size, resources: domainResourceDiagnostics(), skyfall: skyfallDiagnostics(), murmurs: murmurDiagnostics(), strangerSeasons: strangerSeasonDiagnostics() },
-        navigation: { horizonChart: horizonChartCount(), signal: visibleHorizonChartSignal(), hearthBeacon: visibleHearthBeaconSignal(), routePlan: currentRoutePlanSignal(), savedRoutePlan: activeRoutePlan, waystones: waystoneRouteSignals(), caveAnchors: caveAnchorRouteSignals(), weatherVane: weatherVaneForecast(), domain: currentPentagonDomain(), site: currentRouteSiteSignal(), thresholdChamber: currentRouteThresholdChamberSignal(), resource: currentRouteResourceSignal(), skyfall: currentRouteSkyfallSignal(), murmur: currentRouteMurmurSignal(), season: currentRouteSeasonSignal(), seasonRoute: currentSeasonRouteGuides(), guide: currentRouteGuide(), plan: horizonExpeditionPlan(), slate: currentRouteSlate() },
+        landmarks: { ...progressionState(), insights: pentagonInsights(), site: currentPentagonSite(), siteWork: currentPentagonSiteWork(), siteThreshold: currentPentagonSiteThreshold(), siteThresholdEffect: currentPentagonSiteThresholdEffect(), thresholdTerrain: lastThresholdTerrainAction, thresholdChambers: thresholdChamberDiagnostics(), siteCompletions: [...completedPentagonSites], siteCompletionsCount: completedPentagonSites.size, resources: domainResourceDiagnostics(), skyfall: skyfallDiagnostics(), murmurs: murmurDiagnostics(), strangerSeasons: strangerSeasonDiagnostics(), seasonAfterglow: seasonAfterglowDiagnostics() },
+        navigation: { horizonChart: horizonChartCount(), signal: visibleHorizonChartSignal(), hearthBeacon: visibleHearthBeaconSignal(), routePlan: currentRoutePlanSignal(), savedRoutePlan: activeRoutePlan, waystones: waystoneRouteSignals(), caveAnchors: caveAnchorRouteSignals(), weatherVane: weatherVaneForecast(), domain: currentPentagonDomain(), site: currentRouteSiteSignal(), thresholdChamber: currentRouteThresholdChamberSignal(), resource: currentRouteResourceSignal(), skyfall: currentRouteSkyfallSignal(), murmur: currentRouteMurmurSignal(), season: currentRouteSeasonSignal(), seasonAfterglow: currentRouteSeasonAfterglowSignal(), seasonRoute: currentSeasonRouteGuides(), guide: currentRouteGuide(), plan: horizonExpeditionPlan(), slate: currentRouteSlate() },
         journal: { open: journalOpen, state: currentHearthJournal() },
         domainResources: domainResourceDiagnostics(),
         thresholdChambers: thresholdChamberDiagnostics(),
         skyfall: skyfallDiagnostics(),
         murmurs: murmurDiagnostics(),
         strangerSeasons: strangerSeasonDiagnostics(),
+        seasonAfterglow: seasonAfterglowDiagnostics(),
         caveMouths: caveMouthDiagnostics(),
         caveResonances: caveResonanceDiagnostics(),
         audio: audio.state(),
@@ -4410,6 +4565,7 @@ async function boot(): Promise<void> {
       skyfall: currentRouteSkyfallSignal(),
       murmur: currentRouteMurmurSignal(),
       season: currentRouteSeasonSignal(),
+      seasonAfterglow: currentRouteSeasonAfterglowSignal(),
       seasonRoute: currentSeasonRouteGuides(),
       guide: currentRouteGuide(),
       routeRenderer: routeRenderer.stats(),
@@ -4459,13 +4615,15 @@ async function boot(): Promise<void> {
       skyfall: skyfallDiagnostics(),
       murmurs: murmurDiagnostics(),
       strangerSeasons: strangerSeasonDiagnostics(),
+      seasonAfterglow: seasonAfterglowDiagnostics(),
       nearby: pentagonLandmark(nearbyLandmarkTile() ?? -1, pentagonTiles, discoveredPentagons),
       lastAction: lastLandmarkAction,
-      chart: { horizonChart: horizonChartCount(), signal: visibleHorizonChartSignal(), hearthBeacon: visibleHearthBeaconSignal(), routePlan: currentRoutePlanSignal(), waystones: waystoneRouteSignals(), caveAnchors: caveAnchorRouteSignals(), weatherVane: weatherVaneForecast(), domain: currentPentagonDomain(), site: currentRouteSiteSignal(), thresholdChamber: currentRouteThresholdChamberSignal(), resource: currentRouteResourceSignal(), skyfall: currentRouteSkyfallSignal(), murmur: currentRouteMurmurSignal(), season: currentRouteSeasonSignal(), seasonRoute: currentSeasonRouteGuides(), guide: currentRouteGuide(), plan: horizonExpeditionPlan(), slate: currentRouteSlate(), lastAction: lastNavigationAction },
+      chart: { horizonChart: horizonChartCount(), signal: visibleHorizonChartSignal(), hearthBeacon: visibleHearthBeaconSignal(), routePlan: currentRoutePlanSignal(), waystones: waystoneRouteSignals(), caveAnchors: caveAnchorRouteSignals(), weatherVane: weatherVaneForecast(), domain: currentPentagonDomain(), site: currentRouteSiteSignal(), thresholdChamber: currentRouteThresholdChamberSignal(), resource: currentRouteResourceSignal(), skyfall: currentRouteSkyfallSignal(), murmur: currentRouteMurmurSignal(), season: currentRouteSeasonSignal(), seasonAfterglow: currentRouteSeasonAfterglowSignal(), seasonRoute: currentSeasonRouteGuides(), guide: currentRouteGuide(), plan: horizonExpeditionPlan(), slate: currentRouteSlate(), lastAction: lastNavigationAction },
     },
     murmurs: murmurDiagnostics(),
     nativeLife: nativeLifeDiagnostics(),
     strangerSeasons: strangerSeasonDiagnostics(),
+    seasonAfterglow: seasonAfterglowDiagnostics(),
     creativeActive,
   });
   (window as any).advanceTime = (ms = 16) => new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
@@ -4823,6 +4981,9 @@ async function boot(): Promise<void> {
     const murmurSitesNow = currentMurmurSites();
     murmurRenderer.setSites(murmurSitesNow);
     murmurRenderer.update(murmurSitesNow, geo, layers, columns, camWorld, now / 1000);
+    const afterglowNow = currentSeasonAfterglow();
+    seasonAfterglowRenderer.setAfterglow(afterglowNow);
+    seasonAfterglowRenderer.update(afterglowNow, geo, layers, columns, camWorld, now / 1000);
     const nativeSitesNow = currentNativeCreatureSites();
     nativeLifeRenderer.setSites(nativeSitesNow);
     nativeLifeRenderer.update(nativeSitesNow, geo, layers, columns, camWorld, now / 1000);
@@ -4915,6 +5076,7 @@ async function boot(): Promise<void> {
       const murmur = currentRouteMurmurSignal();
       const murmurNearby = nearbyMurmur();
       const season = currentRouteSeasonSignal();
+      const afterglow = currentRouteSeasonAfterglowSignal();
       const chartSignal = horizonChartCount() > 0 ? horizonChartSignal() : null;
       const hearthBeacon = visibleHearthBeaconSignal();
       const guide = currentRouteGuide(chartSignal);
@@ -4936,6 +5098,7 @@ async function boot(): Promise<void> {
         const resourceStats = domainResourceRenderer.stats();
         const skyfallStats = skyfallRenderer.stats();
         const murmurStats = murmurRenderer.stats();
+        const afterglowStats = seasonAfterglowRenderer.stats();
         const nativeStats = nativeLifeRenderer.stats();
         const nativeHazard = nearbyNativeHazard();
         const mouthStats = caveMouthRenderer.stats();
@@ -4979,6 +5142,7 @@ async function boot(): Promise<void> {
           murmur ? `murmur ${murmur.label} · tile ${murmur.tile} · ${murmur.distanceLabel} ${murmur.turn} · ${murmur.minutesRemaining}m left` : '',
           murmurNearby ? `near murmur ${murmurNearby.label} · ${murmurNearby.hint}` : '',
           season ? `stranger season ${season.label} · ${season.detail} · ${season.tradeoff} · ${season.chain.progressLabel}` : '',
+          afterglow ? `season afterglow ${afterglow.read ? 'read' : 'unread'} · ${afterglow.label} · ${afterglow.distanceLabel} ${afterglow.turn} · meshes ${afterglowStats.meshes}` : '',
           domain ? `domain ${domain.label} · ${domain.domainLabel} · ring ${domain.ring}/${domain.radius} · ${domain.discovered ? domain.boon : domain.routeHint}` : '',
           site ? `site ${site.label} · ${siteWork?.completed ? 'complete' : siteWork?.ready ? 'ready' : site.discovered ? `needs ${siteWorkMissingLabels(siteWork).slice(0, 3).join(', ') || site.buildHint}` : site.routeHint}${siteThresholdNow ? ` · threshold ${siteThresholdNow.label}${siteThresholdNow.open ? ' open' : ' sealed'}` : ''}` : '',
           siteThresholdEffectNow ? `threshold effect ${siteThresholdEffectNow.label} · ${siteThresholdEffectNow.detail}` : '',

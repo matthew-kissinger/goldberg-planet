@@ -23,6 +23,8 @@ function materialFor(kind: RouteGuide['kind'], opacity = 0.78, intensity = 0.42)
     ? 0xf4b75f
     : kind === 'murmur'
     ? 0xb99cff
+    : kind === 'seasonAfterglow'
+    ? 0xf6f0a2
     : 0x87a9d6;
   return new THREE.MeshStandardMaterial({
     color,

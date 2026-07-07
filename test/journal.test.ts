@@ -377,6 +377,78 @@ describe('Hearth Journal', () => {
     });
   });
 
+  it('surfaces unread season afterglows as wonder work and records them after reading', () => {
+    const unread = buildHearthJournal(baseInput({
+      home: {
+        label: 'shelter alive',
+        functional: true,
+        protected: true,
+        missing: [],
+        storedItems: 5,
+        cellarProvisions: 2,
+        structures: 9,
+      },
+      food: { expeditionStew: 1, trailRation: 1 },
+      route: {
+        chartKnown: true,
+        slateSummary: 'orange fall line afterglow',
+        planReady: true,
+        planPrepLabel: 'prep complete',
+        planMissing: [],
+        waystones: 1,
+        caveAnchors: 0,
+      },
+      world: {
+        skyfallActive: 0,
+        skyfallHarvested: 1,
+        murmursActive: 0,
+        murmursObserved: 3,
+        seasonAfterglowLabel: 'orange fall line afterglow',
+        seasonAfterglowDetail: '157 m ahead · fall claimed + 3/3 notes resolved at emberfall crater',
+        seasonAfterglowNote: 'the fall and three murmurs hold one remembered path',
+        seasonAfterglowRead: false,
+        seasonAfterglowFocusMinutes: 420,
+        recentMurmurs: [],
+        fishLabel: 'quiet water',
+        fishStrength: 0.2,
+        forageLabel: 'no forage',
+        forageStrength: 0.1,
+      },
+    }));
+
+    expect(unread.next).toContainEqual({
+      label: 'Read season afterglow',
+      detail: 'orange fall line afterglow · 157 m ahead · fall claimed + 3/3 notes resolved at emberfall crater · focus 420m',
+      tone: 'wonder',
+    });
+    expect(unread.sections.find((section) => section.id === 'field')?.entries.find((entry) => entry.label === 'season afterglow')).toMatchObject({
+      detail: 'orange fall line afterglow · unread · 157 m ahead · fall claimed + 3/3 notes resolved at emberfall crater · the fall and three murmurs hold one remembered path',
+      tone: 'wonder',
+    });
+
+    const read = buildHearthJournal(baseInput({
+      home: { functional: true, protected: true, missing: [], label: 'shelter alive', storedItems: 5, cellarProvisions: 2, structures: 9 },
+      food: { trailRation: 2 },
+      route: { chartKnown: true, planReady: true, planPrepLabel: 'ready', planMissing: [], slateSummary: 'afterglow read', waystones: 1, caveAnchors: 0 },
+      world: {
+        skyfallActive: 0,
+        skyfallHarvested: 1,
+        murmursActive: 0,
+        murmursObserved: 3,
+        seasonAfterglowLabel: 'orange fall line afterglow',
+        seasonAfterglowDetail: '157 m ahead · fall claimed + 3/3 notes resolved at emberfall crater',
+        seasonAfterglowRead: true,
+        recentMurmurs: [],
+        fishLabel: 'quiet water',
+        fishStrength: 0.2,
+        forageLabel: 'no forage',
+        forageStrength: 0.1,
+      },
+    }));
+    expect(read.next.map((entry) => entry.label)).not.toContain('Read season afterglow');
+    expect(read.sections.find((section) => section.id === 'field')?.entries.find((entry) => entry.label === 'season afterglow')?.tone).toBe('ready');
+  });
+
   it('tracks expedition site work as missing, ready, and completed journal goals', () => {
     const missing = buildHearthJournal(baseInput({
       discoveries: {

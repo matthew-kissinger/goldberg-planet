@@ -48,9 +48,9 @@ muted).
 | **Q** | eat the best packed food to restore stamina and reduce exposure |
 | **B** | open crafting plus the Pack Ledger inventory readout: sticks, workbench, stone tools, stone blade, reed bow, whistling arrows, fishing rod, bait, campfire, chest, bedroll, crop plot, compost bin, rain cistern, root cellar, shelter kits, dock segment, fish trap, shore net, drying rack, weather vane, lantern, waystone, plane frame |
 | set button in crafting + RMB | place crafted camp/house props on the highlighted hex |
-| **R** | use a nearby placed prop: open chest storage, tend/harvest/fertilize/irrigate crop plots, turn scraps into compost at compost bins, catch rain at rain cisterns, cache or pull provisions at root cellars, cook at lit campfires, set/check/collect fish traps, set/check/comb shore nets, preserve food at drying racks, read weather vanes, light campfires/lanterns, set bedroll home/rest, cast from dock segments, or attune waystones; with no nearby prop, discover pentagon landmarks, gather active Skyfall craters, listen to active World Murmurs, cast from shore with a fishing rod, or forage the current terrain |
+| **R** | use a nearby placed prop: open chest storage, tend/harvest/fertilize/irrigate crop plots, turn scraps into compost at compost bins, catch rain at rain cisterns, cache or pull provisions at root cellars, cook at lit campfires, set/check/collect fish traps, set/check/comb shore nets, preserve food at drying racks, read weather vanes, light campfires/lanterns, set bedroll home/rest, cast from dock segments, or attune waystones; with no nearby prop, discover pentagon landmarks, gather active Skyfall craters, listen to active World Murmurs, read completed season afterglows, cast from shore with a fishing rod, or forage the current terrain |
 | **Shift+R** | pack a nearby empty/inactive placed prop back into inventory; stocked, lit, planted, home, attuned, anchored, or set trap props must be cleared first |
-| **M** | open the Route Slate: Hearth Beacon home signal, active Skyfall events, active World Murmurs, nearby cave/ecology pins, and after the first pentagon awakens, Horizon Chart target distance, turn direction, and expedition prep |
+| **M** | open the Route Slate: Hearth Beacon home signal, active Skyfall events, active World Murmurs, completed season afterglows, nearby cave/ecology pins, and after the first pentagon awakens, Horizon Chart target distance, turn direction, and expedition prep |
 | **P** / **Shift+P** | pin the current Route Slate candidates as a saved route itinerary, or append a new distinct stop / clear the itinerary |
 | **J** | open the Hearth Journal: home state, route prep, discoveries, cave/food/ecology notes, and current next goals |
 | **N** | mute / unmute generated ambience and interaction audio |
@@ -260,7 +260,10 @@ resource pins when nearby. Skyfall events now give the
     seasonal stops advance when the player actually gathers the fall or listens to the note,
     so the route line tracks completed season actions rather than mere arrival. Completing
     the whole seasonal itinerary grants season chord focus, a long trail-focus window that
-    makes the next expedition easier to carry through.
+    makes the next expedition easier to carry through. A completed full season chord now
+    leaves a low season-afterglow marker at the fall crater; Route Slate, the route ribbon,
+    Hearth Journal, F3, save/export/import, and `render_game_to_text` expose it until the
+    player reads it for a one-time focus, stamina, and exposure-relief boon.
     Insights are not just lore:
 The first audio pass is now live: a generated planet-wind ambience loop starts after the
 first player gesture, generated SFX mark crafting, build placement, gathering, fishing,
@@ -292,7 +295,7 @@ before the chart exists: a lit local campfire turns home into a smoke signal wit
 great-circle distance and local turn direction. Survival progress now writes to a local Hearth and Horizon save slot per
 seed/frequency: player position, hotbar inventory, crafted/food/travel items, stamina,
 exposure, weather/time state, placed props and their utility state, pentagon discoveries,
-domain resource and Skyfall harvests, World Murmur observations, threshold chamber readings,
+domain resource and Skyfall harvests, World Murmur observations, season-afterglow readings, threshold chamber readings,
 cave-resonance observations, the saved route itinerary,
 plane unlock, column edits, and chopped trees restore after reload
 unless `?nosave=1` is used.
@@ -467,7 +470,7 @@ water, or a cliff stows it; E brings it back mid-fall.
 - GitHub Pages deploys from the `main` branch workflow in `.github/workflows/deploy.yml`.
   The app is static: no server secrets, runtime API keys, or backend configuration are expected.
 
-Test suite: 227 tests — icosahedron invariants; 10m²+2 counts with exactly 12 pentagons;
+Test suite: 246 tests — icosahedron invariants; 10m²+2 counts with exactly 12 pentagons;
 neighbor symmetry; CCW winding and bit-identical shared corners; id round-trips; seam
 agreement; `tileOf` vs brute force; layer-grid inverses; terrain determinism and
 ocean/land/mountain balance; column edit semantics incl. tunnels and immutable bedrock;
@@ -542,5 +545,6 @@ contracts.
 - Skyfall and World Murmurs are the first timed planetary event pair: one active crater and
   three active listening sites exist per event window, and the first Stranger Season forecast
   now exposes their overlap. Harvesting the fall plus listening to an overlapping note
-  creates the first derived season-chain payoff, while meteor showers, stronger visual tells,
-  and deeper chained seasonal consequences are still future work.
+  creates the first derived season-chain payoff; completing the full chord now leaves a
+  readable afterglow at the fall crater. Meteor showers, stronger visual tells, and later
+  window-changing seasonal consequences are still future work.

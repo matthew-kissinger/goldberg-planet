@@ -114,6 +114,11 @@ export interface HearthJournalInput {
     seasonChainLabel?: string;
     seasonChainDetail?: string;
     seasonChainComplete?: boolean;
+    seasonAfterglowLabel?: string;
+    seasonAfterglowDetail?: string;
+    seasonAfterglowNote?: string;
+    seasonAfterglowRead?: boolean;
+    seasonAfterglowFocusMinutes?: number;
     recentMurmurs: readonly JournalEntry[];
     caveSignal?: string;
     caveDetail?: string;
@@ -197,6 +202,15 @@ export function buildHearthJournal(input: HearthJournalInput): HearthJournal {
   }
   if (input.world.murmursActive > 0 && input.world.murmurRoute) {
     addNext(next, 'Listen to the world', input.world.murmurRoute, 'wonder');
+  }
+  if (input.world.seasonAfterglowLabel && input.world.seasonAfterglowRead !== true) {
+    const focus = clampInt(input.world.seasonAfterglowFocusMinutes ?? 0);
+    addNext(
+      next,
+      'Read season afterglow',
+      `${input.world.seasonAfterglowLabel} · ${input.world.seasonAfterglowDetail ?? 'season chord echo'}${focus > 0 ? ` · focus ${focus}m` : ''}`,
+      'wonder',
+    );
   }
   if (input.world.seasonChainLabel && input.world.seasonChainDetail) {
     addNext(
@@ -350,6 +364,11 @@ export function buildHearthJournal(input: HearthJournalInput): HearthJournal {
       label: 'season chain',
       detail: `${input.world.seasonChainLabel}${input.world.seasonChainDetail ? ` · ${input.world.seasonChainDetail}` : ''}`,
       tone: input.world.seasonChainComplete ? 'ready' as const : 'wonder' as const,
+    }] : []),
+    ...(input.world.seasonAfterglowLabel ? [{
+      label: 'season afterglow',
+      detail: `${input.world.seasonAfterglowLabel} · ${input.world.seasonAfterglowRead ? 'read' : 'unread'}${input.world.seasonAfterglowDetail ? ` · ${input.world.seasonAfterglowDetail}` : ''}${input.world.seasonAfterglowNote ? ` · ${input.world.seasonAfterglowNote}` : ''}`,
+      tone: input.world.seasonAfterglowRead ? 'ready' as const : 'wonder' as const,
     }] : []),
     {
       label: input.world.caveSignal ?? 'caves',

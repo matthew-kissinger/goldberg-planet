@@ -94,6 +94,7 @@ describe('Hearth and Horizon save boundary', () => {
         domainHarvests: [22, 0, 22, 11],
         skyfallHarvests: [4, 1, 4],
         murmurObservations: [7, 3, 7],
+        seasonAfterglowReadings: [19, 7, 19],
         thresholdChamberObservations: [10, 0, 10],
         caveResonanceObservations: [2048, 1024, 2048],
         nativeCreatureTends: [24, 8, 24],
@@ -146,6 +147,7 @@ describe('Hearth and Horizon save boundary', () => {
     expect(parsed!.progression.domainHarvests).toEqual([0, 11, 22]);
     expect(parsed!.progression.skyfallHarvests).toEqual([1, 4]);
     expect(parsed!.progression.murmurObservations).toEqual([3, 7]);
+    expect(parsed!.progression.seasonAfterglowReadings).toEqual([7, 19]);
     expect(parsed!.progression.thresholdChamberObservations).toEqual([0, 10]);
     expect(parsed!.progression.caveResonanceObservations).toEqual([1024, 2048]);
     expect(parsed!.progression.nativeCreatureTends).toEqual([8, 24]);
@@ -214,6 +216,7 @@ describe('Hearth and Horizon save boundary', () => {
     delete (legacy.progression as any).domainHarvests;
     delete (legacy.progression as any).skyfallHarvests;
     delete (legacy.progression as any).murmurObservations;
+    delete (legacy.progression as any).seasonAfterglowReadings;
     delete (legacy.progression as any).thresholdChamberObservations;
     delete (legacy.progression as any).caveResonanceObservations;
     delete (legacy.progression as any).nativeCreatureTends;
@@ -223,6 +226,7 @@ describe('Hearth and Horizon save boundary', () => {
     expect(parseWorldSaveJson(JSON.stringify(legacy))!.progression.siteCompletions).toEqual([]);
     expect(parseWorldSaveJson(JSON.stringify(legacy))!.progression.skyfallHarvests).toEqual([]);
     expect(parseWorldSaveJson(JSON.stringify(legacy))!.progression.murmurObservations).toEqual([]);
+    expect(parseWorldSaveJson(JSON.stringify(legacy))!.progression.seasonAfterglowReadings).toEqual([]);
     expect(parseWorldSaveJson(JSON.stringify(legacy))!.progression.thresholdChamberObservations).toEqual([]);
     expect(parseWorldSaveJson(JSON.stringify(legacy))!.progression.caveResonanceObservations).toEqual([]);
     expect(parseWorldSaveJson(JSON.stringify(legacy))!.progression.nativeCreatureTends).toEqual([]);

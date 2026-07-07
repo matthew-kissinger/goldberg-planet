@@ -2,6 +2,30 @@ Original prompt: complete courier frontier plan
 
 ## 2026-07-06
 
+- Corrected the active Hearth and Horizon workflow back to the documented orchestrator
+  model: deployed four read-only subagent lanes for goal/DAG audit, cross-device UX/input
+  audit, asset-readability audit, and current season-afterglow code review, then added an
+  active DAG rule, 10-lane living DAG board, critical path, subagent operating model, and
+  reviewer gates to the cycle docs so broad work starts with dependency nodes, parallel
+  lanes, merge order, reviewer gates, and proof artifacts instead of drifting into
+  single-threaded feature work.
+- Integrated the subagent audit findings into the active frontier: mobile/tablet route
+  controls and gamepad panel focus are now documented as P0 Cross-Device UX work, while the
+  immediate Asset Readability Gate frontier is player/avatar kit, cave anchors/waystones,
+  native hazards at normal play distance, and the new season-afterglow marker. Low-risk UX
+  safety fixes are in locally: storage clicks no longer leak into mouse-look, opening Route
+  Slate or pinning a route closes crafting, and touch controls reset held state on pointer
+  loss, blur, and visibility changes.
+- Implemented the first Cycle 5 season-afterglow consequence slice locally: a completed
+  full Stranger Season chord now creates a readable crater afterglow, promotes it through
+  Route Slate, route guide/ribbon, Hearth Journal, F3/debug, save/export/import, and
+  `render_game_to_text`, and lets the player read it once for trail focus, stamina, and
+  exposure relief. The afterglow reviewer found and this pass fixed the route-completion
+  edge case: afterglow route plans no longer complete by proximity before reading, and a
+  nearby read now completes the planned stop. Focused event-season/save/navigation/journal/
+  renderer/UX tests, typecheck, browser proof at `output/playwright/season-afterglow/`, the
+  full 246-test suite, production build, and `git diff --check` pass for the slice with only
+  the known LF-to-CRLF checkout warnings.
 - Welcomed the Twelve Bells music handoff into the game: the album now streams through the
   existing `GameAudio` unlock/mute/visibility lifecycle, F3 diagnostics report current
   soundtrack state, the 14 MP3 files were optimized from 50.72 MB to 33.26 MB as stripped

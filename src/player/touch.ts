@@ -105,6 +105,11 @@ export class TouchControls {
     this.el.addEventListener('pointermove', this.onMove, { passive: false });
     this.el.addEventListener('pointerup', this.onUp, { passive: false });
     this.el.addEventListener('pointercancel', this.onUp, { passive: false });
+    this.el.addEventListener('lostpointercapture', this.onLostPointer, { passive: false });
+    window.addEventListener('blur', this.resetHeldState);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') this.resetHeldState();
+    });
 
     const bindHold = (el: HTMLElement, set: (v: boolean) => void): void => {
       el.addEventListener('pointerdown', (e) => {
@@ -121,6 +126,7 @@ export class TouchControls {
       };
       el.addEventListener('pointerup', off);
       el.addEventListener('pointercancel', off);
+      el.addEventListener('lostpointercapture', off);
     };
     bindHold(this.btnJump, (v) => { this.jumpHeld = v; });
     bindHold(this.btnDown, (v) => { this.downHeld = v; });
@@ -131,6 +137,7 @@ export class TouchControls {
     });
     this.btnPlane.addEventListener('pointerup', () => this.btnPlane.classList.remove('press'));
     this.btnPlane.addEventListener('pointercancel', () => this.btnPlane.classList.remove('press'));
+    this.btnPlane.addEventListener('lostpointercapture', () => this.btnPlane.classList.remove('press'));
     this.btnUse.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       try {
@@ -170,6 +177,7 @@ export class TouchControls {
       this.usePackedDuringPress = false;
       this.useDownAt = 0;
     });
+    this.btnUse.addEventListener('lostpointercapture', this.cancelUseButton);
   }
 
   private capture(id: number): void {
@@ -288,6 +296,53 @@ export class TouchControls {
       this.pinchId = -1;
       // the remaining finger goes back to looking, but can't become a tap anymore
     }
+  };
+
+  private onLostPointer = (e: PointerEvent): void => {
+    if (e.pointerId === this.joyId || e.pointerId === this.lookId || e.pointerId === this.pinchId) {
+      this.resetHeldState();
+    }
+  };
+
+  private cancelUseButton = (): void => {
+    if (this.useHoldTimer !== null) {
+      clearTimeout(this.useHoldTimer);
+      this.useHoldTimer = null;
+    }
+    this.btnUse.classList.remove('press');
+    this.usePackedDuringPress = false;
+    this.useDownAt = 0;
+  };
+
+  private resetHeldState = (): void => {
+    this.moveX = 0;
+    this.moveY = 0;
+    this.sprint = false;
+    this.jumpHeld = false;
+    this.downHeld = false;
+    this.planeTap = false;
+    this.useTap = false;
+    this.packTap = false;
+    this.usePackedDuringPress = false;
+    this.useDownAt = 0;
+    if (this.useHoldTimer !== null) {
+      clearTimeout(this.useHoldTimer);
+      this.useHoldTimer = null;
+    }
+    this.mines = [];
+    this.places = [];
+    this.joyId = -1;
+    this.lookId = -1;
+    this.pinchId = -1;
+    this.pinched = false;
+    this.placing = false;
+    this.clearHold();
+    this.joyEl.style.display = 'none';
+    this.setKnob(0, 0);
+    this.btnJump.classList.remove('press');
+    this.btnDown.classList.remove('press');
+    this.btnPlane.classList.remove('press');
+    this.btnUse.classList.remove('press');
   };
 
   private pinch(): void {

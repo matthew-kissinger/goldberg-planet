@@ -190,6 +190,20 @@ export interface RouteSlateSeasonSignal {
   };
 }
 
+export interface RouteSlateSeasonAfterglowSignal {
+  tile?: number;
+  id: number;
+  label: string;
+  detail: string;
+  note: string;
+  routeHint: string;
+  read: boolean;
+  distanceM: number;
+  distanceLabel: string;
+  turn: HorizonChartSignal['turn'];
+  focusMinutes: number;
+}
+
 export interface RouteSlateThresholdChamberSignal {
   label: string;
   detail: string;
@@ -226,7 +240,7 @@ export interface RouteSlateCaveAnchorSignal {
   uses?: number;
 }
 
-export type RoutePlanSourceKind = 'target' | 'home' | 'waystone' | 'cave' | 'caveAnchor' | 'skyfall' | 'murmur' | 'nativeHazard' | 'nativeLife';
+export type RoutePlanSourceKind = 'target' | 'home' | 'waystone' | 'cave' | 'caveAnchor' | 'skyfall' | 'murmur' | 'seasonAfterglow' | 'nativeHazard' | 'nativeLife';
 
 export const ROUTE_ITINERARY_MAX_LEGS = 5;
 
@@ -306,7 +320,7 @@ export function routeAtlasVisible(guide: Pick<RouteGuide, 'kind'> | null | undef
 }
 
 export interface RoutePin {
-  id: 'planned' | 'target' | 'home' | 'domain' | 'site' | 'thresholdChamber' | 'resource' | 'skyfall' | 'murmur' | 'season' | 'caveResonance' | 'cave' | 'caveAnchor' | 'waystone' | 'fish' | 'forage' | 'nativeHazard' | 'nativeLife' | 'weather' | 'insight' | 'prep';
+  id: 'planned' | 'target' | 'home' | 'domain' | 'site' | 'thresholdChamber' | 'resource' | 'skyfall' | 'murmur' | 'season' | 'seasonAfterglow' | 'caveResonance' | 'cave' | 'caveAnchor' | 'waystone' | 'fish' | 'forage' | 'nativeHazard' | 'nativeLife' | 'weather' | 'insight' | 'prep';
   label: string;
   detail: string;
   priority: number;
@@ -341,6 +355,7 @@ export interface RouteSlateInput {
   skyfall?: RouteSlateSkyfallSignal | null;
   murmur?: RouteSlateMurmurSignal | null;
   season?: RouteSlateSeasonSignal | null;
+  seasonAfterglow?: RouteSlateSeasonAfterglowSignal | null;
   nativeLife?: readonly RouteSlateNativeLifeSignal[];
 }
 
@@ -360,6 +375,7 @@ export interface RouteGuideInput {
   waystones?: readonly RouteSlateWaystoneSignal[];
   skyfall?: RouteSlateSkyfallSignal | null;
   murmur?: RouteSlateMurmurSignal | null;
+  seasonAfterglow?: RouteSlateSeasonAfterglowSignal | null;
   seasonGuides?: readonly RouteGuide[];
   nativeLife?: readonly RouteSlateNativeLifeSignal[];
 }
@@ -411,6 +427,7 @@ function routePlanKind(value: unknown): RoutePlanSourceKind | null {
     || value === 'caveAnchor'
     || value === 'skyfall'
     || value === 'murmur'
+    || value === 'seasonAfterglow'
     || value === 'nativeHazard'
     || value === 'nativeLife'
     ? value
@@ -936,6 +953,18 @@ export function routeSlate(input: RouteSlateInput): RouteSlate {
       ready: input.season.chain?.linked === true || input.season.focus !== 'quiet',
     });
   }
+  if (input.seasonAfterglow) {
+    const read = input.seasonAfterglow.read === true;
+    pins.push({
+      id: 'seasonAfterglow',
+      label: input.seasonAfterglow.label,
+      detail: read
+        ? `read · ${input.seasonAfterglow.note}`
+        : `${input.seasonAfterglow.distanceLabel} ${input.seasonAfterglow.turn} · ${input.seasonAfterglow.detail} · ${input.seasonAfterglow.routeHint} · focus ${input.seasonAfterglow.focusMinutes}m`,
+      priority: read ? 43 : 93,
+      ready: !read,
+    });
+  }
   if (input.cave) {
     const rings = input.cave.distance === 0 ? 'here' : `${input.cave.distance} ring${input.cave.distance === 1 ? '' : 's'}`;
     const mouth = input.cave.mouth ? 'mouth · ' : '';
@@ -1106,6 +1135,21 @@ export function routeGuideCandidates(input: RouteGuideInput): RouteGuide[] {
       priority: activeHazard
         ? native.temperament === 'combative' ? 138 : 134
         : 92,
+    });
+  }
+  if (
+    input.seasonAfterglow
+    && input.seasonAfterglow.tile !== undefined
+    && Number.isFinite(input.seasonAfterglow.tile)
+    && input.seasonAfterglow.read !== true
+    && input.seasonAfterglow.distanceM > 8
+  ) {
+    candidates.push({
+      kind: 'seasonAfterglow',
+      targetTile: Math.trunc(input.seasonAfterglow.tile),
+      label: input.seasonAfterglow.label,
+      detail: `${input.seasonAfterglow.distanceLabel} ${input.seasonAfterglow.turn} · ${input.seasonAfterglow.routeHint} · focus ${input.seasonAfterglow.focusMinutes}m`,
+      priority: 129,
     });
   }
   for (const guide of input.seasonGuides ?? []) {

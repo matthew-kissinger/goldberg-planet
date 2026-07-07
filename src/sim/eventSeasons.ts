@@ -1,5 +1,6 @@
 import { MURMUR_WINDOW_MINUTES, murmurSites, type MurmurSite } from './murmurs';
 import { SKYFALL_WINDOW_MINUTES, skyfallSites, type SkyfallSite } from './skyfall';
+import { normalizePentagonList } from './landmarks';
 
 export type StrangerSeasonUrgency = 'now' | 'soon' | 'later';
 export type StrangerSeasonFocus = 'fall' | 'listening' | 'split' | 'quiet';
@@ -36,6 +37,27 @@ export interface StrangerSeasonWindow {
   tradeoff: string;
   routeHint: string;
   chain: StrangerSeasonChain;
+}
+
+export interface StrangerSeasonAfterglow {
+  id: number;
+  key: string;
+  tile: number;
+  label: string;
+  detail: string;
+  note: string;
+  routeHint: string;
+  read: boolean;
+  focusMinutes: number;
+  stamina: number;
+  exposureRelief: number;
+}
+
+export interface StrangerSeasonAfterglowReadResult {
+  ok: boolean;
+  alreadyRead: boolean;
+  afterglow: StrangerSeasonAfterglow;
+  message: string;
 }
 
 function safeDay(day: number): number {
@@ -230,6 +252,55 @@ export function currentStrangerSeason(
   observedMurmurs: ReadonlySet<number>,
 ): StrangerSeasonWindow | null {
   return strangerSeasonForecast(seed, day, minute, tileCount, harvestedSkyfalls, observedMurmurs, 1)[0] ?? null;
+}
+
+export function normalizeSeasonAfterglowReadings(raw: unknown): number[] {
+  return normalizePentagonList(raw);
+}
+
+export function seasonAfterglowForWindow(
+  season: StrangerSeasonWindow | null | undefined,
+  read: ReadonlySet<number>,
+): StrangerSeasonAfterglow | null {
+  if (!season?.chain.fullChord || !season.skyfall) return null;
+  const firstMurmur = season.murmurs[0];
+  const focusMinutes = 420;
+  return {
+    id: season.skyfall.id,
+    key: season.chain.key,
+    tile: season.skyfall.tile,
+    label: `${season.skyfall.omen.label} afterglow`,
+    detail: `${season.chain.progressLabel} resolved at ${season.skyfall.label}`,
+    note: firstMurmur
+      ? `the fall and ${season.chain.notesTotal} murmurs hold one remembered path; ${firstMurmur.note}`
+      : 'the fall holds a remembered path across the season window',
+    routeHint: `read the crater echo before the window fades`,
+    read: read.has(season.skyfall.id),
+    focusMinutes,
+    stamina: 12,
+    exposureRelief: 8,
+  };
+}
+
+export function readSeasonAfterglow(
+  readings: Set<number>,
+  afterglow: StrangerSeasonAfterglow,
+): StrangerSeasonAfterglowReadResult {
+  if (readings.has(afterglow.id) || afterglow.read) {
+    return {
+      ok: false,
+      alreadyRead: true,
+      afterglow: { ...afterglow, read: true },
+      message: `${afterglow.label} already read`,
+    };
+  }
+  readings.add(afterglow.id);
+  return {
+    ok: true,
+    alreadyRead: false,
+    afterglow: { ...afterglow, read: true },
+    message: `read ${afterglow.label} · season chord focus ${afterglow.focusMinutes}m`,
+  };
 }
 
 export { MURMUR_WINDOW_MINUTES, SKYFALL_WINDOW_MINUTES };

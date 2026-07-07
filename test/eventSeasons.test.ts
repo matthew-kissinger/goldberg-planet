@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { strangerSeasonForecast } from '../src/sim/eventSeasons';
+import {
+  normalizeSeasonAfterglowReadings,
+  readSeasonAfterglow,
+  seasonAfterglowForWindow,
+  strangerSeasonForecast,
+} from '../src/sim/eventSeasons';
 
 describe('stranger event seasons', () => {
   it('forecasts the current and next Skyfall/Murmur overlap windows', () => {
@@ -79,6 +84,36 @@ describe('stranger event seasons', () => {
     });
     expect(linked.chain.progressLabel).toBe('fall claimed + 1/3 notes');
     expect(linked.chain.routeEffect).toContain('linked season route');
+  });
+
+  it('creates a one-time readable afterglow after a full season chord', () => {
+    const open = strangerSeasonForecast('season-afterglow', 0, 40, 1000, new Set(), new Set(), 1)[0];
+    const harvested = new Set(open.skyfall ? [open.skyfall.id] : []);
+    const observed = new Set(open.murmurs.map((site) => site.id));
+    const complete = strangerSeasonForecast('season-afterglow', 0, 40, 1000, harvested, observed, 1)[0];
+    const readings = new Set<number>();
+    const afterglow = seasonAfterglowForWindow(complete, readings);
+
+    expect(afterglow).toMatchObject({
+      id: open.skyfall?.id,
+      tile: open.skyfall?.tile,
+      read: false,
+      focusMinutes: 420,
+      stamina: 12,
+      exposureRelief: 8,
+    });
+    expect(afterglow?.label).toContain('afterglow');
+    expect(afterglow?.detail).toContain('fall claimed + 3/3 notes');
+    expect(afterglow?.note).toContain('remembered path');
+
+    const read = readSeasonAfterglow(readings, afterglow!);
+    expect(read).toMatchObject({ ok: true, alreadyRead: false });
+    expect(readings.has(afterglow!.id)).toBe(true);
+    expect(seasonAfterglowForWindow(complete, readings)?.read).toBe(true);
+
+    const duplicate = readSeasonAfterglow(readings, afterglow!);
+    expect(duplicate).toMatchObject({ ok: false, alreadyRead: true });
+    expect(normalizeSeasonAfterglowReadings([afterglow!.id, afterglow!.id, -1, 3.8, 'bad'])).toEqual([...new Set([3, afterglow!.id])].sort((a, b) => a - b));
   });
 
   it('rolls future windows across the next day without losing the countdown', () => {

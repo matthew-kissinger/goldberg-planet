@@ -761,6 +761,62 @@ describe('Hearth and Horizon horizon chart navigation', () => {
     });
   });
 
+  it('promotes unread season afterglows as routeable world consequences', () => {
+    const signal = nextHorizonChartSignal(landmarks, new Set([1]), centers, frame, 0, [1, 0, 0], 100)!;
+    const afterglow = {
+      tile: 1,
+      id: 77,
+      label: 'orange fall line afterglow',
+      detail: 'fall claimed + 3/3 notes resolved at emberfall crater',
+      note: 'the fall and three murmurs hold one remembered path',
+      routeHint: 'read the crater echo before the window fades',
+      read: false,
+      distanceM: 157,
+      distanceLabel: '157 m',
+      turn: 'ahead' as const,
+      focusMinutes: 420,
+    };
+    const plan = planExpedition({
+      signal: null,
+      items: {},
+      survival: { stamina: 92, exposure: 6, mealsEaten: 0 },
+    });
+    const slate = routeSlate({
+      chart: null,
+      beacon: null,
+      plan,
+      seasonAfterglow: afterglow,
+    });
+    expect(slate.primary).toMatchObject({
+      id: 'seasonAfterglow',
+      label: 'orange fall line afterglow',
+      ready: true,
+    });
+    expect(slate.primary?.detail).toContain('focus 420m');
+
+    const candidates = routeGuideCandidates({
+      chart: signal,
+      beacon: null,
+      seasonAfterglow: afterglow,
+    });
+    expect(candidates[0]).toMatchObject({
+      kind: 'seasonAfterglow',
+      targetTile: 1,
+      label: 'orange fall line afterglow',
+      priority: 129,
+    });
+
+    const saved = createRoutePlanFromGuide(candidates[0], 0, 4, 360)!;
+    expect(saved).toMatchObject({
+      sourceKind: 'seasonAfterglow',
+      targetTile: 1,
+      label: 'orange fall line afterglow',
+      detail: 'read the crater echo before the window fades · focus 420m',
+    });
+    expect(normalizeRoutePlan(saved, 4)).toMatchObject({ sourceKind: 'seasonAfterglow', targetTile: 1 });
+    expect(routeGuideCandidates({ chart: signal, beacon: null, seasonAfterglow: { ...afterglow, read: true } })[0].kind).toBe('target');
+  });
+
   it('shows the orbit atlas only for globe zooms unless the path was deliberately planned', () => {
     expect(routeAtlasVisible(null, 900)).toBe(false);
     expect(routeAtlasVisible({ kind: 'skyfall' }, 120)).toBe(false);

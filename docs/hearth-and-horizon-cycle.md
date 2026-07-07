@@ -131,6 +131,24 @@ crafting, storage, journal, or building feature should ship until it has at leas
 desktop/laptop/touch/gamepad verification note proving the controls are reachable and the
 important HUD surfaces do not collide.
 
+Current UX audit frontier:
+
+- **P0 touch route access**: tablet and phone players need reachable Route Slate, route-pin,
+  and clear-route controls without a keyboard. Add compact touch buttons or a deliberate
+  gesture model, update labels/help, and prove Route Slate/pin/clear on phone and tablet.
+- **P0 gamepad panel focus**: crafting, storage, and future station panels need selected
+  rows, D-pad navigation, confirm/alternate actions, close behavior, and disabled feedback
+  so a gamepad-only player can craft, transfer, and place without pointer input.
+- **P1 panel ownership**: Route Slate, crafting, journal, and storage must share one
+  no-overlap controller and close priority. Opening route or pinning should not leave
+  crafting underneath; storage/crafting/journal should not steal the playfield.
+- **P1 pointer safety**: UI surfaces own their pointers; storage clicks must not start
+  mouse-look or pointer lock, and touch controls must clear held movement/build/use state on
+  pointer loss, blur, and visibility changes.
+- **P2 responsive proof**: add a proof harness for desktop, 1366x720 laptop, tablet
+  portrait/landscape, phone portrait/landscape, and synthetic gamepad screenshots with HUD
+  overlap assertions.
+
 Add a recurring **Orchestrated Development Track** to Hearth and Horizon. Large slices
 should be planned as a directed acyclic graph instead of a single linear checklist: define
 the gameplay outcome, list the dependency nodes, mark which nodes can run in parallel, and
@@ -155,6 +173,53 @@ review beside save/load tests, and art-readability critique beside implementatio
 parallelize dependent edits that touch the same fragile runtime path without a clear merge
 order. The orchestrator is responsible for resolving contradictions, pruning weak work, and
 recording what remains human-owned.
+
+Active DAG rule: every substantial continuation of Hearth and Horizon should start by
+recording the active dependency graph before implementation. The current graph should name
+the goal outcome, the local critical-path task, the subagent lanes already running or
+available, the merge order, and the reviewer gates that decide whether the slice actually
+moves the full-game loop forward. If a slice begins without this note, treat that as a
+process bug and add the DAG before widening the implementation.
+
+Current Hearth and Horizon DAG board:
+
+Critical path:
+`A0 -> A2 -> A4 -> B0 -> B1 -> B2 -> B3 -> H0 -> C0 -> C1 -> C2 -> C4 -> C5 -> D2 -> E4 -> F1 -> G3 -> I2 -> J1 -> J4`.
+
+| Lane | Atomic Tasks | Depends On |
+| --- | --- | --- |
+| A Orchestration/docs | A0 repo-state decision; A1 docs truth; A2 living DAG; A3 subagent briefs; A4 reviewer gates | none |
+| B Sim/save architecture | B0 main responsibility map; B1 extract interaction services; B2 save compatibility; B3 progression contracts; B4 economy/anti-exploit balance | A2 |
+| C Building/houses | C0 build-mode UX contract; C1 placement/rotation/dismantle polish; C2 shelter/room validation; C3 readable house-kit assets; C4 utility integrations; C5 functional-home playtest | B1, H0 |
+| D Terrain/caves/water | D0 cave/water spec; D1 entrance readability; D2 larger arches/rooms; D3 cave resources/hazards; D4 spring/cave-lake rules | B2 |
+| E Food/farming/fishing | E0 crop/fish tuning; E1 crop variety; E2 traps/nets loop; E3 cooking/preservation effects; E4 ecology-to-route balance | B2, C4, D4 |
+| F Travel/wonder | F0 settle afterglow local work; F1 route/itinerary polish; F2 visible event consequences; F3 boat/glider/cave-shortcut logistics | B3, D2, E4 |
+| G Native life/combat | G0 behavior state machine; G1 harmless depth; G2 hazard variety; G3 ward/stun/flee tool rules; G4 rewards/anti-farming | B3, D3, E4 |
+| H Avatar/art/assets | H0 authored Soft-Facet model brief; H1 prop/socket catalog; H2 animation coverage; H3 asset readability pass; H4 external asset ledger/probes | A4 |
+| I UX/input | I0 device control matrix; I1 HUD/panel hierarchy; I2 touch/gamepad parity for all verbs; I3 settings/pause/help/accessibility | C0, B3 |
+| J QA/release | J0 unit suites; J1 browser proof scripts; J2 screenshot/readability matrix; J3 perf/audio/bundle gates; J4 deploy/live/docs truth | all feature lanes |
+
+Reviewer gates:
+
+- **R0 DAG intake**: no broad feature edits until the current DAG node, lane owner,
+  dependencies, and proof target are named.
+- **R1 Sim/save gate**: focused tests pass, import/export/save compatibility holds, and
+  hidden progression state is not stranded in `main.ts`.
+- **R2 Playability gate**: the real loop works without debug hooks.
+- **R3 Cross-device gate**: PC, laptop-height, tablet, phone, and gamepad evidence exists
+  for the affected verbs.
+- **R4 Asset readability gate**: screenshot reviewers can name the gameplay noun and
+  likely verb without implementation notes.
+- **R5 Performance/release gate**: production build, browser/canvas proof, console check,
+  bundle/audio budgets, and docs truth pass.
+- **R6 Wonder gate**: mysteries remain player-facing and strange, not vague placeholders.
+
+Subagent operating model: the main agent is the orchestrator. Explorer lanes audit DAG,
+UX/input, art readability, performance, or review risks; worker lanes edit only disjoint
+file sets with explicit ownership; reviewer lanes inspect merged behavior before commit.
+Merge order follows dependency edges, not completion order. The orchestrator resolves
+contradictions, keeps the critical path moving locally, and records any human-owned
+decisions before the next frontier starts.
 
 Each cycle should also produce a small **Avatar Kit** entry before it closes. The kit is the
 working design packet for the authored player model and its visible gameplay attachments:
@@ -210,6 +275,28 @@ normal play distance and keep pushing any hazard that still reads as a shared wa
 Cave anchors should read as belay/route kit rather than shrine ornaments, and waystones need
 stronger route icons so the player can tell shelter, water, cave, landmark, weather, and
 homeward bearings apart at play distance.
+
+Current Asset Readability Gate DAG:
+
+1. **A0 Intake**: inventory the asset family, decide dirty-worktree/generated-asset status,
+   and name the target gameplay noun and verb.
+2. **A1 Contract**: define states, interaction path, UI/audio/readback labels, and the
+   smallest proof scene.
+3. **A2 Art lane**: revise silhouette, material roles, motion cues, sockets, and prop
+   relationships.
+4. **A3 Sim/UX lane**: verify keyboard, touch, and gamepad can reach the intended verb.
+5. **A4 Runtime proof**: capture desktop/mobile screenshots at normal play distance with HUD
+   visible plus `render_game_to_text` evidence.
+6. **A5 Budget proof**: record meshes, draw calls, GLB/import size when applicable, material
+   count, pivot/orientation, and runtime reference path.
+7. **A6 Blind readability review**: ask what the screenshot shows and what action it invites
+   without labels; failed reads return to A2.
+8. **A7 Accept/document/commit**: only after the asset passes noun, verb, UX, budget, and
+   proof gates.
+
+The immediate readability frontier is player/avatar kit, cave anchors and waystones, native
+hazards at normal play distance, and the season-afterglow marker. Generated Kiln GLBs should
+remain uncommitted until they have an integration wrapper, import ledger, and runtime proof.
 
 Add a named **Player Character Model Pass** to this cycle. That pass should design the
 authored survivor as a real production target: base body proportions, clothing and pack
@@ -780,9 +867,13 @@ season action, not on arrival alone: gathering the planned fall moves the itiner
 next note, and listening to planned notes can continue the route line until the chord is
 complete. Completing that full seasonal itinerary now grants season chord focus, a long
 trail-focus window and small recovery bump that makes the next expedition easier without
-turning the event into a plain loot box. The next Cycle 5 work should deepen those chains
-into visible sky/ground tells, event rewards that change later windows, and a few routes
-where choosing the quiet note matters as much as chasing the fall.
+turning the event into a plain loot box. The first season-afterglow consequence is now in:
+a completed full chord leaves a low, readable chord-ring at the fall crater, promotes it
+through Route Slate, route ribbon, Hearth Journal, save/export/import, F3, and
+`render_game_to_text`, and lets the player read it once for trail focus, stamina, and
+exposure relief. The next Cycle 5 work should deepen those chains into stronger sky/ground
+tells, event rewards that change later windows, and a few routes where choosing the quiet
+note matters as much as chasing the fall.
 
 Scope:
 

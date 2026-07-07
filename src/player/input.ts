@@ -56,7 +56,7 @@ export class Input {
     window.addEventListener('mousedown', (e) => {
       if (this.touchMode) return;
       // UI elements handle their own pointers
-      if (e.target instanceof HTMLElement && e.target.closest('#hotbar, #crafting, #journal, .tbtn')) return;
+      if (e.target instanceof HTMLElement && e.target.closest('#hotbar, #crafting, #storage, #journal, .tbtn')) return;
       el.focus();
       if (!this.locked && !this.lockUnavailable) {
         // attempt pointer lock; a denial (embedded preview) flips us to drag-look
