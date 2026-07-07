@@ -8,6 +8,12 @@ or source-control hygiene.
 is only a short pointer back here so the asset folder does not carry a second source of
 truth.
 
+H4 is the gate. The follow-on H5 adoption plan is `docs/kiln-pack-adoption-plan.md`.
+Together they treat the user-approved promoted pack as the visual target for the world:
+procedural meshes should become fallback, collider/socket scaffolding, dynamic overlays, or
+temporary proof geometry except where they are intentionally stronger, such as the current
+craftable plane.
+
 ## Current Decision
 
 The Drop 1 promoted pack is accepted as curated source material:
@@ -20,6 +26,12 @@ The Drop 1 promoted pack is accepted as curated source material:
   prop inside a larger terrain opening.
 - Raw generated drops remain quarantine/provenance material under
   `public/assets/kiln/generated/` when present. They must stay ignored and out of commits.
+
+The current target is to adopt the 61 ready assets across runtime families, not to leave
+them as a passive library. Each ready asset should become runtime wired, runtime dressing,
+or an explicit regeneration/supersession decision. Repeated families must be implemented
+through palette/material reuse, instanced or batched geometry, and distance-gated animation
+where applicable.
 
 Run:
 
@@ -56,8 +68,10 @@ Promotion order:
 2. Prove the quarantine source material.
 3. Build the manifest and promote reviewed assets into `models/`.
 4. Run `npm run proof:kiln-assets` against the promoted pack.
-5. Wire one runtime family through a manifest-driven loader.
-6. Prove desktop and phone screenshots, fallback behavior, and that no runtime requests hit
+5. Wire one runtime family through a manifest-driven loader or family-specific batcher.
+6. For repeated families, prove palette/material reuse, instancing or batching, draw-call
+   budget, and distance-gated animation if the asset has clips.
+7. Prove desktop and phone screenshots, fallback behavior, and that no runtime requests hit
    `public/assets/kiln/generated/`.
 
 ## DAG Node
@@ -75,6 +89,12 @@ Parallel lanes for this node:
   likely verb at normal play distance.
 - **UX/control lane**: select assets that strengthen the survival loop instead of adding
   decoration without a player-facing action.
+- **Batching/perf lane**: keep repeated trees, creatures, drops, resource nodes, and small
+  props on instanced or merged paths with shared palette/material state instead of unique
+  scene-graph clones.
+- **Animation-distance lane**: play GLB animation clips only inside useful distance bands;
+  mid/far creatures should low-rate pose, freeze, use impostors, or hide instead of running
+  mixers globally.
 - **Proof lane**: keep every accepted family behind unit, browser, request-path, fallback,
   and screenshot checks.
 
@@ -88,6 +108,10 @@ No GLB becomes shipped gameplay art until it has:
   HTTP URL, or presigned URL marker.
 - A runtime asset entry declaring scale, pivot, orientation, socket/collider ownership,
   interaction overlays, repetition policy, and procedural fallback.
+- A batching policy for repeated assets, including whether the implementation uses
+  `InstancedMesh`, merged geometry, LOD buckets, or a deliberate one-off mesh.
+- A distance policy for animated assets, including active mixer radius, low-rate/frozen far
+  behavior, and max active mixer counts.
 - A debug-off desktop and phone screenshot proof where the noun and likely verb are
   readable without labels.
 - A browser request proof showing committed `models/` paths only.
@@ -111,15 +135,53 @@ First wired pilot:
   keeps its C-grade instanceability note, but the current acceptance is explicit because it
   remaps the wide local axis to wall width and is browser-proofed in
   `npm run proof:c2-c3-building-snap-grid`.
+- `drop-wood-logs` and `drop-ore-chunk`: accepted as H5/K1 instanced ground-pickup skins.
+  They are loaded from committed `models/`, normalized to ground-pickup pivots, merged by
+  material, and rendered by `ResourceDropRenderer` as instanced batches. Collection timing,
+  pickup glints, unsupported item fallbacks, and inventory truth remain code-authored.
+- All 12 `node-*` resource bodies: accepted as H5/K2 instanced domain-resource skins.
+  `DomainResourceRenderer` keeps the procedural base, dormant, and harvest-glow overlays
+  for gameplay readability, but discovered node bodies now come from material-merged
+  instanced batches. `npm run proof:k2-domain-resources` proves 36 revealed nodes across
+  12 slugs on 33 instanced draw calls, zero pending/fallback, desktop/phone screenshots,
+  and zero runtime `generated/` requests.
+- `tree-pine`, `tree-broadleaf`, `tree-dead-snag`, and `tree-shrub`: accepted as H5/K5
+  instanced vegetation skins. `Trees` remains the gameplay authority for tree existence,
+  visual kind, chop progress, and drops; `TreeAssetRenderer` mirrors resident streamer
+  chunks and turns each accepted tree GLB into a material-merged instanced batch. Procedural
+  chunk tree meshes stay active until every tree skin is ready, then become fallback. The
+  proof caps the family at 11 instanced draw calls for 210 resident trees and gates cosmetic
+  sway to 96 world units while keeping chop damage matrix-driven.
+- All 9 `creature-*` native-life bodies: accepted as H5/K6 animated creature skins.
+  `NativeLifeRenderer` keeps the native-life simulation, pressure, tend/ward rules, and
+  reward/warning overlays code-authored, then hides duplicated procedural body meshes after
+  a GLB skin attaches. Accepted creature assets must provide `idle` and `walk` clips.
+  Runtime diagnostics split loaded/pending/fallback, visible GLB, procedural fallback,
+  fit metadata, clip metadata, and active/low-rate/frozen/hidden mixer bands by slug.
+  `npm run proof:k6-creatures` proves all nine committed model requests, zero generated
+  requests, zero fallback, distance-gated animation, desktop/phone screenshots, and
+  harmless/hazard gameplay responses. K6 is not player-ready until the native-life
+  targetability/placement UX gap is closed.
 
 Runtime pilot candidates from the proof:
 
 - `chest`, `campfire`, `bedroll`, `crop-plot`, `cave-anchor`, `drying-rack`,
   `weather-vane`, `waystone`.
-- Resource/drop candidates: `drop-wood-logs`, `drop-ore-chunk`.
+- Resource/drop candidates: `drop-wood-logs` and `drop-ore-chunk` are H5/K1
+  runtime-wired through `ResourceDropRenderer` with instanced material batches.
 - Resonance/resource-node candidates: `node-hearth-coal`, `node-rain-reed`,
   `node-salt-shell`, `node-lantern-shard`, `node-root-pod`, `node-red-nodule`,
-  `node-bell-crystal`, `node-horizon-shard`.
+  `node-snow-bloom`, `node-glass-shard`, `node-storm-amber`, `node-reed-kelp`,
+  `node-bell-crystal`, and `node-horizon-shard` are H5/K2 runtime-wired through
+  `DomainResourceRenderer` with instanced material batches.
+- Vegetation candidates: `tree-pine`, `tree-broadleaf`, `tree-dead-snag`, and `tree-shrub`
+  are H5/K5 runtime-wired through `TreeAssetRenderer` with resident-chunk instanced
+  material batches.
+- Creature candidates: `creature-moss-puff`, `creature-shell-skitter`,
+  `creature-reedback-grazer`, `creature-cave-blinker`, `creature-brambleback`,
+  `creature-cave-belljaw`, `creature-scree-snapper`, `creature-storm-burr`, and
+  `creature-tide-lurker` are H5/K6 runtime-wired through `NativeLifeRenderer` with
+  distance-gated `AnimationMixer` playback.
 
 Deferred until scale, snap, budget, readability, or animation proof exists:
 
@@ -133,11 +195,14 @@ Deferred until scale, snap, budget, readability, or animation proof exists:
   screenshot proof before shipping as craftable art.
 - Functional props with warnings or watery placement needs: `workbench`, `rain-cistern`,
   `fish-trap`, `shore-net`, `lantern-post`.
-- Shrines, craters, and trees: defer for blind screenshot readability, world-placement
-  scale, repetition/LOD policy, and collision proof.
-- Creatures: all 9 have `hasSkin:false` and node-transform `idle`/`walk` clips. Wire later
-  with `THREE.AnimationMixer` by clip name after native-life behavior/combat rules choose
-  harmless, useful, and aggressive roles.
+- Shrines and craters: defer for blind screenshot readability, world-placement scale,
+  repetition/LOD policy, and collision proof. Trees are no longer deferred for the first
+  vegetation slice; broader forest art direction can still revise placement, density, and
+  regeneration prompts after K5 proof.
+- Native-life UX: creature GLB skinning is wired, but playtest feedback found that visible
+  native hazards can still be treated as ordinary terrain by click/attack and placement
+  routing. Add native-life pick priority, HUD pressure source feedback, and occupied-tile
+  placement blockers before calling K6 player-ready.
 
 Rejected for runtime:
 

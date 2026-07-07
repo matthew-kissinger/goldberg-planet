@@ -33,6 +33,8 @@ export interface TreeParams {
   tint: number;
 }
 
+export type TreeVisualKind = 'pine' | 'broadleaf' | 'deadSnag' | 'shrub';
+
 export interface TreeStrikeResult {
   hit: boolean;
   felled: boolean;
@@ -129,6 +131,18 @@ export class Trees {
     if (!this.hasTree(id)) return 0;
     const required = Math.max(1, Number.isFinite(needed) ? needed : TREE_CHOP_STAGES);
     return Math.max(0, Math.min(0.98, (this.chopProgress.get(id) ?? 0) / required));
+  }
+
+  visualKindFor(id: number): TreeVisualKind {
+    const h = this.columns.heightOf(id);
+    const c = this.geo.centers;
+    const forest = this.terrain.forestAt(c[id * 3], c[id * 3 + 1], c[id * 3 + 2]);
+    const age = this.hash01(id, 7);
+    const shape = this.hash01(id, 8);
+    if (age < 0.075) return 'deadSnag';
+    if (forest < 0.44 && shape < 0.38) return 'shrub';
+    if (h > 34 || shape < 0.42) return 'pine';
+    return 'broadleaf';
   }
 
   paramsFor(id: number): TreeParams {

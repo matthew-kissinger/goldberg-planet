@@ -50,6 +50,7 @@ export class Streamer {
   private eyeY = 0;
   private eyeZ = 0;
   residencyDirty = true;
+  private proceduralTreesEnabled = true;
 
   // metrics
   loads = 0;
@@ -133,7 +134,7 @@ export class Streamer {
 
   buildChunk(info: ChunkInfo): void {
     const t0 = performance.now();
-    const data = buildChunkMesh(info, this.geo, this.layers, this.columns, this.trees, this.cellDamage);
+    const data = buildChunkMesh(info, this.geo, this.layers, this.columns, this.proceduralTreesEnabled ? this.trees : undefined, this.cellDamage);
     let mesh: THREE.Mesh | null = null;
     if (data) {
       const geom = new THREE.BufferGeometry();
@@ -184,6 +185,22 @@ export class Streamer {
 
   residentKeys(): Set<number> {
     return new Set(this.resident.keys());
+  }
+
+  residentChunks(): ChunkInfo[] {
+    return [...this.resident.values()].map((res) => res.info);
+  }
+
+  proceduralTreesActive(): boolean {
+    return this.proceduralTreesEnabled;
+  }
+
+  setProceduralTreesEnabled(enabled: boolean): boolean {
+    if (this.proceduralTreesEnabled === enabled) return false;
+    this.proceduralTreesEnabled = enabled;
+    this.releaseAll();
+    this.residencyDirty = true;
+    return true;
   }
 
   /** Release every resident chunk mesh (edit-persistence proof / memory reset). Columns and edits are untouched. */

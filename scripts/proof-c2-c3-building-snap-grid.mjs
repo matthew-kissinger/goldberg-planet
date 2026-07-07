@@ -25,6 +25,29 @@ const outDir = path.join(root, 'output', 'playwright', proofSlug);
 const requestedPort = Number(process.env.PROOF_PORT || 0);
 const profileFilter = (process.env.PROOF_PROFILE || '').trim().toLowerCase();
 const requiredHouseKitModels = ['door-kit.glb', 'window-frame.glb', 'roof-bundle.glb'];
+const snapPreviewExpectations = {
+  doorKit: {
+    socketRole: 'wall-opening',
+    socketCollider: 'thin-wall',
+    silhouette: 'door-opening-preview',
+    meshNames: ['snapPreviewDoorLeftJamb', 'snapPreviewDoorRightJamb', 'snapPreviewDoorLintel'],
+    roles: ['snap preview door opening', 'snap preview door lintel'],
+  },
+  windowFrame: {
+    socketRole: 'wall-light',
+    socketCollider: 'thin-wall',
+    silhouette: 'window-light-preview',
+    meshNames: ['snapPreviewWindowGlassPane', 'snapPreviewWindowSill', 'snapPreviewWindowCenterMullion'],
+    roles: ['snap preview window light', 'snap preview window sill', 'snap preview window centered opening'],
+  },
+  roofBundle: {
+    socketRole: 'roof-cap',
+    socketCollider: 'roof-shell',
+    silhouette: 'roof-cap-preview',
+    meshNames: ['snapPreviewRoofRidgeBeam', 'snapPreviewRoofLeftEave', 'snapPreviewRoofCapPlane'],
+    roles: ['snap preview roof cap', 'snap preview roof eave', 'snap preview roof cap coverage'],
+  },
+};
 
 async function getFreePort() {
   if (requestedPort > 0) return requestedPort;
@@ -221,6 +244,30 @@ function assertSnapPreview(state, expected, label) {
   if ((state.renderer.meshes ?? 0) < 3 || (state.renderer.readabilityRoles ?? 0) < 3) {
     throw new Error(`${label}: renderer preview not readable enough ${JSON.stringify(state.renderer)}`);
   }
+  const socketRole = preview.socket?.role ?? preview.socketRole ?? null;
+  if (socketRole && state.renderer.socketRole !== socketRole) {
+    throw new Error(`${label}: renderer socket role drifted ${JSON.stringify({ preview, renderer: state.renderer })}`);
+  }
+  if (preview.socket?.collider && state.renderer.socketCollider !== preview.socket.collider) {
+    throw new Error(`${label}: renderer socket collider drifted ${JSON.stringify({ preview, renderer: state.renderer })}`);
+  }
+  const guide = snapPreviewExpectations[preview.item];
+  if (guide) {
+    if (state.renderer.socketRole !== guide.socketRole || state.renderer.socketCollider !== guide.socketCollider || state.renderer.silhouette !== guide.silhouette) {
+      throw new Error(`${label}: renderer socket silhouette mismatch ${JSON.stringify({ expected: guide, renderer: state.renderer })}`);
+    }
+    const meshNames = new Set(state.renderer.meshNames ?? []);
+    const visibleRoles = new Set(state.renderer.visibleReadabilityRoles ?? []);
+    for (const meshName of guide.meshNames) {
+      if (!meshNames.has(meshName)) throw new Error(`${label}: missing snap-preview guide mesh ${meshName} ${JSON.stringify(state.renderer)}`);
+    }
+    for (const role of guide.roles) {
+      if (!visibleRoles.has(role)) throw new Error(`${label}: missing visible snap-preview role ${role} ${JSON.stringify(state.renderer)}`);
+    }
+    if (preview.ok && visibleRoles.has('blocked snap crossbar')) {
+      throw new Error(`${label}: valid preview counted hidden blocked crossbars as visible roles ${JSON.stringify(state.renderer)}`);
+    }
+  }
 }
 
 function controlSource(profile) {
@@ -274,6 +321,144 @@ async function readSnapPreview(page, tile, screenshotName) {
   });
   const shot = screenshotName ? await screenshot(page, screenshotName) : null;
   return { ...state, screenshot: shot };
+}
+
+async function framePlacementPreviewTile(page, tile) {
+  await page.evaluate((targetTile) => {
+    const world = window.__world;
+    const occupied = new Set(world.structures().items.map((entry) => entry.tile));
+    let stand = world.player.tile;
+    let bestStandScore = Infinity;
+    const targetLayer = world.columns.groundLayerBelow(targetTile, world.layers.bounds[0]);
+    const seen = new Set([targetTile]);
+    const queue = [{ tile: targetTile, ring: 0 }];
+    for (let i = 0; i < queue.length; i += 1) {
+      const entry = queue[i];
+      if (entry.ring >= 3) continue;
+      const degree = world.geo.degreeOf(entry.tile);
+      for (let edge = 0; edge < degree; edge += 1) {
+        const neighbor = world.geo.neighbor(entry.tile, edge);
+        if (seen.has(neighbor)) continue;
+        seen.add(neighbor);
+        const ring = entry.ring + 1;
+        queue.push({ tile: neighbor, ring });
+        if (ring < 2 || occupied.has(neighbor)) continue;
+        const neighborLayer = world.columns.groundLayerBelow(neighbor, world.layers.bounds[0]);
+        const score = Math.abs(neighborLayer - targetLayer) + (ring === 2 ? 0 : 0.35);
+        if (score < bestStandScore) {
+          bestStandScore = score;
+          stand = neighbor;
+        }
+      }
+    }
+    world.player.spawnAt(stand);
+    const c = world.geo.centers;
+    const sx = c[stand * 3], sy = c[stand * 3 + 1], sz = c[stand * 3 + 2];
+    const tx = c[targetTile * 3], ty = c[targetTile * 3 + 1], tz = c[targetTile * 3 + 2];
+    const upLen = Math.hypot(sx, sy, sz) || 1;
+    const ux = sx / upLen, uy = sy / upLen, uz = sz / upLen;
+    let dx = tx - sx, dy = ty - sy, dz = tz - sz;
+    const dot = dx * ux + dy * uy + dz * uz;
+    dx -= ux * dot;
+    dy -= uy * dot;
+    dz -= uz * dot;
+    const len = Math.hypot(dx, dy, dz) || 1;
+    world.player.fwdX = dx / len;
+    world.player.fwdY = dy / len;
+    world.player.fwdZ = dz / len;
+    world.player.pitch = -0.24;
+    world.player.reorthonormalize?.();
+    world.setZoom?.(0);
+    world.debugAimAtTile(targetTile);
+  }, tile);
+  await page.waitForTimeout(420);
+}
+
+async function runHouseKitPlacementPreviews(page, name) {
+  const candidates = await page.evaluate(() => {
+    const world = window.__world;
+    for (const item of ['doorKit', 'windowFrame', 'roofBundle']) world.giveItem(item, 3);
+    const occupied = new Set(world.structures().items.map((entry) => entry.tile));
+    occupied.add(world.player.tile);
+    const nativeBlocked = new Set();
+    for (const site of world.nativeLife?.().sites ?? []) {
+      if (!Number.isFinite(site?.tile)) continue;
+      nativeBlocked.add(site.tile);
+      const degree = world.geo.degreeOf(site.tile);
+      for (let edge = 0; edge < degree; edge += 1) nativeBlocked.add(world.geo.neighbor(site.tile, edge));
+    }
+    const groundLayer = (tile) => world.columns.groundLayerBelow(tile, world.layers.bounds[0]);
+    const flatScore = (tile) => {
+      const top = groundLayer(tile);
+      const degree = world.geo.degreeOf(tile);
+      let maxDelta = 0;
+      for (let edge = 0; edge < degree; edge += 1) {
+        const neighbor = world.geo.neighbor(tile, edge);
+        maxDelta = Math.max(maxDelta, Math.abs(groundLayer(neighbor) - top));
+      }
+      return maxDelta;
+    };
+    const tiles = world.nearbyTiles(14)
+      .filter((tile) => tile !== world.player.tile && !occupied.has(tile) && !nativeBlocked.has(tile))
+      .map((tile) => ({ tile, flat: flatScore(tile) }))
+      .sort((a, b) => a.flat - b.flat);
+    return tiles.filter((entry) => entry.flat <= 1).map((entry) => entry.tile).slice(0, 32);
+  });
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    throw new Error(`${name}: no placement-preview candidate tiles`);
+  }
+  const inUsefulFrame = (point) => point
+    && point.x >= 120
+    && point.x <= 1320
+    && point.y >= 90
+    && point.y <= 690;
+  const previews = {};
+  for (const item of Object.keys(snapPreviewExpectations)) {
+    await page.evaluate((selectedItem) => window.__world.selectStructure(selectedItem), item);
+    await page.waitForTimeout(160);
+    let accepted = null;
+    for (const tile of candidates) {
+      const candidate = await readSnapPreview(page, tile, null);
+      if (candidate.preview?.active && candidate.preview.item === item && candidate.preview.ok && candidate.preview.tile === tile) {
+        assertSnapPreview(candidate, {
+          active: true,
+          mode: 'place',
+          ok: true,
+          item,
+          tile,
+          blocker: null,
+        }, `${name}: ${item} placement-preview socket guide`);
+        await framePlacementPreviewTile(page, tile);
+        const framed = await readSnapPreview(page, tile, null);
+        const screenPoint = await page.evaluate((targetTile) => window.__world.screenPointForTile(targetTile), tile);
+        if (!inUsefulFrame(screenPoint)) continue;
+        assertSnapPreview(framed, {
+          active: true,
+          mode: 'place',
+          ok: true,
+          item,
+          tile,
+          blocker: null,
+        }, `${name}: ${item} framed placement-preview socket guide`);
+        accepted = {
+          ...framed,
+          screenPoint,
+          screenshot: await screenshot(page, `${name}-${item}-placement-preview`),
+        };
+        break;
+      }
+    }
+    if (!accepted) throw new Error(`${name}: failed to find a valid ${item} placement preview ${JSON.stringify(candidates)}`);
+    previews[item] = {
+      preview: accepted.preview,
+      renderer: accepted.renderer,
+      screenPoint: accepted.screenPoint,
+      screenshot: accepted.screenshot,
+    };
+  }
+  await page.evaluate(() => window.__world.setZoom?.(0.22));
+  await page.waitForTimeout(180);
+  return previews;
 }
 
 async function setupPlayerRelocationFixture(page) {
@@ -802,11 +987,15 @@ async function runProfile(browser, url, profile) {
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     const result = await runSnapGridContract(page, profile.name);
+    const placementPreviews = !profile.touch && !profile.gamepad
+      ? await runHouseKitPlacementPreviews(page, profile.name)
+      : null;
     const playerRelocation = await runPlayerRelocationControls(page, profile, profile.name);
     const kilnAssets = assertHouseKitAssetNetwork(profile.name, kilnAssetRequests, kilnAssetResponses);
     if (consoleErrors.length || pageErrors.length) throw new Error(`${profile.name}: browser errors ${JSON.stringify({ consoleErrors, pageErrors })}`);
     return {
       ...result,
+      placementPreviews,
       playerRelocation,
       kilnAssets,
       url,
@@ -814,7 +1003,9 @@ async function runProfile(browser, url, profile) {
       touch: !!profile.touch,
       gamepad: !!profile.gamepad,
       inputClaim: `${playerRelocation.source} player-facing relocation path; deterministic proof target uses debug aim only`,
-      previewClaim: playerRelocation.previewClaim,
+      previewClaim: placementPreviews
+        ? `${playerRelocation.previewClaim}; keyboard placement previews prove door/window/roof socket guide silhouettes`
+        : playerRelocation.previewClaim,
       consoleErrors,
       pageErrors,
     };
@@ -855,7 +1046,7 @@ async function main() {
       generatedAt: new Date().toISOString(),
       claim: proofClaim,
       inputClaim: 'C2/C3 relocation is proven through player-facing keyboard, touch, and injected synthetic gamepad paths across desktop/laptop/tablet/phone profiles; deterministic target aiming uses debug proof hooks; real hardware gamepad validation remains unclaimed',
-      previewClaim: 'C2/C3 snap-preview and blocked-preview diagnostics/screenshots are proven before player-facing relocation drops across the same profile matrix',
+      previewClaim: 'C2/C3 snap-preview and blocked-preview diagnostics/screenshots are proven before player-facing relocation drops across the same profile matrix; desktop/laptop keyboard placement previews prove door/window/roof guide silhouettes',
       realHardwareGamepad: false,
       desktopUrl,
       touchUrl,

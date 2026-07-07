@@ -4,6 +4,12 @@ import type { Columns } from '../world/columns';
 import type { Layers } from '../world/layers';
 import { WATER_SURFACE } from '../world/layers';
 import type { DomainResourceKind, DomainResourceSite } from '../sim/domainResources';
+import type {
+  DomainResourceSkinProvider,
+  KilnDomainResourceSkinFitSnapshot,
+  KilnDomainResourceSkinSlug,
+  KilnDomainResourceSkinTemplate,
+} from './kilnAssets';
 
 type ResourcePart = 'base' | 'core' | 'glow' | 'dormant';
 type DomainResourceSilhouette =
@@ -53,6 +59,40 @@ const silhouettes: Record<DomainResourceKind, DomainResourceSilhouette> = {
   bellCrystal: 'bell-ribs',
   horizonShard: 'horizon-vane',
 };
+
+const KILN_DOMAIN_RESOURCE_SKIN_BY_KIND: Record<DomainResourceKind, KilnDomainResourceSkinSlug> = {
+  hearthCoal: 'node-hearth-coal',
+  rainReed: 'node-rain-reed',
+  saltShell: 'node-salt-shell',
+  lanternShard: 'node-lantern-shard',
+  rootPod: 'node-root-pod',
+  redNodule: 'node-red-nodule',
+  snowBloom: 'node-snow-bloom',
+  glassShard: 'node-glass-shard',
+  stormAmber: 'node-storm-amber',
+  reedKelp: 'node-reed-kelp',
+  bellCrystal: 'node-bell-crystal',
+  horizonShard: 'node-horizon-shard',
+};
+
+type DomainResourceSkinStatus = 'pending' | 'loaded' | 'fallback';
+
+interface DomainResourceSkinBatch {
+  slug: KilnDomainResourceSkinSlug;
+  group: THREE.Group;
+  template: KilnDomainResourceSkinTemplate;
+  meshes: THREE.InstancedMesh[];
+  capacity: number;
+  count: number;
+}
+
+interface DomainResourceSkinStats {
+  loaded: number;
+  pending: number;
+  fallback: number;
+  batchedInstances: number;
+  instancedMeshes: number;
+}
 
 const dormant = mat(0x59636a, 0.86, 0.02, 0x1d3137, 0.14);
 const shadow = mat(0x3d4746, 0.92);
@@ -258,17 +298,65 @@ function makeSite(site: DomainResourceSite): THREE.Group {
   return g;
 }
 
+function capacityForSiteCount(count: number): number {
+  let capacity = 16;
+  while (capacity < count) capacity *= 2;
+  return capacity;
+}
+
+function makeDomainResourceSkinBatch(template: KilnDomainResourceSkinTemplate, capacity: number): DomainResourceSkinBatch {
+  const group = new THREE.Group();
+  group.name = `kiln-domain-resource-batch-${template.slug}`;
+  group.userData.kilnAssetSlug = template.slug;
+  group.userData.kilnDomainResourceKind = template.kind;
+  group.userData.kilnDomainResourceSkinFit = template.fit;
+  const meshes = template.parts.map((part, index) => {
+    const instanced = new THREE.InstancedMesh(part.geometry, part.material, capacity);
+    instanced.name = `${part.name}-domain-resource-batch`;
+    instanced.count = 0;
+    instanced.frustumCulled = false;
+    instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    instanced.userData.kilnAssetSlug = template.slug;
+    instanced.userData.kilnDomainResourceKind = template.kind;
+    instanced.userData.kilnSourceMeshNames = part.sourceMeshNames;
+    instanced.userData.kilnSourceMeshCount = part.sourceMeshCount;
+    instanced.userData.kilnBatchPartIndex = index;
+    group.add(instanced);
+    return instanced;
+  });
+  return { slug: template.slug, group, template, meshes, capacity, count: 0 };
+}
+
+function domainNodeScale(fit: KilnDomainResourceSkinFitSnapshot): number {
+  const footprint = Math.max(fit.normalizedBboxSize[0] ?? 0, fit.normalizedBboxSize[2] ?? 0, 0.001);
+  return Math.max(0.38, Math.min(2.35, 0.78 / footprint));
+}
+
 export class DomainResourceRenderer {
   readonly group = new THREE.Group();
   private readonly objects = new Map<number, THREE.Group>();
+  private readonly skinTemplates = new Map<KilnDomainResourceSkinSlug, KilnDomainResourceSkinTemplate>();
+  private readonly skinBatches = new Map<KilnDomainResourceSkinSlug, DomainResourceSkinBatch>();
+  private readonly skinStatus = new Map<KilnDomainResourceSkinSlug, DomainResourceSkinStatus>();
+  private readonly skinPromises = new Map<KilnDomainResourceSkinSlug, Promise<KilnDomainResourceSkinTemplate | null>>();
+  private currentSites: DomainResourceSite[] = [];
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, private readonly domainSkins?: DomainResourceSkinProvider) {
     this.group.name = 'domain-resources';
     scene.add(this.group);
   }
 
   setSites(sites: readonly DomainResourceSite[]): void {
+    this.currentSites = sites.map((site) => ({ ...site }));
     const wanted = new Set(sites.map((s) => s.id));
+    const wantedBySkin = new Map<KilnDomainResourceSkinSlug, number>();
+    for (const site of sites) {
+      if (!site.discovered || site.harvested) continue;
+      const slug = KILN_DOMAIN_RESOURCE_SKIN_BY_KIND[site.kind];
+      wantedBySkin.set(slug, (wantedBySkin.get(slug) ?? 0) + 1);
+    }
+    for (const [slug, count] of wantedBySkin) this.ensureSkin(slug, count);
+
     for (const [id, obj] of this.objects) {
       if (!wanted.has(id)) {
         this.group.remove(obj);
@@ -285,6 +373,59 @@ export class DomainResourceRenderer {
     }
   }
 
+  private ensureSkin(slug: KilnDomainResourceSkinSlug, minCount: number): void {
+    const template = this.skinTemplates.get(slug);
+    if (template) {
+      this.ensureBatch(slug, template, minCount);
+      return;
+    }
+    if (!this.domainSkins) {
+      this.skinStatus.set(slug, 'fallback');
+      return;
+    }
+    if (this.skinPromises.has(slug)) {
+      this.skinStatus.set(slug, 'pending');
+      return;
+    }
+    this.skinStatus.set(slug, 'pending');
+    const promise = this.domainSkins.createDomainResourceSkinTemplate(slug)
+      .then((loaded) => {
+        this.skinPromises.delete(slug);
+        if (!loaded) {
+          this.skinStatus.set(slug, 'fallback');
+          return null;
+        }
+        this.skinTemplates.set(slug, loaded);
+        this.skinStatus.set(slug, 'loaded');
+        const count = this.currentSites.filter((site) => !site.harvested && site.discovered && KILN_DOMAIN_RESOURCE_SKIN_BY_KIND[site.kind] === slug).length;
+        this.ensureBatch(slug, loaded, count);
+        this.setSites(this.currentSites);
+        return loaded;
+      })
+      .catch(() => {
+        this.skinPromises.delete(slug);
+        this.skinStatus.set(slug, 'fallback');
+        return null;
+      });
+    this.skinPromises.set(slug, promise);
+  }
+
+  private ensureBatch(slug: KilnDomainResourceSkinSlug, template: KilnDomainResourceSkinTemplate, minCount: number): void {
+    const existing = this.skinBatches.get(slug);
+    if (existing && existing.capacity >= Math.max(1, minCount)) return;
+    if (existing) this.group.remove(existing.group);
+    const batch = makeDomainResourceSkinBatch(template, capacityForSiteCount(Math.max(1, minCount)));
+    this.skinBatches.set(slug, batch);
+    this.group.add(batch.group);
+  }
+
+  private writeBatchInstance(batch: DomainResourceSkinBatch, matrix: THREE.Matrix4): void {
+    if (batch.count >= batch.capacity) return;
+    const index = batch.count;
+    for (const mesh of batch.meshes) mesh.setMatrixAt(index, matrix);
+    batch.count += 1;
+  }
+
   update(
     sites: readonly DomainResourceSite[],
     geo: Goldberg,
@@ -297,11 +438,19 @@ export class DomainResourceRenderer {
     const vY = new THREE.Vector3();
     const vZ = new THREE.Vector3();
     const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    const instanceMatrix = new THREE.Matrix4();
     const c = geo.centers;
+    for (const batch of this.skinBatches.values()) {
+      batch.count = 0;
+      for (const mesh of batch.meshes) mesh.count = 0;
+    }
     for (const site of sites) {
       const obj = this.objects.get(site.id);
       if (!obj) continue;
       obj.visible = !site.harvested;
+      obj.userData.kilnResourceSkinActive = false;
       const frame = geo.frameOf(site.tile);
       const yaw = site.id * 0.47 + site.slot * 0.9;
       const ca = Math.cos(yaw);
@@ -331,28 +480,126 @@ export class DomainResourceRenderer {
         c[site.tile * 3 + 2] * r + vX.z * ox + vZ.z * oz - camWorld.z,
       );
       const pulse = site.discovered ? 1 + Math.sin(seconds * 2.1 + site.id) * 0.1 : 0.72;
+      const slug = KILN_DOMAIN_RESOURCE_SKIN_BY_KIND[site.kind];
+      const batch = site.discovered && !site.harvested ? this.skinBatches.get(slug) : undefined;
+      if (batch) {
+        obj.userData.kilnResourceSkinActive = true;
+        q.setFromRotationMatrix(m);
+        const bodyPulse = 1 + Math.sin(seconds * 1.6 + site.id) * 0.025;
+        scale.setScalar(domainNodeScale(batch.template.fit) * bodyPulse);
+        instanceMatrix.compose(obj.position, q, scale);
+        this.writeBatchInstance(batch, instanceMatrix);
+      }
       obj.traverse((child) => {
         const part = child.userData.resourcePart as ResourcePart | undefined;
+        const kilnBody = batch !== undefined;
         if (part === 'dormant' || child.name === 'dormantCore') child.visible = !site.discovered;
-        if (part === 'core' || part === 'glow' || child.name === 'resourceCore' || child.name === 'resourceRoot' || child.name === 'resourceGlow') child.visible = site.discovered;
+        if (part === 'core' || child.name === 'resourceCore' || child.name === 'resourceRoot') child.visible = site.discovered && !kilnBody;
+        if (part === 'glow' || child.name === 'resourceGlow') child.visible = site.discovered;
+        if (part === 'base' || child.name === 'resourceBase') child.visible = true;
         const base = Array.isArray(child.userData.baseScale) ? child.userData.baseScale as [number, number, number] : [child.scale.x, child.scale.y, child.scale.z];
         if (part === 'glow' || child.name === 'resourceGlow') child.scale.set(base[0] * pulse, base[1] * pulse, base[2] * pulse);
         if (part === 'base' || child.name === 'resourceBase') child.scale.set(base[0] * (site.discovered ? pulse : 0.86), base[1], base[2] * (site.discovered ? pulse : 0.86));
       });
     }
+    for (const batch of this.skinBatches.values()) {
+      for (const mesh of batch.meshes) {
+        mesh.count = batch.count;
+        mesh.instanceMatrix.needsUpdate = true;
+      }
+    }
   }
 
-  stats(): { groups: number; meshes: number; active: number; kinds: number; silhouettes: number } {
+  stats(): {
+    groups: number;
+    meshes: number;
+    active: number;
+    kinds: number;
+    silhouettes: number;
+    fallbackGroups: number;
+    fallbackMeshes: number;
+    kilnSkinsLoaded: number;
+    kilnSkinsPending: number;
+    kilnSkinFallbacks: number;
+    instancedMeshes: number;
+    instancedDrawCalls: number;
+    batchedInstances: number;
+    kilnSkinsBySlug: Partial<Record<KilnDomainResourceSkinSlug, DomainResourceSkinStats>>;
+    kilnSkinFits: Partial<Record<KilnDomainResourceSkinSlug, KilnDomainResourceSkinFitSnapshot>>;
+  } {
     let meshes = 0;
     let active = 0;
+    let fallbackGroups = 0;
+    let fallbackMeshes = 0;
     const kinds = new Set<string>();
     const silhouettes = new Set<string>();
     for (const obj of this.objects.values()) {
       if (obj.visible) active++;
+      if (obj.visible && obj.userData.kilnResourceSkinActive !== true) fallbackGroups++;
       if (typeof obj.userData.resourceKind === 'string') kinds.add(obj.userData.resourceKind);
       if (typeof obj.userData.resourceSilhouette === 'string') silhouettes.add(obj.userData.resourceSilhouette);
-      obj.traverse((child) => { if ((child as THREE.Mesh).isMesh) meshes++; });
+      obj.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          meshes++;
+          if (obj.userData.kilnResourceSkinActive !== true) fallbackMeshes++;
+        }
+      });
     }
-    return { groups: this.objects.size, meshes, active, kinds: kinds.size, silhouettes: silhouettes.size };
+    let instancedMeshes = 0;
+    let batchedInstances = 0;
+    const kilnSkinFits: Partial<Record<KilnDomainResourceSkinSlug, KilnDomainResourceSkinFitSnapshot>> = {};
+    for (const [slug, batch] of this.skinBatches) {
+      instancedMeshes += batch.meshes.length;
+      batchedInstances += batch.count;
+      meshes += batch.meshes.length;
+      active += batch.count;
+      kilnSkinFits[slug] = batch.template.fit;
+    }
+    const countsBySlug: Partial<Record<KilnDomainResourceSkinSlug, number>> = {};
+    for (const site of this.currentSites) {
+      if (!site.discovered || site.harvested) continue;
+      const slug = KILN_DOMAIN_RESOURCE_SKIN_BY_KIND[site.kind];
+      countsBySlug[slug] = (countsBySlug[slug] ?? 0) + 1;
+    }
+    let kilnSkinsLoaded = 0;
+    let kilnSkinsPending = 0;
+    let kilnSkinFallbacks = 0;
+    const kilnSkinsBySlug: Partial<Record<KilnDomainResourceSkinSlug, DomainResourceSkinStats>> = {};
+    for (const slug of new Set(Object.values(KILN_DOMAIN_RESOURCE_SKIN_BY_KIND))) {
+      const count = countsBySlug[slug] ?? 0;
+      if (count <= 0 && !this.skinStatus.has(slug)) continue;
+      const batch = this.skinBatches.get(slug);
+      const status = this.skinStatus.get(slug);
+      const loaded = batch ? count : 0;
+      const pending = status === 'pending' ? count : 0;
+      const fallback = !batch && status === 'fallback' ? count : 0;
+      kilnSkinsLoaded += loaded;
+      kilnSkinsPending += pending;
+      kilnSkinFallbacks += fallback;
+      kilnSkinsBySlug[slug] = {
+        loaded,
+        pending,
+        fallback,
+        batchedInstances: batch?.count ?? 0,
+        instancedMeshes: batch?.meshes.length ?? 0,
+      };
+    }
+    return {
+      groups: this.objects.size + this.skinBatches.size,
+      meshes,
+      active,
+      kinds: kinds.size,
+      silhouettes: silhouettes.size,
+      fallbackGroups,
+      fallbackMeshes,
+      kilnSkinsLoaded,
+      kilnSkinsPending,
+      kilnSkinFallbacks,
+      instancedMeshes,
+      instancedDrawCalls: instancedMeshes,
+      batchedInstances,
+      kilnSkinsBySlug,
+      kilnSkinFits,
+    };
   }
 }

@@ -3,6 +3,55 @@ import type { Goldberg } from '../geo/goldberg';
 import type { Columns } from '../world/columns';
 import type { Layers } from '../world/layers';
 import type { NativeCreatureKind, NativeCreatureSite } from '../sim/nativeLife';
+import {
+  CREATURE_ACTIVE_MIXER_RADIUS,
+  CREATURE_LOW_RATE_MIXER_RADIUS,
+  CREATURE_FROZEN_MIXER_RADIUS,
+  type CreatureSkinProvider,
+  type KilnCreatureSkinFitSnapshot,
+  type KilnCreatureSkinSlug,
+  type KilnCreatureSkinTemplate,
+} from './kilnAssets';
+
+export const KILN_CREATURE_SKIN_SLUGS: readonly KilnCreatureSkinSlug[] = [
+  'creature-moss-puff',
+  'creature-brambleback',
+  'creature-shell-skitter',
+  'creature-reedback-grazer',
+  'creature-cave-belljaw',
+  'creature-cave-blinker',
+  'creature-scree-snapper',
+  'creature-storm-burr',
+  'creature-tide-lurker',
+];
+
+const KILN_CREATURE_SKIN_BY_KIND: Record<NativeCreatureKind, KilnCreatureSkinSlug> = {
+  mossPuff: 'creature-moss-puff',
+  brambleback: 'creature-brambleback',
+  shellSkitter: 'creature-shell-skitter',
+  reedbackGrazer: 'creature-reedback-grazer',
+  caveBelljaw: 'creature-cave-belljaw',
+  caveBlinker: 'creature-cave-blinker',
+  screeSnapper: 'creature-scree-snapper',
+  stormBurr: 'creature-storm-burr',
+  tideLurker: 'creature-tide-lurker',
+};
+
+type CreatureSkinStatus = 'pending' | 'loaded' | 'fallback';
+type CreatureAnimationBand = 'active' | 'lowRate' | 'frozen' | 'hidden';
+
+interface CreatureSkinRecord {
+  slug: KilnCreatureSkinSlug;
+  kind: NativeCreatureKind;
+  root: THREE.Object3D;
+  mixer: THREE.AnimationMixer;
+  clips: Map<string, THREE.AnimationClip>;
+  actions: Map<string, THREE.AnimationAction>;
+  currentClip: string | null;
+  lastMixerSeconds: number;
+  lastLowRateStepSeconds: number;
+  band: CreatureAnimationBand;
+}
 
 function mat(color: number, roughness = 0.78, metalness = 0.02, emissive = 0x000000): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness, emissive, emissiveIntensity: emissive === 0 ? 0 : 0.22 });
@@ -92,6 +141,11 @@ function telegraph(m: THREE.Mesh, role: string): THREE.Mesh {
   return m;
 }
 
+function overlay(m: THREE.Mesh, role: string): THREE.Mesh {
+  m.userData.nativeOverlayRole = role;
+  return m;
+}
+
 function makeMossPuff(site: NativeCreatureSite): THREE.Group {
   const g = new THREE.Group();
   g.name = `native-${site.kind}-${site.id}`;
@@ -115,7 +169,7 @@ function makeMossPuff(site: NativeCreatureSite): THREE.Group {
     }
   }
   for (let i = 0; i < 3; i++) {
-    const seed = mesh(cyl8, materials.seed, [-0.12 + i * 0.12, 0.57 + i * 0.025, 0.25], [0.026, 0.11, 0.026], 'puffSeedBurr');
+    const seed = overlay(mesh(cyl8, materials.seed, [-0.12 + i * 0.12, 0.57 + i * 0.025, 0.25], [0.026, 0.11, 0.026], 'puffSeedBurr'), 'seed reward burr');
     seed.rotation.x = Math.PI / 2;
     seed.rotation.z = i * 0.7;
     seed.visible = !site.tended;
@@ -183,7 +237,7 @@ function makeShellSkitter(site: NativeCreatureSite): THREE.Group {
     g.add(leg);
   }
   const scrapMat = site.reward.item === 'kelp' ? materials.mossDark : materials.shellPearl;
-  const scrap = mesh(site.reward.item === 'kelp' ? cone8 : sphere8, scrapMat, [0.24, 0.24, -0.12], [0.055, 0.12, 0.055], 'skitterRewardScrap');
+  const scrap = overlay(mesh(site.reward.item === 'kelp' ? cone8 : sphere8, scrapMat, [0.24, 0.24, -0.12], [0.055, 0.12, 0.055], 'skitterRewardScrap'), 'shore reward scrap');
   scrap.rotation.z = 0.45;
   scrap.visible = !site.tended;
   g.add(scrap);
@@ -255,10 +309,10 @@ function makeCaveBlinker(site: NativeCreatureSite): THREE.Group {
   for (let i = 0; i < capCount; i++) {
     const x = -0.13 + i * 0.13;
     const z = 0.17 + (i % 2) * 0.05;
-    const stem = mesh(cyl8, materials.blinkerGill, [x, 0.62 + i * 0.015, z], [0.025, 0.1, 0.025], 'blinkerMushroomStem');
+    const stem = overlay(mesh(cyl8, materials.blinkerGill, [x, 0.62 + i * 0.015, z], [0.025, 0.1, 0.025], 'blinkerMushroomStem'), 'cave mushroom reward stem');
     stem.visible = !site.tended;
     g.add(stem);
-    const cap = mesh(cone8, materials.blinkerCap, [x, 0.72 + i * 0.015, z], [0.11, 0.1, 0.11], 'blinkerMushroomCap');
+    const cap = overlay(mesh(cone8, materials.blinkerCap, [x, 0.72 + i * 0.015, z], [0.11, 0.1, 0.11], 'blinkerMushroomCap'), 'cave mushroom reward cap');
     cap.rotation.y = site.id * 0.17 + i;
     cap.visible = !site.tended;
     g.add(cap);
@@ -426,7 +480,7 @@ function makeReedbackGrazer(site: NativeCreatureSite): THREE.Group {
     }
   }
   for (let i = 0; i < 2; i++) {
-    const pellet = mesh(sphere8, materials.compost, [-0.08 + i * 0.16, 0.22, 0.32], [0.06, 0.045, 0.055], 'reedbackCompostPellet');
+    const pellet = overlay(mesh(sphere8, materials.compost, [-0.08 + i * 0.16, 0.22, 0.32], [0.06, 0.045, 0.055], 'reedbackCompostPellet'), 'compost reward pellet');
     pellet.visible = !site.tended;
     g.add(pellet);
   }
@@ -451,8 +505,12 @@ function makeNativeCreature(site: NativeCreatureSite): THREE.Group {
 export class NativeLifeRenderer {
   readonly group = new THREE.Group();
   private readonly objects = new Map<number, THREE.Group>();
+  private readonly skinTemplates = new Map<KilnCreatureSkinSlug, KilnCreatureSkinTemplate>();
+  private readonly skinPromises = new Map<KilnCreatureSkinSlug, Promise<KilnCreatureSkinTemplate | null>>();
+  private readonly skinStatus = new Map<KilnCreatureSkinSlug, CreatureSkinStatus>();
+  private readonly skinRecords = new Map<number, CreatureSkinRecord>();
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, private readonly creatureSkins?: CreatureSkinProvider) {
     this.group.name = 'native-life';
     scene.add(this.group);
   }
@@ -461,20 +519,171 @@ export class NativeLifeRenderer {
     const wanted = new Set(sites.map((site) => site.id));
     for (const [id, obj] of this.objects) {
       if (!wanted.has(id)) {
+        this.disposeSkinRecord(id);
         this.group.remove(obj);
         this.objects.delete(id);
       }
     }
     for (const site of sites) {
-      if (this.objects.has(site.id)) continue;
-      const obj = makeNativeCreature(site);
-      obj.userData.nativeCreatureId = site.id;
-      obj.userData.tile = site.tile;
-      obj.userData.nativeKind = site.kind;
-      obj.userData.nativeTemperament = site.temperament;
-      obj.userData.nativeSilhouette = silhouettes[site.kind];
-      this.objects.set(site.id, obj);
-      this.group.add(obj);
+      let obj = this.objects.get(site.id);
+      if (!obj) {
+        obj = makeNativeCreature(site);
+        obj.userData.nativeCreatureId = site.id;
+        obj.userData.tile = site.tile;
+        obj.userData.nativeKind = site.kind;
+        obj.userData.nativeTemperament = site.temperament;
+        obj.userData.nativeSilhouette = silhouettes[site.kind];
+        this.objects.set(site.id, obj);
+        this.group.add(obj);
+      }
+      const slug = KILN_CREATURE_SKIN_BY_KIND[site.kind];
+      this.ensureSkin(slug);
+      const template = this.skinTemplates.get(slug);
+      if (template) this.attachSkin(site, obj, template);
+    }
+  }
+
+  private ensureSkin(slug: KilnCreatureSkinSlug): void {
+    if (this.skinTemplates.has(slug)) {
+      this.skinStatus.set(slug, 'loaded');
+      return;
+    }
+    if (!this.creatureSkins) {
+      this.skinStatus.set(slug, 'fallback');
+      return;
+    }
+    if (this.skinPromises.has(slug)) {
+      this.skinStatus.set(slug, 'pending');
+      return;
+    }
+    this.skinStatus.set(slug, 'pending');
+    const promise = this.creatureSkins.createCreatureSkinTemplate(slug)
+      .then((template) => {
+        this.skinPromises.delete(slug);
+        if (!template) {
+          this.skinStatus.set(slug, 'fallback');
+          return null;
+        }
+        this.skinTemplates.set(slug, template);
+        this.skinStatus.set(slug, 'loaded');
+        for (const obj of this.objects.values()) {
+          if (obj.userData.nativeKind === template.kind) {
+            const site: NativeCreatureSite = {
+              id: Number(obj.userData.nativeCreatureId),
+              kind: template.kind,
+              tile: Number(obj.userData.tile),
+              slot: 0,
+              label: String(obj.userData.nativeKind),
+              detail: '',
+              temperament: obj.userData.nativeTemperament === 'harmless' ? 'harmless' : obj.userData.nativeTemperament === 'combative' ? 'combative' : 'territorial',
+              reward: { item: 'reeds', count: 1, label: 'reward' },
+              tended: false,
+              warded: false,
+              hint: '',
+            };
+            this.attachSkin(site, obj, template);
+          }
+        }
+        return template;
+      })
+      .catch(() => {
+        this.skinPromises.delete(slug);
+        this.skinStatus.set(slug, 'fallback');
+        return null;
+      });
+    this.skinPromises.set(slug, promise);
+  }
+
+  private disposeSkinRecord(id: number): void {
+    const record = this.skinRecords.get(id);
+    if (!record) return;
+    record.mixer.stopAllAction();
+    record.mixer.uncacheRoot(record.root);
+    this.skinRecords.delete(id);
+  }
+
+  private attachSkin(site: NativeCreatureSite, obj: THREE.Group, template: KilnCreatureSkinTemplate): void {
+    if (this.skinRecords.has(site.id)) return;
+    const root = template.template.clone(true);
+    root.name = `kiln-creature-${template.slug}-${site.id}`;
+    root.userData.kilnAssetSlug = template.slug;
+    root.userData.kilnCreatureKind = template.kind;
+    root.userData.kilnCreatureFit = template.fit;
+    root.userData.kilnCreatureSkin = true;
+    root.traverse((child) => {
+      child.userData.kilnAssetSlug = template.slug;
+      child.userData.kilnCreatureKind = template.kind;
+      child.userData.kilnCreatureSkin = true;
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        mesh.castShadow = false;
+        mesh.receiveShadow = true;
+        mesh.frustumCulled = false;
+      }
+    });
+    obj.add(root);
+    const mixer = new THREE.AnimationMixer(root);
+    const clips = new Map(template.clips.map((clip) => [clip.name, clip]));
+    this.skinRecords.set(site.id, {
+      slug: template.slug,
+      kind: template.kind,
+      root,
+      mixer,
+      clips,
+      actions: new Map(),
+      currentClip: null,
+      lastMixerSeconds: 0,
+      lastLowRateStepSeconds: 0,
+      band: 'frozen',
+    });
+    this.applyProceduralBodyVisibility(obj, false);
+  }
+
+  private applyProceduralBodyVisibility(obj: THREE.Group, visible: boolean): void {
+    obj.traverse((child) => {
+      if (child.userData.kilnCreatureSkin) return;
+      if (!(child as THREE.Mesh).isMesh) return;
+      if (typeof child.userData.nativeTelegraphRole === 'string') return;
+      if (typeof child.userData.nativeOverlayRole === 'string') return;
+      child.visible = visible;
+    });
+  }
+
+  private updateCreatureSkin(site: NativeCreatureSite, obj: THREE.Group, seconds: number): void {
+    const record = this.skinRecords.get(site.id);
+    if (!record) return;
+    this.applyProceduralBodyVisibility(obj, false);
+    const distance = obj.position.length();
+    const desiredBand: CreatureAnimationBand =
+      distance <= CREATURE_ACTIVE_MIXER_RADIUS ? 'active'
+      : distance <= CREATURE_LOW_RATE_MIXER_RADIUS ? 'lowRate'
+      : distance <= CREATURE_FROZEN_MIXER_RADIUS ? 'frozen'
+      : 'hidden';
+    record.band = desiredBand;
+    record.root.visible = desiredBand !== 'hidden';
+    const desiredClip = site.temperament === 'harmless' || site.tended || site.warded ? 'idle' : 'walk';
+    const clip = record.clips.get(desiredClip) ?? record.clips.get('idle') ?? [...record.clips.values()][0];
+    if (!clip) return;
+    let action = record.actions.get(clip.name);
+    if (!action) {
+      action = record.mixer.clipAction(clip);
+      record.actions.set(clip.name, action);
+    }
+    if (record.currentClip !== clip.name) {
+      if (record.currentClip) record.actions.get(record.currentClip)?.fadeOut(0.12);
+      action.reset().fadeIn(0.12).play();
+      record.currentClip = clip.name;
+    }
+    const dt = record.lastMixerSeconds > 0 ? Math.max(0, Math.min(0.05, seconds - record.lastMixerSeconds)) : 1 / 60;
+    record.lastMixerSeconds = seconds;
+    const shouldStepLowRate = desiredBand === 'lowRate' && seconds - record.lastLowRateStepSeconds >= 0.24;
+    for (const ownedAction of record.actions.values()) ownedAction.paused = desiredBand !== 'active' && !shouldStepLowRate;
+    if (desiredBand === 'active') {
+      record.mixer.update(dt);
+    } else if (shouldStepLowRate) {
+      record.mixer.update(Math.min(0.08, Math.max(0.016, seconds - record.lastLowRateStepSeconds)));
+      record.lastLowRateStepSeconds = seconds;
+      for (const ownedAction of record.actions.values()) ownedAction.paused = true;
     }
   }
 
@@ -683,10 +892,45 @@ export class NativeLifeRenderer {
         }
         if (child.name === 'brambleQuill') child.rotation.z += Math.sin(seconds * 5.1 + site.id) * 0.0035;
       });
+      this.updateCreatureSkin(site, obj, seconds);
     }
   }
 
-  stats(): { groups: number; meshes: number; active: number; kinds: number; silhouettes: number; hazards: number; telegraphRoles: number; telegraphMeshes: number } {
+  stats(): {
+    groups: number;
+    meshes: number;
+    active: number;
+    kinds: number;
+    silhouettes: number;
+    hazards: number;
+    telegraphRoles: number;
+    telegraphMeshes: number;
+    kilnCreatureSkinsLoaded: number;
+    kilnCreatureSkinsPending: number;
+    kilnCreatureSkinFallbacks: number;
+    kilnCreatureSkinGroups: number;
+    kilnCreatureGlbVisible: number;
+    proceduralCreatureFallbackVisible: number;
+    activeMixers: number;
+    lowRateMixers: number;
+    frozenMixers: number;
+    hiddenCreatureSkins: number;
+    activeMixerRadius: number;
+    lowRateMixerRadius: number;
+    frozenMixerRadius: number;
+    kilnCreatureSkinsBySlug: Partial<Record<KilnCreatureSkinSlug, {
+      loaded: number;
+      pending: number;
+      fallback: number;
+      activeMixers: number;
+      lowRateMixers: number;
+      frozenMixers: number;
+      hidden: number;
+      glbVisible: number;
+      clips: readonly string[];
+    }>>;
+    kilnCreatureSkinFits: Partial<Record<KilnCreatureSkinSlug, KilnCreatureSkinFitSnapshot>>;
+  } {
     let meshes = 0;
     let active = 0;
     let hazardCount = 0;
@@ -707,6 +951,78 @@ export class NativeLifeRenderer {
         }
       });
     }
-    return { groups: this.objects.size, meshes, active, kinds: kinds.size, silhouettes: silhouettes.size, hazards: hazardCount, telegraphRoles: telegraphRoles.size, telegraphMeshes };
+    let activeMixers = 0;
+    let lowRateMixers = 0;
+    let frozenMixers = 0;
+    let hiddenCreatureSkins = 0;
+    let kilnCreatureGlbVisible = 0;
+    let proceduralCreatureFallbackVisible = 0;
+    const kilnCreatureSkinsBySlug: Partial<Record<KilnCreatureSkinSlug, {
+      loaded: number;
+      pending: number;
+      fallback: number;
+      activeMixers: number;
+      lowRateMixers: number;
+      frozenMixers: number;
+      hidden: number;
+      glbVisible: number;
+      clips: readonly string[];
+    }>> = {};
+    const kilnCreatureSkinFits: Partial<Record<KilnCreatureSkinSlug, KilnCreatureSkinFitSnapshot>> = {};
+    for (const [id, obj] of this.objects) {
+      if (!this.skinRecords.has(id) && obj.visible) proceduralCreatureFallbackVisible++;
+    }
+    for (const slug of KILN_CREATURE_SKIN_SLUGS) {
+      const status = this.skinStatus.get(slug);
+      const template = this.skinTemplates.get(slug);
+      const records = [...this.skinRecords.values()].filter((record) => record.slug === slug);
+      const activeForSlug = records.filter((record) => record.band === 'active').length;
+      const lowRateForSlug = records.filter((record) => record.band === 'lowRate').length;
+      const frozenForSlug = records.filter((record) => record.band === 'frozen').length;
+      const hiddenForSlug = records.filter((record) => record.band === 'hidden').length;
+      const glbVisibleForSlug = records.filter((record) => record.root.visible).length;
+      activeMixers += activeForSlug;
+      lowRateMixers += lowRateForSlug;
+      frozenMixers += frozenForSlug;
+      hiddenCreatureSkins += hiddenForSlug;
+      kilnCreatureGlbVisible += glbVisibleForSlug;
+      if (template) kilnCreatureSkinFits[slug] = template.fit;
+      kilnCreatureSkinsBySlug[slug] = {
+        loaded: records.length,
+        pending: status === 'pending' ? 1 : 0,
+        fallback: status === 'fallback' ? 1 : 0,
+        activeMixers: activeForSlug,
+        lowRateMixers: lowRateForSlug,
+        frozenMixers: frozenForSlug,
+        hidden: hiddenForSlug,
+        glbVisible: glbVisibleForSlug,
+        clips: template?.clips.map((clip) => clip.name) ?? [],
+      };
+    }
+    return {
+      groups: this.objects.size,
+      meshes,
+      active,
+      kinds: kinds.size,
+      silhouettes: silhouettes.size,
+      hazards: hazardCount,
+      telegraphRoles: telegraphRoles.size,
+      telegraphMeshes,
+      kilnCreatureSkinsLoaded: this.skinRecords.size,
+      kilnCreatureSkinsPending: KILN_CREATURE_SKIN_SLUGS.filter((slug) => this.skinStatus.get(slug) === 'pending').length,
+      kilnCreatureSkinFallbacks: KILN_CREATURE_SKIN_SLUGS.filter((slug) => this.skinStatus.get(slug) === 'fallback').length,
+      kilnCreatureSkinGroups: this.skinRecords.size,
+      kilnCreatureGlbVisible,
+      proceduralCreatureFallbackVisible,
+      activeMixers,
+      lowRateMixers,
+      frozenMixers,
+      hiddenCreatureSkins,
+      activeMixerRadius: CREATURE_ACTIVE_MIXER_RADIUS,
+      lowRateMixerRadius: CREATURE_LOW_RATE_MIXER_RADIUS,
+      frozenMixerRadius: CREATURE_FROZEN_MIXER_RADIUS,
+      kilnCreatureSkinsBySlug,
+      kilnCreatureSkinFits,
+    };
   }
 }

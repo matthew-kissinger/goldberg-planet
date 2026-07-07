@@ -5,7 +5,7 @@ import { buildLayers, PLANET_RADIUS, WATER_SURFACE } from './world/layers';
 import { NATURAL_VOID_SCAN_LAYERS, type NaturalVoidKind } from './world/caves';
 import { Terrain, MAT, type MaterialId } from './world/terrain';
 import { Columns } from './world/columns';
-import { Trees } from './world/trees';
+import { Trees, type TreeVisualKind } from './world/trees';
 import { Streamer } from './world/streamer';
 import { chunkKeyOfTile } from './world/chunks';
 import { FarSphere } from './render/farsphere';
@@ -22,6 +22,7 @@ import { RouteRenderer } from './render/routes';
 import { MurmurRenderer } from './render/murmurs';
 import { SeasonAfterglowRenderer } from './render/seasonAfterglow';
 import { ResourceDropRenderer } from './render/resourceDrops';
+import { TreeAssetRenderer } from './render/treeAssets';
 import { NativeLifeRenderer } from './render/nativeLife';
 import { Player } from './player/player';
 import { Input } from './player/input';
@@ -66,6 +67,7 @@ import {
   type ResourceDropSave,
 } from './sim/resourceDrops';
 import {
+  nativeCreatureAt,
   nativeCreatureSitesAround,
   nearestNativeCreatureSite,
   normalizeNativeCreatureTends,
@@ -581,15 +583,17 @@ async function boot(): Promise<void> {
   const tendedNativeCreatures = new Set(normalizeNativeCreatureTends(loadedSave?.progression?.nativeCreatureTends));
   const wardedNativeCreatures = new Set(normalizeNativeCreatureWards(loadedSave?.progression?.nativeCreatureWards));
   const landmarkRenderer = new LandmarkRenderer(scene, pentagonTiles);
-  const domainResourceRenderer = new DomainResourceRenderer(scene);
+  const domainResourceRenderer = new DomainResourceRenderer(scene, kilnAssets);
   const skyfallRenderer = new SkyfallRenderer(scene);
   const caveMouthRenderer = new CaveMouthRenderer(scene);
   const routeRenderer = new RouteRenderer(scene);
   const murmurRenderer = new MurmurRenderer(scene);
   const seasonAfterglowRenderer = new SeasonAfterglowRenderer(scene);
-  const resourceDropRenderer = new ResourceDropRenderer(scene);
-  const nativeLifeRenderer = new NativeLifeRenderer(scene);
+  const resourceDropRenderer = new ResourceDropRenderer(scene, kilnAssets);
+  const treeAssetRenderer = new TreeAssetRenderer(scene, kilnAssets);
+  const nativeLifeRenderer = new NativeLifeRenderer(scene, kilnAssets);
   resourceDropRenderer.setDrops(resourceDrops);
+  let treeAssetSyncNeeded = true;
 
   // --- highlight (Line with an explicit closing vertex; LineLoop is unsupported on WebGPURenderer) ---
   const highlightGeom = new THREE.BufferGeometry();
@@ -833,6 +837,10 @@ async function boot(): Promise<void> {
   const resourceDropDiagnostics = () => ({
     count: resourceDrops.length,
     wood: resourceDrops.filter((drop) => drop.item === 'wood').reduce((sum, drop) => sum + drop.count, 0),
+    byItem: resourceDrops.reduce((totals, drop) => {
+      totals[drop.item] = (totals[drop.item] ?? 0) + drop.count;
+      return totals;
+    }, {} as Partial<Record<ItemId, number>>),
     ready: resourceDrops.filter((drop) => drop.age >= 0.9).length,
     lastPickup: lastPickupAction,
     items: resourceDrops.slice(0, 12).map((drop) => ({
@@ -844,6 +852,19 @@ async function boot(): Promise<void> {
       source: drop.source,
     })),
     renderer: resourceDropRenderer.stats(),
+  });
+
+  const treeAssetDiagnostics = () => ({
+    proceduralChunkTrees: streamer.proceduralTreesActive(),
+    renderer: treeAssetRenderer.stats(),
+    chop: {
+      active: trees.chopProgress.size,
+      target: treePick ? {
+        tile: treePick.tile,
+        damage: trees.damageOf(treePick.tile),
+        kind: trees.visualKindFor(treePick.tile),
+      } : null,
+    },
   });
 
   const mineProgressDiagnostics = () => ({
@@ -1125,6 +1146,46 @@ async function boot(): Promise<void> {
     return null;
   };
 
+  const treeVisualKinds: readonly TreeVisualKind[] = ['pine', 'broadleaf', 'deadSnag', 'shrub'];
+
+  const normalizeTreeVisualKind = (kind: unknown): TreeVisualKind | null => {
+    const text = String(kind ?? '').trim();
+    return treeVisualKinds.includes(text as TreeVisualKind) ? text as TreeVisualKind : null;
+  };
+
+  const findTreeTileOfKind = (kind: TreeVisualKind, startTile = player.tile): number | null => {
+    const start = Math.max(0, Math.min(geo.count - 1, Math.trunc(Number.isFinite(startTile) ? startTile : player.tile)));
+    for (let offset = 0; offset < geo.count; offset += 1) {
+      const tile = (start + offset) % geo.count;
+      if (trees.hasTree(tile) && trees.visualKindFor(tile) === kind) return tile;
+    }
+    return null;
+  };
+
+  const spawnAtTreeTile = (target: number): { treeTile: number; standTile: number; kind: TreeVisualKind; damage: number; treeAssets: ReturnType<typeof treeAssetDiagnostics> } | null => {
+    if (target < 0 || target >= geo.count || !trees.hasTree(target)) return null;
+    let stand = target;
+    const deg = geo.degreeOf(target);
+    for (let k = 0; k < deg; k++) {
+      const nb = geo.neighbor(target, k);
+      if (!trees.hasTree(nb)) { stand = nb; break; }
+    }
+    player.spawnAt(stand);
+    facePlayerTowardTile(target);
+    player.mode = 'walk';
+    player.vx = 0; player.vy = 0; player.vz = 0;
+    streamer.refreshDesired(...player.up(), player.altitudeAGL());
+    treeAssetSyncNeeded = true;
+    updatePicks(player.fwdX, player.fwdY, player.fwdZ);
+    return {
+      treeTile: target,
+      standTile: stand,
+      kind: trees.visualKindFor(target),
+      damage: trees.damageOf(target),
+      treeAssets: treeAssetDiagnostics(),
+    };
+  };
+
   const strikeTreeTile = (tile: number): ReturnType<Trees['strike']> | null => {
     if (!trees.hasTree(tile)) return null;
     const tool = bestToolForTree(craftedItems, toolWear);
@@ -1134,6 +1195,7 @@ async function boot(): Promise<void> {
     triggerCharacterAction('chop', tool.tool ?? 'hands', toolPoseDuration(tool, tool.cooldown + 0.28));
     applyToolUse(tool, 'chop');
     rebuildAround(tile);
+    treeAssetSyncNeeded = true;
     markSaveDirty();
     if (result.felled) {
       const drops = spawnTreeDrops(tile);
@@ -1210,6 +1272,7 @@ async function boot(): Promise<void> {
     edits++;
     triggerNativeMiningNoise(targetTile, materialItem);
     rebuildAround(targetTile);
+    treeAssetSyncNeeded = true;
     return { ok: true, tile: targetTile, layer: targetLayer, materialItem, strike, mined: true, caveDrop, resourceDrops: resourceDropDiagnostics(), mineProgress: mineProgressDiagnostics() };
   };
 
@@ -1341,6 +1404,22 @@ async function boot(): Promise<void> {
       lastAction: lastDomainResourceAction,
     };
   };
+  const debugRevealDomainResources = (limit = pentagonTiles.length) => {
+    const max = Math.max(0, Math.min(pentagonTiles.length, Math.trunc(Number.isFinite(limit) ? limit : pentagonTiles.length)));
+    let added = 0;
+    for (let i = 0; i < max; i += 1) {
+      const tile = pentagonTiles[i];
+      if (!discoveredPentagons.has(tile)) {
+        discoveredPentagons.add(tile);
+        added += 1;
+      }
+    }
+    domainResourceRenderer.setSites(currentDomainResourceSites());
+    lastDomainResourceAction = added > 0 ? `debug revealed ${added} domain landmarks` : 'debug domain resources already revealed';
+    markSaveDirty();
+    refreshUseButton();
+    return domainResourceDiagnostics();
+  };
   const currentSkyfallSites = () => skyfallSites(SEED, timeState.day, timeState.minute, geo.count, harvestedSkyfalls);
   const currentSkyfall = () => currentSkyfallSites()[0] ?? null;
   const nearbySkyfall = () => nearestSkyfallSite(nearbyTiles(1), currentSkyfallSites());
@@ -1418,6 +1497,21 @@ async function boot(): Promise<void> {
   };
   const currentNativeCreatureSites = (): NativeCreatureSite[] =>
     nativeCreatureSitesAround(SEED, geo, columns, terrain, player.tile, 7, tendedNativeCreatures, wardedNativeCreatures, 7);
+  const nativeCreatureKinds = new Set<NativeCreatureKind>([
+    'mossPuff',
+    'shellSkitter',
+    'reedbackGrazer',
+    'caveBlinker',
+    'tideLurker',
+    'caveBelljaw',
+    'screeSnapper',
+    'stormBurr',
+    'brambleback',
+  ]);
+  const normalizeNativeCreatureKind = (kind: unknown): NativeCreatureKind | null =>
+    typeof kind === 'string' && nativeCreatureKinds.has(kind as NativeCreatureKind)
+      ? kind as NativeCreatureKind
+      : null;
   const nativeLifeRoutePriority = (site: Pick<NativeCreatureSite, 'temperament' | 'tended' | 'warded'>): number =>
     site.temperament !== 'harmless' && !site.warded
       ? site.temperament === 'combative' ? 95 : 91
@@ -1479,6 +1573,71 @@ async function boot(): Promise<void> {
       player.pitch = 0;
       player.reorthonormalize();
     }
+  };
+  const standForNativeCreature = (candidate: NativeCreatureSite): { stand: number; score: number } => {
+    const siteHeight = columns.heightOf(candidate.tile);
+    let stand = candidate.tile;
+    let score = trees.hasTree(candidate.tile) ? 9999 : 0;
+    const deg = geo.degreeOf(candidate.tile);
+    for (let k = 0; k < deg; k++) {
+      const nb = geo.neighbor(candidate.tile, k);
+      if (trees.hasTree(nb)) continue;
+      const h = columns.heightOf(nb);
+      const s = Math.abs(h - siteHeight) + (h < 2.5 ? 20 : 0);
+      if (s < score) {
+        score = s;
+        stand = nb;
+      }
+    }
+    return { stand, score };
+  };
+  const spawnAtNativeCreatureSite = (site: NativeCreatureSite): { site: NativeCreatureSite; standTile: number } => {
+    const bestStand = standForNativeCreature(site);
+    const stand = bestStand.stand >= 0 ? bestStand.stand : site.tile;
+    player.spawnAt(stand);
+    facePlayerTowardTile(site.tile);
+    player.mode = 'walk';
+    player.vx = 0; player.vy = 0; player.vz = 0;
+    nativeHazardCooldown = site.temperament === 'harmless' ? Math.max(nativeHazardCooldown, 2.5) : 0;
+    lastNativeLifeAction = `debug spawned ${site.label}`;
+    streamer.refreshDesired(...player.up(), player.altitudeAGL());
+    refreshUseButton();
+    nativeLifeRenderer.setSites(currentNativeCreatureSites());
+    return { site, standTile: stand };
+  };
+  const findNativeCreatureOfKind = (kind: NativeCreatureKind, startTile = player.tile): NativeCreatureSite | null => {
+    const start = Math.max(0, Math.min(geo.count - 1, Math.trunc(Number.isFinite(startTile) ? startTile : player.tile)));
+    for (let i = 0; i < geo.count; i += 1) {
+      const tile = (start + i) % geo.count;
+      const site = nativeCreatureAt(SEED, geo, columns, terrain, tile, tendedNativeCreatures, wardedNativeCreatures);
+      if (site?.kind === kind) return site;
+    }
+    return null;
+  };
+  const debugSpawnAtDomainResource = (kind?: string) => {
+    const sites = currentDomainResourceSites()
+      .filter((site) => site.discovered && !site.harvested && (!kind || site.kind === kind));
+    const site = sites[0] ?? null;
+    if (!site) return null;
+    let stand = site.tile;
+    const deg = geo.degreeOf(site.tile);
+    for (let k = 0; k < deg; k += 1) {
+      const candidate = geo.neighbor(site.tile, k);
+      if (candidate >= 0) {
+        stand = candidate;
+        break;
+      }
+    }
+    player.spawnAt(stand);
+    facePlayerTowardTile(site.tile);
+    player.mode = 'walk';
+    player.vx = 0;
+    player.vy = 0;
+    player.vz = 0;
+    streamer.refreshDesired(...player.up(), player.altitudeAGL());
+    domainResourceRenderer.setSites(currentDomainResourceSites());
+    refreshUseButton();
+    return { site, standTile: stand, diagnostics: domainResourceDiagnostics() };
   };
   const nativeLifeDiagnostics = () => {
     const sites = currentNativeCreatureSites();
@@ -4782,10 +4941,8 @@ async function boot(): Promise<void> {
       rock: counts[1],
       resourceDrops: resourceDropDiagnostics(),
       mineProgress: mineProgressDiagnostics(),
-      treeChop: {
-        active: trees.chopProgress.size,
-        target: treePick ? { tile: treePick.tile, damage: trees.damageOf(treePick.tile) } : null,
-      },
+      treeAssets: treeAssetDiagnostics(),
+      treeChop: treeAssetDiagnostics().chop,
       craftedItems: { ...craftedItems },
       inventory: packLedger(),
       tools: { ...toolSummary(craftedItems, toolWear), wear: { ...toolWear }, lastAction: lastToolAction, reach: playerReach() },
@@ -4850,6 +5007,7 @@ async function boot(): Promise<void> {
     tools: () => ({ ...toolSummary(craftedItems, toolWear), wear: { ...toolWear }, lastAction: lastToolAction, reach: playerReach() }),
     nearbyTiles: (rings = 1) => [...tileSetAround(player.tile, Math.max(0, Math.trunc(Number.isFinite(rings) ? Number(rings) : 1)))],
     resourceDrops: () => resourceDropDiagnostics(),
+    treeAssets: () => treeAssetDiagnostics(),
     mineProgress: () => mineProgressDiagnostics(),
     debugStrikeMineTile: (tile?: number, layer?: number) => {
       const target = Number.isFinite(tile) ? Math.max(0, Math.min(geo.count - 1, Math.trunc(tile!))) : player.tile;
@@ -4876,6 +5034,7 @@ async function boot(): Promise<void> {
         markSaveDirty();
         triggerNativeMiningNoise(target, materialItem);
         rebuildAround(target);
+        treeAssetSyncNeeded = true;
       }
       return {
         ok,
@@ -4905,32 +5064,36 @@ async function boot(): Promise<void> {
         drops: resourceDropDiagnostics(),
       };
     },
+    debugSpawnAtTreeKind: (kind: unknown = 'pine', startTile?: number) => {
+      const targetKind = normalizeTreeVisualKind(kind);
+      if (!targetKind) return { ok: false, reason: 'unknown tree kind', kind, allowed: treeVisualKinds };
+      const target = findTreeTileOfKind(targetKind, Number.isFinite(startTile) ? Math.trunc(startTile!) : player.tile);
+      const spawned = target === null ? null : spawnAtTreeTile(target);
+      return spawned
+        ? { ok: true, ...spawned }
+        : { ok: false, reason: 'no live tree of kind', kind: targetKind, treeAssets: treeAssetDiagnostics() };
+    },
     debugSpawnWoodDrops: (tile?: number) => {
       const target = Number.isFinite(tile) ? Math.trunc(tile!) : player.tile;
       const drops = spawnTreeDrops(Math.max(0, Math.min(geo.count - 1, target)));
       markSaveDirty();
       return { drops, diagnostics: resourceDropDiagnostics() };
     },
+    debugSpawnResourceDrops: (item: string = 'rock', total = 1, tile?: number) => {
+      if (!(item in ITEM_DEFS)) return { ok: false, reason: 'unknown item', item, diagnostics: resourceDropDiagnostics() };
+      const target = Math.max(0, Math.min(geo.count - 1, Number.isFinite(tile) ? Math.trunc(tile!) : player.tile));
+      const drops = spawnMineDrops(target, item as ItemId, Math.max(1, Math.trunc(Number.isFinite(total) ? total : 1)));
+      markSaveDirty();
+      return { ok: true, item, drops, diagnostics: resourceDropDiagnostics() };
+    },
     debugCollectDrops: (seconds = 1.2) => {
       tickResourceDrops(Math.max(0, Number.isFinite(seconds) ? seconds : 1.2));
-      return { wood: counts[WOOD_SLOT], drops: resourceDropDiagnostics() };
+      return { wood: counts[WOOD_SLOT], rock: counts[1], inventory: packLedger(), drops: resourceDropDiagnostics() };
     },
     spawnNearTree: (tile?: number) => {
       const target = Number.isFinite(tile) ? Math.trunc(tile!) : nearestTreeTileAround(player.tile, 8);
       if (target === null || target < 0 || target >= geo.count) return null;
-      let stand = target;
-      const deg = geo.degreeOf(target);
-      for (let k = 0; k < deg; k++) {
-        const nb = geo.neighbor(target, k);
-        if (!trees.hasTree(nb)) { stand = nb; break; }
-      }
-      player.spawnAt(stand);
-      facePlayerTowardTile(target);
-      player.mode = 'walk';
-      player.vx = 0; player.vy = 0; player.vz = 0;
-      streamer.refreshDesired(...player.up(), player.altitudeAGL());
-      updatePicks(player.fwdX, player.fwdY, player.fwdZ);
-      return { treeTile: target, standTile: stand, damage: trees.damageOf(target) };
+      return spawnAtTreeTile(target);
     },
     setToolWear: (wear: unknown) => {
       toolWear = normalizeToolWear(wear);
@@ -4982,6 +5145,8 @@ async function boot(): Promise<void> {
     closeStorage: () => { closeStorage(); return { open: openChestId !== null, chestId: openChestId, state: currentChestStorage() }; },
     transferChest: (id: number, item: string, action: ChestTransferAction = 'depositAll') => transferChestStorage(id, item, action),
     domainResources: () => domainResourceDiagnostics(),
+    debugRevealDomainResources,
+    debugSpawnAtDomainResource,
     gatherDomainResource: () => tryDomainResource(),
     thresholdChambers: () => thresholdChamberDiagnostics(),
     inspectThresholdChamber: () => {
@@ -5008,50 +5173,28 @@ async function boot(): Promise<void> {
     readSeasonAfterglow: () => trySeasonAfterglow(),
     nativeLife: () => nativeLifeDiagnostics(),
     tendNativeLife: () => tryNativeCreature(),
+    debugSpawnAtNativeLifeKind: (kind: unknown = 'mossPuff', startTile?: number) => {
+      const targetKind = normalizeNativeCreatureKind(kind);
+      if (!targetKind) return { ok: false, reason: 'unknown native creature kind', kind, allowed: [...nativeCreatureKinds] };
+      const site = findNativeCreatureOfKind(targetKind, Number.isFinite(startTile) ? Math.trunc(startTile!) : player.tile);
+      if (!site) return { ok: false, reason: 'no native creature of kind', kind: targetKind, nativeLife: nativeLifeDiagnostics() };
+      return { ok: true, ...spawnAtNativeCreatureSite(site), diagnostics: nativeLifeDiagnostics() };
+    },
     spawnAtNativeLife: (kindOrRings: NativeCreatureKind | number = 'mossPuff', maybeRings = 48) => {
       const kind: NativeCreatureKind = typeof kindOrRings === 'string' ? kindOrRings : 'mossPuff';
       const rings = typeof kindOrRings === 'number' ? kindOrRings : maybeRings;
       const sites = nativeCreatureSitesAround(SEED, geo, columns, terrain, player.tile, Math.max(1, Math.trunc(rings)), tendedNativeCreatures, wardedNativeCreatures, 32, kind);
-      const standFor = (candidate: NativeCreatureSite): { stand: number; score: number } => {
-        const siteHeight = columns.heightOf(candidate.tile);
-        let stand = candidate.tile;
-        let score = trees.hasTree(candidate.tile) ? 9999 : 0;
-        const deg = geo.degreeOf(candidate.tile);
-        for (let k = 0; k < deg; k++) {
-          const nb = geo.neighbor(candidate.tile, k);
-          if (trees.hasTree(nb)) continue;
-          const h = columns.heightOf(nb);
-          const s = Math.abs(h - siteHeight) + (h < 2.5 ? 20 : 0);
-          if (s < score) {
-            score = s;
-            stand = nb;
-          }
-        }
-        return { stand, score };
-      };
       let site: NativeCreatureSite | null = null;
-      let stand = -1;
       let bestScore = 9999;
       for (const candidate of sites) {
-        const next = standFor(candidate);
+        const next = standForNativeCreature(candidate);
         if (next.score < bestScore) {
           site = candidate;
-          stand = next.stand;
           bestScore = next.score;
         }
       }
       if (!site) return null;
-      if (stand < 0) stand = site.tile;
-      player.spawnAt(stand);
-      facePlayerTowardTile(site.tile);
-      player.mode = 'walk';
-      player.vx = 0; player.vy = 0; player.vz = 0;
-      nativeHazardCooldown = site.temperament === 'harmless' ? Math.max(nativeHazardCooldown, 2.5) : 0;
-      lastNativeLifeAction = `debug spawned ${site.label}`;
-      streamer.refreshDesired(...player.up(), player.altitudeAGL());
-      refreshUseButton();
-      nativeLifeRenderer.setSites(currentNativeCreatureSites());
-      return { site, standTile: stand };
+      return spawnAtNativeCreatureSite(site);
     },
     spawnAtNativeHazard: (rings = 64) => (window as any).__world.spawnAtNativeLife('brambleback', rings),
     wardNativeHazard: () => tryWardNativeHazard(),
@@ -5215,6 +5358,7 @@ async function boot(): Promise<void> {
         if ((craftedItems.planeFrame ?? 0) > 0) planeCrafted = true;
         streamer.releaseAll();
         streamer.refreshDesired(...player.up(), player.altitudeAGL());
+        treeAssetSyncNeeded = true;
         saveDirty = true;
         hud.flash('save imported', 2);
         return true;
@@ -5455,6 +5599,7 @@ async function boot(): Promise<void> {
         controls: { ux: uxManager.snapshot(), gamepad: gamepad.snapshot(), touch: touch.enabled, panels: currentPanelOwnership() },
         characterRenderer: character.stats(),
         mineProgress: mineProgressDiagnostics(),
+        treeAssets: treeAssetDiagnostics(),
         survival: { ...survivalSnapshot(), time: { ...timeState }, pack: packBurden() },
         structures: { relocation: relocationDiagnostics(), snapPreview: currentStructureSnapPreview(), commands: buildCommandDiagnostics() },
       };
@@ -5476,6 +5621,7 @@ async function boot(): Promise<void> {
       selected: SLOTS[hotbarSel]?.name ?? 'unknown',
       resourceDrops: resourceDropDiagnostics(),
       mineProgress: mineProgressDiagnostics(),
+      treeAssets: treeAssetDiagnostics(),
       treeChop: {
         active: trees.chopProgress.size,
         target: treePick ? { tile: treePick.tile, damage: trees.damageOf(treePick.tile) } : null,
@@ -5959,10 +6105,23 @@ async function boot(): Promise<void> {
       streamer.refreshDesired(ux, uy, uz, agl);
     }
     const builtThisFrame = streamer.pump();
+    if (treeAssetRenderer.readyForProceduralReplacement() && streamer.proceduralTreesActive()) {
+      if (streamer.setProceduralTreesEnabled(false)) {
+        treeAssetSyncNeeded = true;
+        streamer.refreshDesired(ux, uy, uz, player.altitudeAGL());
+      }
+    }
+    if (builtThisFrame > 0 || streamer.residencyDirty || treeAssetSyncNeeded) {
+      treeAssetRenderer.setChunks(streamer.residentChunks(), geo, trees);
+      treeAssetSyncNeeded = false;
+    }
+    treeAssetRenderer.setProceduralFallbackActive(streamer.proceduralTreesActive());
+    treeAssetRenderer.setRenderEnabled(!streamer.proceduralTreesActive() && treeAssetRenderer.readyForProceduralReplacement());
     // deferred seam-neighbor rebuilds from edits: one per frame
     if (pendingRebuilds.length > 0) {
       const key = pendingRebuilds.shift()!;
       if (streamer.resident.has(key)) streamer.rebuildNow(key);
+      treeAssetSyncNeeded = true;
     }
     // far-sphere refilter is a 184k-tri scan + index re-upload: keep it off build frames
     // and cap it at 4 Hz — a briefly unfiltered far tri sits 6 m under a loaded chunk, invisible
@@ -5984,6 +6143,7 @@ async function boot(): Promise<void> {
     structureRenderer.update(structures, geo, layers, camWorld, now / 1000);
     structureRenderer.updateSnapPreview(currentStructureSnapPreview(), geo, layers, camWorld, now / 1000);
     resourceDropRenderer.update(resourceDrops, geo, layers, columns, camWorld, now / 1000);
+    treeAssetRenderer.update(geo, layers, columns, trees, camWorld, now / 1000);
     landmarkRenderer.update(pentagonTiles, discoveredPentagons, geo, layers, columns, camWorld, now / 1000, completedPentagonSites);
     const domainSites = currentDomainResourceSites();
     domainResourceRenderer.setSites(domainSites);

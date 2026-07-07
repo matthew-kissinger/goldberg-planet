@@ -6,6 +6,20 @@ import type { KilnAssetSnapshot, KilnSkinFitSnapshot, KilnStructureSkinSlug, Str
 
 type PropFactory = () => THREE.Group;
 type StructureSilhouette = 'cave-anchor-belay-marker' | 'waystone-attuned-marker';
+type SnapPreviewSilhouette = 'door-opening-preview' | 'window-light-preview' | 'roof-cap-preview';
+
+interface SnapPreviewGuidePart {
+  name: string;
+  role: string;
+  pos: [number, number, number];
+  scale: [number, number, number];
+  geom?: THREE.BufferGeometry;
+}
+
+interface SnapPreviewGuideSpec {
+  silhouette: SnapPreviewSilhouette;
+  parts: readonly SnapPreviewGuidePart[];
+}
 
 export interface StructureSnapPreview {
   active: boolean;
@@ -69,6 +83,8 @@ const materials = {
   snapPreviewBlocked: new THREE.MeshStandardMaterial({ color: 0xff8b64, roughness: 0.55, metalness: 0.02, emissive: 0xff4f2d, emissiveIntensity: 0.52, transparent: true, opacity: 0.42, depthWrite: false }),
   snapPreviewRingOk: new THREE.MeshStandardMaterial({ color: 0xc8f0a3, roughness: 0.6, metalness: 0.02, emissive: 0x5fd65b, emissiveIntensity: 0.65, transparent: true, opacity: 0.72, depthWrite: false }),
   snapPreviewRingBlocked: new THREE.MeshStandardMaterial({ color: 0xffc08a, roughness: 0.6, metalness: 0.02, emissive: 0xff5b36, emissiveIntensity: 0.72, transparent: true, opacity: 0.78, depthWrite: false }),
+  snapPreviewGuideOk: new THREE.MeshBasicMaterial({ color: 0xeaff8d, transparent: true, opacity: 0.94, depthWrite: false, depthTest: false }),
+  snapPreviewGuideBlocked: new THREE.MeshBasicMaterial({ color: 0xffd08a, transparent: true, opacity: 0.95, depthWrite: false, depthTest: false }),
 };
 
 const box = new THREE.BoxGeometry(1, 1, 1);
@@ -96,6 +112,56 @@ function role<T extends THREE.Object3D>(obj: T, roleName: string): T {
 function silhouette<T extends THREE.Object3D>(obj: T, silhouetteName: StructureSilhouette): T {
   obj.userData.structureSilhouette = silhouetteName;
   return obj;
+}
+
+const SNAP_PREVIEW_GUIDES: Partial<Record<StructureSave['item'], SnapPreviewGuideSpec>> = {
+  doorKit: {
+    silhouette: 'door-opening-preview',
+    parts: [
+      { name: 'snapPreviewDoorLeftJamb', role: 'snap preview door opening', pos: [-0.5, 0.82, -0.2], scale: [0.075, 1.5, 0.09] },
+      { name: 'snapPreviewDoorRightJamb', role: 'snap preview door opening', pos: [0.5, 0.82, -0.2], scale: [0.075, 1.5, 0.09] },
+      { name: 'snapPreviewDoorLintel', role: 'snap preview door lintel', pos: [0, 1.54, -0.2], scale: [1.08, 0.095, 0.09] },
+      { name: 'snapPreviewDoorThreshold', role: 'snap preview door threshold', pos: [0, 0.14, -0.24], scale: [0.84, 0.045, 0.2] },
+    ],
+  },
+  windowFrame: {
+    silhouette: 'window-light-preview',
+    parts: [
+      { name: 'snapPreviewWindowGlassPane', role: 'snap preview window light', pos: [0, 0.9, -0.2], scale: [0.68, 0.5, 0.04] },
+      { name: 'snapPreviewWindowSill', role: 'snap preview window sill', pos: [0, 0.58, -0.24], scale: [0.78, 0.07, 0.13] },
+      { name: 'snapPreviewWindowCenterMullion', role: 'snap preview window centered opening', pos: [0, 0.9, -0.26], scale: [0.055, 0.56, 0.06] },
+      { name: 'snapPreviewWindowTopRail', role: 'snap preview window light', pos: [0, 1.22, -0.24], scale: [0.76, 0.07, 0.09] },
+    ],
+  },
+  roofBundle: {
+    silhouette: 'roof-cap-preview',
+    parts: [
+      { name: 'snapPreviewRoofRidgeBeam', role: 'snap preview roof cap', pos: [0, 0.78, -0.12], scale: [0.15, 0.18, 1.18] },
+      { name: 'snapPreviewRoofLeftEave', role: 'snap preview roof eave', pos: [-0.62, 0.42, -0.12], scale: [0.1, 0.14, 1.2] },
+      { name: 'snapPreviewRoofRightEave', role: 'snap preview roof eave', pos: [0.62, 0.42, -0.12], scale: [0.1, 0.14, 1.2] },
+      { name: 'snapPreviewRoofCapPlane', role: 'snap preview roof cap coverage', pos: [0, 0.46, -0.14], scale: [1.18, 0.05, 1.18] },
+    ],
+  },
+};
+
+function makeSnapPreviewGuides(item: StructureSave['item']): THREE.Group | null {
+  const spec = SNAP_PREVIEW_GUIDES[item];
+  if (!spec) return null;
+  const group = new THREE.Group();
+  group.name = `snapPreviewGuide-${item}`;
+  group.userData.snapPreviewSilhouette = spec.silhouette;
+  group.userData.structureReadabilityRole = `snap preview ${spec.silhouette}`;
+  for (const part of spec.parts) {
+    const guide = role(
+      mesh(part.geom ?? box, materials.snapPreviewRingOk, part.pos, part.scale, part.name),
+      part.role,
+    );
+    guide.userData.snapPreviewGuide = true;
+    guide.userData.snapPreviewSilhouette = spec.silhouette;
+    guide.renderOrder = 8;
+    group.add(guide);
+  }
+  return group;
 }
 
 function post(name: string, x: number, z: number, height = 0.8): THREE.Mesh {
@@ -615,6 +681,7 @@ export class StructureRenderer {
   private readonly kilnSkinStatus = new Map<number, KilnSkinStatus>();
   private snapPreviewObject: THREE.Group | null = null;
   private snapPreviewItem: StructureSave['item'] | null = null;
+  private snapPreviewCacheKey: string | null = null;
   private lastSnapPreview: StructureSnapPreview | null = null;
 
   constructor(scene: THREE.Scene, private readonly kilnAssets?: StructureSkinProvider) {
@@ -684,17 +751,28 @@ export class StructureRenderer {
     this.lastSnapPreview = preview ? { ...preview } : null;
     if (!preview?.active) {
       this.snapPreviewGroup.visible = false;
+      delete this.snapPreviewGroup.userData.snapPreview;
+      delete this.snapPreviewGroup.userData.snapPreviewSilhouette;
       return;
     }
-    if (!this.snapPreviewObject || this.snapPreviewItem !== preview.item) {
+    const silhouetteName = SNAP_PREVIEW_GUIDES[preview.item]?.silhouette ?? null;
+    const cacheKey = `${preview.item}:${preview.socket?.role ?? preview.socketRole ?? 'none'}:${silhouetteName ?? 'generic'}`;
+    if (!this.snapPreviewObject || this.snapPreviewItem !== preview.item || this.snapPreviewCacheKey !== cacheKey) {
       this.snapPreviewGroup.clear();
       this.snapPreviewObject = this.makeSnapPreviewObject(preview.item);
       this.snapPreviewItem = preview.item;
+      this.snapPreviewCacheKey = cacheKey;
       this.snapPreviewGroup.add(this.snapPreviewObject);
     }
     const ok = preview.ok;
     this.snapPreviewGroup.visible = true;
-    this.snapPreviewGroup.userData.snapPreview = { ...preview };
+    this.snapPreviewGroup.userData.snapPreview = {
+      ...preview,
+      socketRole: preview.socket?.role ?? preview.socketRole ?? null,
+      socketCollider: preview.socket?.collider ?? null,
+      silhouette: silhouetteName,
+    };
+    this.snapPreviewGroup.userData.snapPreviewSilhouette = silhouetteName;
     const frame = geo.frameOf(preview.tile);
     const ca = Math.cos(preview.yaw), sa = Math.sin(preview.yaw);
     const vX = new THREE.Vector3(
@@ -726,6 +804,9 @@ export class StructureRenderer {
       if (name === 'snapPreviewBlockerA' || name === 'snapPreviewBlockerB') {
         child.visible = !ok;
         meshChild.material = materials.snapPreviewRingBlocked;
+      } else if (meshChild.userData.snapPreviewGuide === true) {
+        child.visible = true;
+        meshChild.material = ok ? materials.snapPreviewGuideOk : materials.snapPreviewGuideBlocked;
       } else if (name === 'snapPreviewFootprint' || name === 'snapPreviewFaceTick') {
         child.visible = true;
         meshChild.material = ok ? materials.snapPreviewRingOk : materials.snapPreviewRingBlocked;
@@ -758,7 +839,11 @@ export class StructureRenderer {
         child.userData.structureReadabilityRole = 'snap preview prop silhouette';
       }
     });
-    wrapper.add(footprint, faceTick, ghost, blockerA, blockerB);
+    const guides = makeSnapPreviewGuides(item);
+    if (guides) wrapper.userData.snapPreviewSilhouette = guides.userData.snapPreviewSilhouette;
+    wrapper.add(footprint, faceTick);
+    if (guides) wrapper.add(guides);
+    wrapper.add(ghost, blockerA, blockerB);
     return wrapper;
   }
 
@@ -1011,8 +1096,13 @@ export class StructureRenderer {
       tile: number | null;
       layer: number | null;
       blocker: string | null;
+      socketRole: StructureSocketSpec['role'] | string | null;
+      socketCollider: StructureSocketSpec['collider'] | null;
+      silhouette: SnapPreviewSilhouette | null;
       meshes: number;
       readabilityRoles: number;
+      meshNames: string[];
+      visibleReadabilityRoles: string[];
     };
     kilnAssets?: KilnAssetSnapshot;
   } {
@@ -1036,6 +1126,8 @@ export class StructureRenderer {
     const kilnSkinFits: Partial<Record<KilnStructureSkinSlug, KilnSkinFitSnapshot>> = {};
     let snapPreviewMeshes = 0;
     const snapPreviewRoles = new Set<string>();
+    const snapPreviewVisibleRoles = new Set<string>();
+    const snapPreviewMeshNames = new Set<string>();
     for (const obj of this.objects.values()) {
       if (typeof obj.userData.structureSilhouette === 'string') routeSilhouettes.add(obj.userData.structureSilhouette);
       const skinStatus = obj.userData.kilnSkinStatus as KilnSkinStatus | undefined;
@@ -1068,10 +1160,19 @@ export class StructureRenderer {
     }
     if (this.snapPreviewGroup.visible) {
       this.snapPreviewGroup.traverse((child) => {
-        if ((child as THREE.Mesh).isMesh && child.visible) snapPreviewMeshes++;
-        if (typeof child.userData.structureReadabilityRole === 'string') snapPreviewRoles.add(child.userData.structureReadabilityRole);
+        const visible = child.visible;
+        if ((child as THREE.Mesh).isMesh && visible) {
+          snapPreviewMeshes++;
+          if (child.name) snapPreviewMeshNames.add(child.name);
+        }
+        if (typeof child.userData.structureReadabilityRole === 'string') {
+          snapPreviewRoles.add(child.userData.structureReadabilityRole);
+          if (visible) snapPreviewVisibleRoles.add(child.userData.structureReadabilityRole);
+        }
       });
     }
+    const snapPreviewSocket = this.lastSnapPreview?.socket;
+    const snapPreviewItem = this.lastSnapPreview?.item ?? null;
     return {
       groups: this.objects.size,
       meshes,
@@ -1089,12 +1190,17 @@ export class StructureRenderer {
         active: this.snapPreviewGroup.visible,
         ok: this.lastSnapPreview?.ok ?? false,
         mode: this.lastSnapPreview?.mode ?? null,
-        item: this.lastSnapPreview?.item ?? null,
+        item: snapPreviewItem,
         tile: this.lastSnapPreview?.tile ?? null,
         layer: this.lastSnapPreview?.layer ?? null,
         blocker: this.lastSnapPreview?.blocker ?? null,
+        socketRole: snapPreviewSocket?.role ?? this.lastSnapPreview?.socketRole ?? null,
+        socketCollider: snapPreviewSocket?.collider ?? null,
+        silhouette: snapPreviewItem ? SNAP_PREVIEW_GUIDES[snapPreviewItem]?.silhouette ?? null : null,
         meshes: snapPreviewMeshes,
         readabilityRoles: snapPreviewRoles.size,
+        meshNames: [...snapPreviewMeshNames].sort(),
+        visibleReadabilityRoles: [...snapPreviewVisibleRoles].sort(),
       },
       kilnAssets: this.kilnAssets?.snapshot?.(),
     };

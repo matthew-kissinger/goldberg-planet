@@ -3,6 +3,72 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-07
 
+- Promoted full approved Kiln pack adoption to a goal-level Hearth and Horizon track. H4
+  remains the intake/proof gate, while new H5 treats the 61 ready GLBs as the target visual
+  backlog for replacing janky procedural world art across pickups, rocks/resource nodes,
+  home props, waterline utilities, trees, creatures, landmarks, and remaining modular kits.
+  The current craftable plane is the explicit exception because it already reads well.
+- Added `docs/kiln-pack-adoption-plan.md`. The plan requires every ready asset to become
+  runtime wired, runtime dressing, regenerated, or explicitly superseded; repeated families
+  must use palette/material reuse plus instanced or batched geometry; animated creatures
+  must distance-gate `AnimationMixer` playback so far creatures freeze, impostor, or hide
+  instead of burning mixer cost.
+- Closed the first H5/K1 approved-pack runtime adoption slice for ground pickups. Wood and
+  rock drops now load promoted Kiln `drop-wood-logs` and `drop-ore-chunk` GLBs through
+  `KilnRuntimeAssets`, normalize them to a ground-pickup pivot, merge source meshes by
+  material, and render them through `THREE.InstancedMesh` batches while procedural drops
+  remain fallback for unsupported or failed skins. `npm run proof:k1-resource-drops` now
+  proves desktop and phone GLB requests, zero `generated/` runtime requests, 5 spawned drops
+  as 5 batched instances on 5 instanced draw calls, screenshot pixels, no browser errors,
+  and collection into 6 wood plus 2 rock.
+- Closed the H5/K2 approved-pack domain-resource slice. All 12 promoted `node-*` GLBs now
+  load through `KilnRuntimeAssets` as normalized center-XZ/bottom-Y instanced templates,
+  with source meshes sanitized for material merging so the family stays on 33 draw calls
+  instead of many cloned scene graphs. `DomainResourceRenderer` keeps code-authored
+  base/dormant/harvest-glow overlays and only replaces discovered procedural bodies after
+  a GLB batch is ready. `npm run proof:k2-domain-resources` now proves desktop and phone
+  requests for every committed node model, zero `generated/` runtime requests, 36 revealed
+  nodes as 36 batched instances, 33 instanced draw calls, zero pending/fallback, screenshot
+  pixels, and no browser errors.
+- Closed the H5/K5 approved-pack tree/shrub slice. `tree-pine`, `tree-broadleaf`,
+  `tree-dead-snag`, and `tree-shrub` now load as normalized, material-merged instanced
+  templates through `KilnRuntimeAssets`; `TreeAssetRenderer` mirrors resident streamer
+  chunks while `Trees` remains the gameplay authority for visual kind, chopping, and wood
+  drops. Procedural chunk tree meshes stay active until all four GLB skins are ready, then
+  become fallback instead of default visuals. Cosmetic sway is distance-gated to 96 world
+  units while chop damage stays matrix-driven. `npm run proof:k5-trees` now proves desktop
+  and phone committed model requests, zero `generated/` runtime requests, 210 resident tree
+  instances on 11 instanced draw calls, zero pending/fallback, screenshot pixels, no browser
+  errors, and a felled tree spawning collectible wood drops.
+- Closed the first H5/K6 approved-pack native-creature skin slice. All nine promoted
+  `creature-*` GLBs now load through `KilnRuntimeAssets`, require `idle` and `walk` clips,
+  normalize to native-life body sockets, and attach to `NativeLifeRenderer` while the
+  native-life sim remains authoritative. The renderer hides duplicated procedural body
+  meshes after a skin loads, preserves code-owned reward/warning overlays, and exposes
+  loaded/pending/fallback, visible GLB, procedural fallback, fit metadata, clip metadata,
+  and active/low-rate/frozen/hidden mixer-band diagnostics by slug. `npm run
+  proof:k6-creatures` now proves desktop and phone committed model requests for all nine
+  creature GLBs, zero `generated/` runtime requests, zero fallback, required clip metadata,
+  active/low-rate/hidden distance-band behavior, capped active mixers, screenshot pixels,
+  no browser errors, and tend/ward gameplay responses.
+- Logged the current K6 native-life UX gap from user playtesting. Native life is still
+  tile-anchored rather than roaming AI; hazards can apply stamina/exposure pressure through
+  the native-life system, but click/attack routing still targets terrain/trees because
+  there is no native-life ray-pick target. Next K6 UX slice should add native pick priority,
+  inspect/tend/ward/scare feedback, placement blockers on occupied native tiles, named HUD
+  pressure messages, and proof that creature targeting wins over mining the underlying hex.
+- Closed the C2/C3 socket-specific snap-preview readability node under the DAG/subagent
+  workflow. Door kits, window frames, and roof bundles now add code-authored preview guide
+  silhouettes on top of the generic footprint ghost: door jamb/lintel/threshold, window
+  glass/sill/mullion/top rail, and roof ridge/eaves/cap coverage. Renderer diagnostics now
+  expose preview `socketRole`, `socketCollider`, `silhouette`, visible mesh names, and
+  visible readability roles so hidden blocked crossbars cannot falsely satisfy a valid
+  preview's readability contract.
+- Extended `test/structureRenderer.test.ts` and `npm run proof:c2-c3-building-snap-grid`
+  so the proof checks door/window/roof guide mesh names, roles, socket metadata, and
+  silhouettes. The proof adds a desktop/laptop placement-preview loop for all three house-kit
+  sockets while keeping the existing keyboard/touch/synthetic-gamepad relocation-preview
+  matrix for player-facing move/drop parity.
 - Advanced the H4/C2-C3 generated house-kit intake node under the DAG/subagent workflow.
   The promoted Kiln `door-kit`, `window-frame`, and `roof-bundle` GLBs now load through
   `KilnRuntimeAssets` as decorative skins over the existing code-owned `doorKit`,

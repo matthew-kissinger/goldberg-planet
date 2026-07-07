@@ -3,7 +3,7 @@ import * as THREE from 'three/webgpu';
 import { Goldberg } from '../src/geo/goldberg';
 import { StructureRenderer } from '../src/render/structures';
 import type { KilnStructureSkinSlug, StructureSkinProvider } from '../src/render/kilnAssets';
-import type { StructureSave } from '../src/sim/structures';
+import type { StructureSave, StructureSocketSpec } from '../src/sim/structures';
 import { buildLayers } from '../src/world/layers';
 
 function meshNames(renderer: StructureRenderer): Set<string> {
@@ -94,6 +94,58 @@ class FakeKilnAssets implements StructureSkinProvider {
     };
   }
 }
+
+const HOUSE_PREVIEW_SOCKETS: Record<'doorKit' | 'windowFrame' | 'roofBundle', StructureSocketSpec> = {
+  doorKit: {
+    item: 'doorKit',
+    name: 'Door kit',
+    role: 'wall-opening',
+    modularKit: true,
+    gridWidth: 1,
+    gridDepth: 0.22,
+    height: 1.9,
+    openingWidth: 0.72,
+    openingHeight: 1.55,
+    pivot: 'wall-center',
+    collider: 'thin-wall',
+    snap: ['front edge on hex face'],
+    visualScale: 'test',
+    loadBearing: 'code-socket',
+    glbPolicy: 'decorative-skin-after-normalization',
+  },
+  windowFrame: {
+    item: 'windowFrame',
+    name: 'Window frame',
+    role: 'wall-light',
+    modularKit: true,
+    gridWidth: 0.92,
+    gridDepth: 0.18,
+    height: 1.45,
+    openingWidth: 0.58,
+    openingHeight: 0.52,
+    pivot: 'wall-center',
+    collider: 'thin-wall',
+    snap: ['front edge on hex face'],
+    visualScale: 'test',
+    loadBearing: 'code-socket',
+    glbPolicy: 'decorative-skin-after-normalization',
+  },
+  roofBundle: {
+    item: 'roofBundle',
+    name: 'Roof bundle',
+    role: 'roof-cap',
+    modularKit: true,
+    gridWidth: 1.12,
+    gridDepth: 1.12,
+    height: 0.62,
+    pivot: 'center',
+    collider: 'roof-shell',
+    snap: ['centered over one occupied shelter hex'],
+    visualScale: 'test',
+    loadBearing: 'code-socket',
+    glbPolicy: 'decorative-skin-after-normalization',
+  },
+};
 
 class FailingKilnAssets implements StructureSkinProvider {
   async createStructureSkin() {
@@ -313,21 +365,7 @@ describe('structure renderer asset readability', () => {
       message: 'Window frame can snap here',
       blocker: null,
       blockers: [],
-      socket: {
-        item: 'windowFrame',
-        name: 'Window frame',
-        role: 'wall-light',
-        modularKit: true,
-        gridWidth: 0.92,
-        gridDepth: 0.18,
-        height: 1.45,
-        pivot: 'wall-center',
-        collider: 'thin-wall',
-        snap: ['front edge on hex face'],
-        visualScale: 'test',
-        loadBearing: 'code-socket',
-        glbPolicy: 'decorative-skin-after-normalization',
-      },
+      socket: HOUSE_PREVIEW_SOCKETS.windowFrame,
     }, geo, layers, { x: 0, y: 0, z: 0 }, 1.1);
 
     expect(renderer.stats()).toMatchObject({
@@ -361,21 +399,7 @@ describe('structure renderer asset readability', () => {
       message: 'door kit already on that snap hex',
       blocker: 'same snap target',
       blockers: ['same snap target'],
-      socket: {
-        item: 'doorKit',
-        name: 'Door kit',
-        role: 'wall-opening',
-        modularKit: true,
-        gridWidth: 1,
-        gridDepth: 0.22,
-        height: 1.9,
-        pivot: 'wall-center',
-        collider: 'thin-wall',
-        snap: ['front edge on hex face'],
-        visualScale: 'test',
-        loadBearing: 'code-socket',
-        glbPolicy: 'decorative-skin-after-normalization',
-      },
+      socket: HOUSE_PREVIEW_SOCKETS.doorKit,
     }, geo, layers, { x: 0, y: 0, z: 0 }, 1.2);
 
     expect(renderer.stats()).toMatchObject({
@@ -395,5 +419,77 @@ describe('structure renderer asset readability', () => {
     renderer.updateSnapPreview(null, geo, layers, { x: 0, y: 0, z: 0 }, 1.3);
     expect(renderer.stats().snapPreview.active).toBe(false);
     expect(renderer.stats().groups).toBe(1);
+  });
+
+  it('exposes socket-specific snap preview silhouettes for house-kit pieces', () => {
+    const scene = new THREE.Scene();
+    const geo = new Goldberg(8);
+    const layers = buildLayers();
+    const renderer = new StructureRenderer(scene);
+    const cases: Array<{
+      item: 'doorKit' | 'windowFrame' | 'roofBundle';
+      role: StructureSocketSpec['role'];
+      collider: StructureSocketSpec['collider'];
+      silhouette: string;
+      meshNames: string[];
+      roles: string[];
+    }> = [
+      {
+        item: 'doorKit',
+        role: 'wall-opening',
+        collider: 'thin-wall',
+        silhouette: 'door-opening-preview',
+        meshNames: ['snapPreviewDoorLeftJamb', 'snapPreviewDoorRightJamb', 'snapPreviewDoorLintel'],
+        roles: ['snap preview door opening', 'snap preview door lintel'],
+      },
+      {
+        item: 'windowFrame',
+        role: 'wall-light',
+        collider: 'thin-wall',
+        silhouette: 'window-light-preview',
+        meshNames: ['snapPreviewWindowGlassPane', 'snapPreviewWindowSill', 'snapPreviewWindowCenterMullion'],
+        roles: ['snap preview window light', 'snap preview window sill', 'snap preview window centered opening'],
+      },
+      {
+        item: 'roofBundle',
+        role: 'roof-cap',
+        collider: 'roof-shell',
+        silhouette: 'roof-cap-preview',
+        meshNames: ['snapPreviewRoofRidgeBeam', 'snapPreviewRoofLeftEave', 'snapPreviewRoofCapPlane'],
+        roles: ['snap preview roof cap', 'snap preview roof eave', 'snap preview roof cap coverage'],
+      },
+    ];
+
+    for (const [index, testCase] of cases.entries()) {
+      renderer.updateSnapPreview({
+        active: true,
+        mode: 'place',
+        ok: true,
+        item: testCase.item,
+        tile: index + 2,
+        layer: 100,
+        yaw: index * Math.PI / 3,
+        turn: index,
+        message: `${testCase.item} can snap here`,
+        blocker: null,
+        blockers: [],
+        socket: HOUSE_PREVIEW_SOCKETS[testCase.item],
+      }, geo, layers, { x: 0, y: 0, z: 0 }, 1 + index);
+
+      const stats = renderer.stats().snapPreview;
+      expect(stats).toMatchObject({
+        active: true,
+        ok: true,
+        mode: 'place',
+        item: testCase.item,
+        socketRole: testCase.role,
+        socketCollider: testCase.collider,
+        silhouette: testCase.silhouette,
+      });
+      expect(stats.meshNames).toEqual(expect.arrayContaining(testCase.meshNames));
+      expect(stats.visibleReadabilityRoles).toEqual(expect.arrayContaining(testCase.roles));
+      expect(stats.visibleReadabilityRoles).not.toContain('blocked snap crossbar');
+      expect(stats.meshes).toBeGreaterThanOrEqual(testCase.meshNames.length + 3);
+    }
   });
 });
