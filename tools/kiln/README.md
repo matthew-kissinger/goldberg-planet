@@ -61,6 +61,26 @@ KILN_ASSET_ROLE=poi node scripts/generate-asset.mjs "a small glowing waypoint sh
 Each generation writes `KILN_OUT_DIR/<assetId>/model.glb` + `asset.json`. Then register it in your
 game's asset manifest and load it with `GLTFLoader` (see `knowledge/05-glb-voxel-integration.md`).
 
+## Hearth and Horizon request packs
+Future approved-asset needs live in `requests/hearth-horizon-next-packs.json` before they enter
+`assets-catalog.json`. This keeps missing future GLBs from breaking the current intake proof while
+still giving the team an executable Kiln plan.
+
+No-spend validation:
+```bash
+node scripts/validate-request-packs.mjs
+node scripts/validate-request-packs.mjs k9-aquatic-life
+```
+
+Guarded generation for one approved pack:
+```bash
+KILN_CONFIRM_SPEND=1 node scripts/generate-request-pack.mjs k9-aquatic-life
+```
+
+Generated candidates stay in `public/assets/kiln/generated/` until review. After acceptance, add the
+slugs to `assets-catalog.json`, run `node scripts/build-manifest.mjs`, then `node scripts/promote.mjs`
+and the root proof gates.
+
 ## The flow in one line
 `POST /v1/generations` (202) → poll `GET /v1/generations/:jobId` → `POST /v1/assets/:id/download-url`
 → GET the presigned GLB → verify `glTF` magic. Auth is `Authorization: Bearer ks_live_...`.

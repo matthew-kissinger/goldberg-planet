@@ -243,7 +243,34 @@ Use the current pack first. When we need a new Kiln run, use the same `sphere-pl
 palette/optimized-palette contract, keep tokens in gitignored local env, and promote only
 after `proof:kiln-assets` and `proof:kiln-asset-viewer`.
 
-High-value future requests:
+The canonical pre-catalog request packet is now
+`tools/kiln/requests/hearth-horizon-next-packs.json`. Do not add those slugs to
+`tools/kiln/assets-catalog.json` until the run is approved and the generated GLBs exist in
+`public/assets/kiln/generated/`.
+
+No-spend validation:
+
+```bash
+cd tools/kiln
+node scripts/capabilities.mjs
+node scripts/validate-request-packs.mjs
+```
+
+Current validation, 2026-07-07: all 7 request packs are API-valid, 52 candidate GLBs total,
+estimated at 346 cents before spend. The guarded generator refuses to spend unless explicitly
+confirmed:
+
+```bash
+cd tools/kiln
+KILN_CONFIRM_SPEND=1 node scripts/generate-request-pack.mjs k9-aquatic-life
+```
+
+After generation, review the quarantined GLBs, add accepted slugs to
+`tools/kiln/assets-catalog.json`, then run `node scripts/build-manifest.mjs`,
+`node scripts/promote.mjs`, `npm run proof:kiln-assets`, and
+`npm run proof:kiln-asset-viewer`.
+
+Prepared request packs:
 
 - Aquatic life: `fish-school-shore`, `fish-school-storm-run`,
   `fish-school-cave-shimmer`, and `creature-driftjelly` with idle/swim/turn/dart clips.
@@ -259,6 +286,9 @@ High-value future requests:
 - Wonder/cave dressing: threshold arches, tide underpass ribs, lantern skylight rings,
   root vault room pieces, horizon gate dressing, dripstone clusters, cave mushrooms,
   spring seep stones, sea-cave tide-pool stones, and glow-crystal veins.
+- Avatar/equipment: authored Soft-Facet Wayfarer candidate, pack frame, storm cloak,
+  hatchet, pickaxe, fishing rod, sword, bow, and folded chart as an approved-asset path
+  for replacing the procedural character once rig/socket decisions are ready.
 
 Do not generate these as GLBs unless a specific prop is needed: hex tile textures, terrain
 columns, block materials, mining cracks, water/sky, route ribbons, telegraph rings, dynamic

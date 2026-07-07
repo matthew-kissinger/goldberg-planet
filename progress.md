@@ -23,6 +23,14 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   skins, future ore/resource nodes after item taxonomy, a shared-scale house-shell pack, and
   wonder/cave dressing. Hex tile textures, terrain blocks, mining cracks, water, sky, route
   ribbons, telegraphs, dynamic glows, and particles stay procedural/material/shader systems.
+- Promoted missing future GLBs into an executable Kiln request path instead of procedural
+  stand-ins. `tools/kiln/requests/hearth-horizon-next-packs.json` now stages seven API-valid
+  packs: shared-scale house shell, aquatic life/fish, pickup skins, ore/material nodes,
+  native-life expansion, wonder/cave dressing, and authored avatar/equipment. `node
+  scripts/capabilities.mjs` passes with pack scopes, and `node scripts/validate-request-packs.mjs`
+  validates all 52 candidate GLBs at an estimated 346 cents before spend. The guarded
+  `node scripts/generate-request-pack.mjs <pack-id>` runner refuses to generate unless
+  `KILN_CONFIRM_SPEND=1` is set.
 - Added the Kiln alignment viewer as the approved-pack placement review bench. The viewer
   opens at `/?assetViewer=kiln&family=ready` or `/?assetViewer=kiln&slug=<slug>`, renders
   GLBs against a 5.6 world-unit hex socket with local `+Y` as planet-normal sky, local `+Z`

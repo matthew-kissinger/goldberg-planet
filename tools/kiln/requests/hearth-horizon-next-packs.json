@@ -1,0 +1,629 @@
+{
+  "schemaVersion": "spherePlanet.kilnRequests.v1",
+  "name": "Hearth and Horizon Next Kiln Packs",
+  "createdFor": "Hearth and Horizon approved-asset expansion",
+  "status": "pre-catalog-request-packet",
+  "paletteId": "sphere-planet",
+  "rules": [
+    "Keep generated GLBs in public/assets/kiln/generated until intake proof passes.",
+    "Do not add these entries to tools/kiln/assets-catalog.json until the generation run is approved.",
+    "Promote only after proof:kiln-assets and proof:kiln-asset-viewer pass.",
+    "Use generated GLBs as skins, bodies, props, or dressing; terrain, water, mining cracks, route ribbons, glows, particles, and collision truth stay code-owned."
+  ],
+  "packs": [
+    {
+      "id": "k3w-house-shell-shared-scale",
+      "priority": 1,
+      "goalNode": "C6/K3W wall and shell sockets",
+      "reason": "Door, window, and roof GLBs are approved inserts, but the game still needs actual wall pieces that share one dimensional contract.",
+      "requiresBeforeCatalog": [
+        "Code-owned wall socket dimensions",
+        "Hex-edge pivot and snap rule",
+        "Wall, opening, roof, and foundation enclosure contribution rules"
+      ],
+      "runtimeOwner": "src/sim/structures.ts + src/render/structures.ts + src/render/kilnAssets.ts",
+      "manifest": {
+        "schemaVersion": "kiln.pack.v1",
+        "name": "Sphere Planet Shared-Scale House Shell",
+        "sourceIntent": "A coherent modular low-poly house shell kit for a hex-tile spherical survival game. Every member must share the same wall height, timber thickness, pivot convention, opening scale, palette, and weathered plank language so door, window, wall, rail, roof, and foundation pieces can snap together visually.",
+        "paletteId": "sphere-planet",
+        "toggles": {
+          "moreDetail": true,
+          "optimizedPalette": true,
+          "consolidateMaterials": "force"
+        },
+        "items": [
+          {
+            "name": "wall-panel",
+            "prompt": "A single modular low-poly wooden wall panel for a survival hut: flat plank face, two side posts, top and bottom rails, same height and thickness as all other wall pieces, no door, no window, no floor, no roof.",
+            "category": "architecture",
+            "role": "building",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "wall-window-opening",
+            "prompt": "A modular wooden wall panel with a centered window opening: same outer size as the plain wall panel, timber posts and rails, a simple fitted frame around an empty window hole, no glass pane floating outside the wall.",
+            "category": "architecture",
+            "role": "building",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "wall-door-opening",
+            "prompt": "A modular wooden wall panel with a centered door opening: same outer size as the plain wall panel, sturdy jamb posts and lintel, low threshold, no separate room, no roof, no loose freestanding doorway.",
+            "category": "architecture",
+            "role": "building",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "wall-corner-join",
+            "prompt": "A compact low-poly corner join for two wooden wall panels meeting at a hex-friendly angle: shared-height vertical post, short angled rails, visible join caps, made to visually bridge two wall faces.",
+            "category": "architecture",
+            "role": "building",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "wall-half-rail",
+            "prompt": "A half-height modular wooden rail wall: same width and timber language as the wall panel, two low posts, top rail, lower planks, open upper air, useful for porches and garden edges.",
+            "category": "architecture",
+            "role": "building",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "floor-foundation",
+            "prompt": "A single low modular wooden floor foundation panel for a hex survival hut: weathered plank deck, short underside beams, flat top, clean edge lip, no walls or roof.",
+            "category": "architecture",
+            "role": "building",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "roof-edge",
+            "prompt": "A modular low-poly roof edge piece with weathered planks and a visible eave: same timber palette as the wall kit, made to cap one wall span, no full house, no walls.",
+            "category": "architecture",
+            "role": "building",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "roof-corner-cap",
+            "prompt": "A compact modular roof corner cap for a small hex-friendly hut: angled plank planes meeting cleanly, short eave lips, same material language as roof-edge, no full building.",
+            "category": "architecture",
+            "role": "building",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "roof-support-post",
+            "prompt": "A short sturdy timber roof support post with simple bracket arms and pegged caps, same height language as the wall kit, designed to sit under roof edges or porch rails.",
+            "category": "architecture",
+            "role": "building",
+            "tier": "standard",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "k9-aquatic-life",
+      "priority": 2,
+      "goalNode": "K9 aquatic life and fishing visibility",
+      "reason": "Fishing already has systems, traps, nets, and fish-school rules, but there are no authored fish bodies in the approved pack.",
+      "requiresBeforeCatalog": [
+        "Fish-school visual owner in fishing or native-life renderer",
+        "Distance-gated swim animation policy",
+        "Waterline placement and culling proof"
+      ],
+      "runtimeOwner": "Fishing sim + NativeLifeRenderer or dedicated FishSchoolRenderer",
+      "manifest": {
+        "schemaVersion": "kiln.pack.v1",
+        "name": "Sphere Planet Aquatic Life",
+        "sourceIntent": "A coherent set of silly low-poly aquatic life for a spherical hex survival game. These are visible swimming bodies for existing fishing, trap, net, cave, and storm-run systems, not terrain or collision meshes.",
+        "paletteId": "sphere-planet",
+        "toggles": {
+          "moreDetail": true,
+          "optimizedPalette": true,
+          "consolidateMaterials": "force"
+        },
+        "items": [
+          {
+            "name": "fish-school-shore",
+            "prompt": "A small loose school of three goofy low-poly shore fish: rounded bodies, tiny fins, big simple eyes, one or two color accents, arranged as one readable compact group for shallow water.",
+            "category": "character",
+            "role": "prop",
+            "tier": "standard",
+            "includeAnimation": true,
+            "animationClips": ["idle", "swim", "turn", "dart"],
+            "count": 1
+          },
+          {
+            "name": "fish-school-storm-run",
+            "prompt": "A compact school of storm-run fish with angular little bodies, bright fins, and tiny sparkle-like glow accents, readable as fast migrating fish in rough water.",
+            "category": "character",
+            "role": "prop",
+            "tier": "standard",
+            "includeAnimation": true,
+            "animationClips": ["idle", "swim", "turn", "dart"],
+            "count": 1
+          },
+          {
+            "name": "fish-school-cave-shimmer",
+            "prompt": "A compact school of cave shimmer fish: rounded dark bodies, soft glowing bellies, small fins, big curious eyes, arranged as a readable group for dim sea caves.",
+            "category": "character",
+            "role": "prop",
+            "tier": "standard",
+            "includeAnimation": true,
+            "animationClips": ["idle", "swim", "turn", "dart"],
+            "count": 1
+          },
+          {
+            "name": "creature-driftjelly",
+            "prompt": "A gentle goofy open-ocean driftjelly creature: soft low-poly bell, dangling ribbon tendrils, little face, glowing underside, friendly but strange, sized as a visible swimming neighbor.",
+            "category": "character",
+            "role": "prop",
+            "tier": "standard",
+            "includeAnimation": true,
+            "animationClips": ["idle", "swim", "turn", "pulse"],
+            "count": 1
+          },
+          {
+            "name": "fish-school-reed-fry",
+            "prompt": "A tiny reed-water fish cluster: four small rounded fry around a reed scrap, simple eyes and short fins, compact and readable as bait fish near shore nets.",
+            "category": "character",
+            "role": "prop",
+            "tier": "background",
+            "includeAnimation": true,
+            "animationClips": ["idle", "swim", "turn"],
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "k1-pickup-and-drop-skins",
+      "priority": 3,
+      "goalNode": "K1 pickup skins expansion",
+      "reason": "Wood and ore drops are GLB-backed now; common future resources still need authored pickup bodies.",
+      "requiresBeforeCatalog": [
+        "Item taxonomy locked enough to map slug to item id",
+        "Ground-drop instancing path extended beyond wood and ore"
+      ],
+      "runtimeOwner": "src/render/resourceDrops.ts + src/render/kilnAssets.ts",
+      "manifest": {
+        "schemaVersion": "kiln.pack.v1",
+        "name": "Sphere Planet Pickup Drop Skins",
+        "sourceIntent": "A coherent pickup-drop prop set for small collectible items that arc and bounce on the ground after chopping, mining, fishing, farming, or creature interactions.",
+        "paletteId": "sphere-planet",
+        "toggles": {
+          "moreDetail": false,
+          "optimizedPalette": true,
+          "consolidateMaterials": "force"
+        },
+        "items": [
+          {
+            "name": "drop-dirt-clod",
+            "prompt": "A small low-poly dirt clod pickup: lumpy brown soil chunk with a few tiny root hairs, compact and readable on a hex tile.",
+            "category": "prop",
+            "role": "fill",
+            "tier": "background",
+            "count": 1
+          },
+          {
+            "name": "drop-sand-pile",
+            "prompt": "A small low-poly sand pile pickup: soft faceted mound with two or three pale shell flecks, compact and readable.",
+            "category": "prop",
+            "role": "fill",
+            "tier": "background",
+            "count": 1
+          },
+          {
+            "name": "drop-snow-clump",
+            "prompt": "A small low-poly snow clump pickup: rounded white chunk with a faint blue shadow side, compact and readable.",
+            "category": "prop",
+            "role": "fill",
+            "tier": "background",
+            "count": 1
+          },
+          {
+            "name": "drop-glow-crystal",
+            "prompt": "A small low-poly glowing crystal pickup: two or three faceted shards on a dark pebble base, bright but not huge.",
+            "category": "prop",
+            "role": "fill",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "drop-raw-fish",
+            "prompt": "A small low-poly raw fish pickup: one compact fish body with simple fins and eye, slightly curved, readable as food on the ground.",
+            "category": "prop",
+            "role": "fill",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "drop-kelp-reeds",
+            "prompt": "A small low-poly bundle of kelp and reeds tied with a cord, green-brown strands, compact collectible pickup.",
+            "category": "prop",
+            "role": "fill",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "drop-compost-pellet",
+            "prompt": "A small low-poly compost pellet pickup: dark crumbly ball with tiny leaf bits, compact and readable as farming material.",
+            "category": "prop",
+            "role": "fill",
+            "tier": "background",
+            "count": 1
+          },
+          {
+            "name": "drop-cave-mushroom",
+            "prompt": "A small low-poly cave mushroom pickup: two squat glowing caps and a stubby stem cluster, compact collectible size.",
+            "category": "prop",
+            "role": "fill",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "drop-creature-fiber",
+            "prompt": "A small low-poly tuft of soft creature fiber: rounded woolly puff clump with a tied thread, compact pickup size.",
+            "category": "prop",
+            "role": "fill",
+            "tier": "background",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2-resource-and-ore-nodes",
+      "priority": 4,
+      "goalNode": "K2 resource node expansion",
+      "reason": "The first 12 domain nodes are wired, but survival progression needs clearer ore, clay, geode, and glow-crystal extraction targets.",
+      "requiresBeforeCatalog": [
+        "Future ore/resource item ids named",
+        "Harvest yield and tool-tier rules drafted",
+        "Domain node placement weights updated"
+      ],
+      "runtimeOwner": "src/render/domainResources.ts + resource taxonomy",
+      "manifest": {
+        "schemaVersion": "kiln.pack.v1",
+        "name": "Sphere Planet Ore and Material Nodes",
+        "sourceIntent": "A coherent resource-node set for visible harvest targets on a hex sphere. Each node should be a readable surface prop or embedded mound, not a terrain block or cave wall mesh.",
+        "paletteId": "sphere-planet",
+        "toggles": {
+          "moreDetail": true,
+          "optimizedPalette": true,
+          "consolidateMaterials": "force"
+        },
+        "items": [
+          {
+            "name": "node-iron-vein",
+            "prompt": "A low-poly iron vein node: dark stone base with rusty metal streaks and a few angular exposed ore plates, compact enough for one hex.",
+            "category": "prop",
+            "role": "poi",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "node-copper-patina",
+            "prompt": "A low-poly copper patina node: stone mound with green-blue oxidized copper flakes and warm copper edges, compact and readable.",
+            "category": "prop",
+            "role": "poi",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "node-coal-seam",
+            "prompt": "A low-poly coal seam node: black angular chunks set into grey stone, a few dull highlights, compact one-hex harvest prop.",
+            "category": "prop",
+            "role": "poi",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "node-glow-crystal-vein",
+            "prompt": "A low-poly glow-crystal vein node: dark rock base with several faceted glowing crystals growing from one side, readable in caves.",
+            "category": "prop",
+            "role": "poi",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "node-clay-bank",
+            "prompt": "A low-poly clay bank node: damp reddish clay mound with a few layered cut faces and pebbles, meant for shore or cave-edge harvesting.",
+            "category": "prop",
+            "role": "poi",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "node-geode-pocket",
+            "prompt": "A low-poly geode pocket node: cracked stone shell exposing small colorful crystal points inside, compact and readable as a rare find.",
+            "category": "prop",
+            "role": "poi",
+            "tier": "standard",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "k6r-native-life-expansion",
+      "priority": 5,
+      "goalNode": "G5/K6R native roaming and ecology state",
+      "reason": "The nine approved creatures are wired as skins; roaming AI and ecology will benefit from a few more authored native families once the state machine exists.",
+      "requiresBeforeCatalog": [
+        "NativeCreatureActor state machine",
+        "Clip hint contract for idle, walk, flee, warn, and interact",
+        "Distance-band animation budget proof"
+      ],
+      "runtimeOwner": "src/sim/nativeLife.ts + src/render/nativeLife.ts",
+      "manifest": {
+        "schemaVersion": "kiln.pack.v1",
+        "name": "Sphere Planet Native Life Expansion",
+        "sourceIntent": "A coherent creature expansion using the goofy low-poly Soft-Facet native-life language. These are planet-native characters with readable silhouettes, not generic enemies.",
+        "paletteId": "sphere-planet",
+        "toggles": {
+          "moreDetail": true,
+          "optimizedPalette": true,
+          "consolidateMaterials": "force"
+        },
+        "items": [
+          {
+            "name": "creature-pocket-puff",
+            "prompt": "A tiny companion moss-puff creature: round fuzzy low-poly body, little feet, big curious eyes, leaf sprout on top, friendly and goofy, small enough to follow the player.",
+            "category": "character",
+            "role": "prop",
+            "tier": "standard",
+            "includeAnimation": true,
+            "animationClips": ["idle", "walk", "hop", "sniff", "flee"],
+            "count": 1
+          },
+          {
+            "name": "creature-frostpuff",
+            "prompt": "A friendly cold-biome puff creature: woolly round body, icy blue accents, tiny feet, warm sleepy eyes, a little snow cap, goofy and harmless.",
+            "category": "character",
+            "role": "prop",
+            "tier": "standard",
+            "includeAnimation": true,
+            "animationClips": ["idle", "walk", "hop", "flee"],
+            "count": 1
+          },
+          {
+            "name": "creature-skylift",
+            "prompt": "A goofy balloon-bird creature for grasslands: round floating body, tiny dangling legs, little wing fins, simple beak, big eyes, readable as gentle flying life.",
+            "category": "character",
+            "role": "prop",
+            "tier": "standard",
+            "includeAnimation": true,
+            "animationClips": ["idle", "float", "turn", "flap", "flee"],
+            "count": 1
+          },
+          {
+            "name": "creature-glowmoth",
+            "prompt": "A safe cave glowmoth creature: soft low-poly moth body, oversized glowing wings, tiny antennae, calm face, readable as a cave-air marker.",
+            "category": "character",
+            "role": "prop",
+            "tier": "standard",
+            "includeAnimation": true,
+            "animationClips": ["idle", "flutter", "turn", "flee"],
+            "count": 1
+          },
+          {
+            "name": "creature-glidewing",
+            "prompt": "A forest canopy glidewing creature: small low-poly body, wide leaf-like gliding wings, little feet, big watchful eyes, curious but skittish.",
+            "category": "character",
+            "role": "prop",
+            "tier": "standard",
+            "includeAnimation": true,
+            "animationClips": ["idle", "walk", "glide", "turn", "flee"],
+            "count": 1
+          },
+          {
+            "name": "creature-domain-warden",
+            "prompt": "A rare territorial domain warden: goofy but imposing low-poly native creature with faceted shell armor, crest fins, sturdy feet, bright warning markings, not humanoid.",
+            "category": "character",
+            "role": "prop",
+            "tier": "hero",
+            "includeAnimation": true,
+            "animationClips": ["idle", "walk", "warn", "charge", "recover"],
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "k7-wonder-and-cave-dressing",
+      "priority": 6,
+      "goalNode": "K7 landmarks, wonders, and cave identity",
+      "reason": "The planet needs more authored wonder dressing once the current shrines and carved caves have verbs and placement proof.",
+      "requiresBeforeCatalog": [
+        "Wonder placement rules by domain",
+        "Cave-dressing sockets that do not fake cave mouths",
+        "Readability review against ambiguous crystal-gate shapes"
+      ],
+      "runtimeOwner": "Landmark, threshold-space, cave, and route renderers",
+      "manifest": {
+        "schemaVersion": "kiln.pack.v1",
+        "name": "Sphere Planet Wonder and Cave Dressing",
+        "sourceIntent": "A coherent set of authored props and dressing for caves, arches, and pentagon-domain wonders. These decorate real carved spaces and landmarks; they are not replacement terrain or fake cave-mouth doors.",
+        "paletteId": "sphere-planet",
+        "toggles": {
+          "moreDetail": true,
+          "optimizedPalette": true,
+          "consolidateMaterials": "force"
+        },
+        "items": [
+          {
+            "name": "tide-underpass-ribs",
+            "prompt": "A low-poly set of curved tide-smoothed stone ribs for the inside of a sea underpass, compact modular cave dressing, no doorway frame.",
+            "category": "environment",
+            "role": "poi",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "lantern-skylight-ring",
+            "prompt": "A compact low-poly stone-and-wood skylight ring with tiny hanging lantern hooks, made to dress a cave ceiling opening, no full building.",
+            "category": "architecture",
+            "role": "poi",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "root-vault-room-piece",
+            "prompt": "A low-poly root-vault interior dressing piece: twisting roots around a small stone shelf and soil lip, for an underground room wall, not a complete cave.",
+            "category": "environment",
+            "role": "poi",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "horizon-gate-dressing",
+            "prompt": "A low-poly horizon gate dressing prop: two low stone vanes and a small wind marker aligned like a route device, clear base, not a tilted crystal portal.",
+            "category": "architecture",
+            "role": "wonder",
+            "tier": "hero",
+            "count": 1
+          },
+          {
+            "name": "dripstone-cluster",
+            "prompt": "A compact low-poly cave dripstone cluster with a few stalagmites and matching short stalactite tips, designed as dressing in a real cave space.",
+            "category": "environment",
+            "role": "fill",
+            "tier": "background",
+            "count": 1
+          },
+          {
+            "name": "cave-mushroom-clump",
+            "prompt": "A low-poly cave mushroom clump with squat caps and soft glow dots, compact enough for repeated cave floor dressing.",
+            "category": "vegetation",
+            "role": "fill",
+            "tier": "background",
+            "count": 1
+          },
+          {
+            "name": "spring-seep-stones",
+            "prompt": "A small low-poly spring seep prop: damp stones, a tiny water trickle groove, a few moss patches, for cave or hillside water hints.",
+            "category": "environment",
+            "role": "poi",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "sea-cave-tide-pool-stones",
+            "prompt": "A compact low-poly tide-pool stone cluster with shells and wet dark edges, for dressing real sea-cave floors near water.",
+            "category": "environment",
+            "role": "fill",
+            "tier": "background",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "h0-avatar-and-equipment",
+      "priority": 7,
+      "goalNode": "H0/H1/H2 authored player and props",
+      "reason": "The procedural player is a contract placeholder. The authored player model, equipment, and tool props should come from the same approved asset path.",
+      "requiresBeforeCatalog": [
+        "Socket map for hands, back, belt, head, and carried bundle",
+        "Animation list locked for survival verbs",
+        "Decision on Kiln-generated model versus dedicated character rig pass"
+      ],
+      "runtimeOwner": "src/render/character.ts + authored avatar asset pipeline",
+      "manifest": {
+        "schemaVersion": "kiln.pack.v1",
+        "name": "Sphere Planet Wayfarer and Equipment",
+        "sourceIntent": "A coherent low-poly silly-but-polished survivor character and equipment kit for a spherical hex survival game. The character should be charming and readable at normal play distance, not a capsule with boxes.",
+        "paletteId": "sphere-planet",
+        "toggles": {
+          "moreDetail": true,
+          "optimizedPalette": true,
+          "consolidateMaterials": "force"
+        },
+        "items": [
+          {
+            "name": "player-soft-facet-wayfarer",
+            "prompt": "A silly polished low-poly survival wayfarer character: squat sturdy body, rounded faceted head, expressive simple face, little boots, short gloves, backpack straps, charming proportions, no generic capsule body.",
+            "category": "character",
+            "role": "prop",
+            "tier": "hero",
+            "includeAnimation": true,
+            "animationClips": ["idle", "walk", "jump", "chop", "attack", "carry"],
+            "count": 1
+          },
+          {
+            "name": "equip-pack-frame",
+            "prompt": "A compact low-poly backpack frame prop with bedroll straps, little pouches, and a clipped tool loop, made to mount on a character back socket.",
+            "category": "prop",
+            "role": "prop",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "equip-storm-cloak",
+            "prompt": "A short low-poly storm cloak prop with chunky folds and a simple clasp, made to drape over a small survivor character without hiding the silhouette.",
+            "category": "prop",
+            "role": "prop",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "tool-hatchet",
+            "prompt": "A low-poly survival hatchet prop: short wooden handle, chunky stone or iron blade, readable at hand-held size.",
+            "category": "prop",
+            "role": "prop",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "tool-pickaxe",
+            "prompt": "A low-poly pickaxe prop with a short wood handle and faceted metal head, readable at hand-held size.",
+            "category": "prop",
+            "role": "prop",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "tool-fishing-rod",
+            "prompt": "A low-poly fishing rod prop with a bent reed pole, simple line loop, tiny cork float, and wrapped grip, readable in a character hand.",
+            "category": "prop",
+            "role": "prop",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "tool-short-sword",
+            "prompt": "A simple low-poly short survival blade prop: compact metal blade, wrapped handle, not fantasy ornate, readable for warding small creatures.",
+            "category": "prop",
+            "role": "prop",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "tool-bow",
+            "prompt": "A compact low-poly reed-and-wood bow prop with a small string and bundled arrow notch, readable at hand-held size.",
+            "category": "prop",
+            "role": "prop",
+            "tier": "standard",
+            "count": 1
+          },
+          {
+            "name": "equip-folded-chart",
+            "prompt": "A small low-poly folded map chart prop with tied corners and a route mark on top, made to hold in two hands or strap to a pack.",
+            "category": "prop",
+            "role": "prop",
+            "tier": "standard",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

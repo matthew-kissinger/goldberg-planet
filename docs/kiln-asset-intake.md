@@ -273,21 +273,25 @@ runtime owner and socket/behavior contract are known. Keep Kiln tokens in gitign
 env or an authenticated AWS/Kiln session, and promote only after `proof:kiln-assets` and
 `proof:kiln-asset-viewer`.
 
-- Aquatic life: `fish-school-shore`, `fish-school-storm-run`,
-  `fish-school-cave-shimmer`, and `creature-driftjelly` with idle/swim/turn/dart clips.
-  These visualize existing fishing and waterline rules; fish-school logic stays in sim.
-- Pickup/drop skins: `drop-dirt-clod`, `drop-sand-pile`, `drop-snow-clump`,
-  `drop-glow-crystal`, `drop-raw-fish`, `drop-kelp-reeds`, `drop-compost-pellet`, and
-  `drop-cave-mushroom`.
-- Ore/resource nodes after item taxonomy: `node-iron-vein`, `node-copper-patina`,
-  `node-coal-seam`, `node-glow-crystal-vein`, `node-clay-bank`, and
-  `node-geode-pocket`.
-- Shared-scale house shell: wall panel, wall-window opening, wall-door opening, wall
-  corner, half rail, roof edge, roof corner, and floor/foundation pieces authored to the
-  code-owned hex socket dimensions.
-- Wonder and cave dressing: threshold arches, tide underpass ribs, lantern skylight rings,
-  root vault room pieces, horizon gate dressing, dripstone clusters, glow-crystal veins,
-  cave mushroom clumps, spring seep stones, and sea-cave tide-pool stones.
+The backlog is now an executable pre-catalog request packet:
+`tools/kiln/requests/hearth-horizon-next-packs.json`. It currently contains API-valid packs
+for shared-scale house shells, aquatic life/fish, pickup/drop skins, ore/resource nodes,
+native-life expansion, wonder/cave dressing, and authored avatar/equipment. Validate it
+without spend from `tools/kiln`:
+
+```bash
+node scripts/validate-request-packs.mjs
+```
+
+Generate one approved pack only after the runtime/socket owner is ready and the spend is
+intentional:
+
+```bash
+KILN_CONFIRM_SPEND=1 node scripts/generate-request-pack.mjs k9-aquatic-life
+```
+
+Generated candidates stay quarantined in `public/assets/kiln/generated/`. Accepted slugs
+then enter `tools/kiln/assets-catalog.json`, manifest build, promote, and the proof gates.
 
 Do not request GLBs for hex tile textures, terrain chunks, block materials, mining cracks,
 water, sky, route ribbons, telegraph rings, dynamic glows, skyfall beams, or particle/signal

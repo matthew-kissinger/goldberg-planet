@@ -23,6 +23,26 @@ what to ADD. Everything here is a Kiln GLB candidate; use `paletteId: sphere-pla
    encounters, trading in murmurs & gifts, never storefronts. The companion beat is best served by
    a **follower creature**, not a person or a mount.
 
+## Executable request queue
+
+The next approved-asset needs are now staged as a pre-catalog Kiln request packet:
+`tools/kiln/requests/hearth-horizon-next-packs.json`.
+
+Current no-spend validation, 2026-07-07:
+
+- `k3w-house-shell-shared-scale`: 9 shared-scale wall/roof/foundation GLBs, estimated 60c.
+- `k9-aquatic-life`: 5 fish/driftjelly GLBs with swim clips, estimated 33c.
+- `k1-pickup-and-drop-skins`: 9 pickup GLBs, estimated 60c.
+- `k2-resource-and-ore-nodes`: 6 ore/material-node GLBs, estimated 40c.
+- `k6r-native-life-expansion`: 6 creature GLBs with ecology/roaming clips, estimated 40c.
+- `k7-wonder-and-cave-dressing`: 8 wonder/cave dressing GLBs, estimated 53c.
+- `h0-avatar-and-equipment`: 9 player/equipment GLBs, estimated 60c.
+
+Run `node scripts/validate-request-packs.mjs` from `tools/kiln` before spend. Run
+`KILN_CONFIRM_SPEND=1 node scripts/generate-request-pack.mjs <pack-id>` only after the pack is
+approved for generation. Keep generated candidates out of `assets-catalog.json` until they exist
+and have passed review.
+
 ---
 
 ## Track A — Planned content (roadmap-backed; highest priority)

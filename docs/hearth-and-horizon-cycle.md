@@ -70,6 +70,12 @@ generation is mostly a surface height field plus trees.
    instanced geometry or batching, and distance-gated animation so the broader pack does not
    balloon draw calls or mixer cost.
 
+   New missing visual bodies should be generated through the repo's Kiln tools, not patched in
+   with throwaway procedural art by default. Future fish, wall-shell pieces, pickup skins,
+   ore/resource nodes, native-life additions, cave/wonder dressing, and authored avatar props
+   are staged in `tools/kiln/requests/hearth-horizon-next-packs.json` as API-valid request
+   packs. They enter `tools/kiln/assets-catalog.json` only after generation, review, and proof.
+
 ## Reference Stance
 
 Borrow from Minecraft:
