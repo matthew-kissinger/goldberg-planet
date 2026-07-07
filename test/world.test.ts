@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Goldberg } from '../src/geo/goldberg';
-import { buildLayers, PLANET_RADIUS, BUILD_CEILING, CELL_H } from '../src/world/layers';
+import { buildLayers, PLANET_RADIUS, BUILD_CEILING, CELL_H, WATER_SURFACE } from '../src/world/layers';
 import { Terrain, MAT } from '../src/world/terrain';
 import { Columns } from '../src/world/columns';
 import { Trees } from '../src/world/trees';
+import { MineProgress } from '../src/sim/mining';
 import { enumerateChunks } from '../src/world/chunks';
 import { buildChunkMesh } from '../src/render/mesher';
 
@@ -88,9 +89,17 @@ describe('columns', () => {
     return new Columns(g, layers, new Terrain('cols'));
   }
 
+  function ordinaryTile(cols: Columns, start: number): number {
+    for (let i = 0; i < g.count; i++) {
+      const id = (start + i) % g.count;
+      if (!cols.hasNaturalVoids(id)) return id;
+    }
+    throw new Error('no ordinary tile found');
+  }
+
   it('default column: air above surface, solid below, bedrock at bottom', () => {
     const cols = fresh();
-    const id = 100;
+    const id = ordinaryTile(cols, 100);
     const top = cols.topLayerOf(id);
     expect(cols.solidAt(id, top - 1)).toBe(false);
     expect(cols.solidAt(id, top)).toBe(true);
@@ -101,7 +110,7 @@ describe('columns', () => {
 
   it('mine removes exactly one cell; place adds one; bedrock immutable', () => {
     const cols = fresh();
-    const id = 200;
+    const id = ordinaryTile(cols, 200);
     const top = cols.topLayerOf(id);
     expect(cols.mine(id, top)).toBe(true);
     expect(cols.solidAt(id, top)).toBe(false);
@@ -124,7 +133,7 @@ describe('columns', () => {
 
   it('ground/ceiling queries respect tunnels', () => {
     const cols = fresh();
-    const id = 300;
+    const id = ordinaryTile(cols, 300);
     const top = cols.topLayerOf(id);
     const rAbove = layers.topRadius(top) + 3;
     expect(cols.groundLayerBelow(id, rAbove)).toBe(top);
@@ -141,7 +150,7 @@ describe('columns', () => {
 
   it('placed cells remember their material, mine clears it, and replay regenerates it', () => {
     const cols = fresh();
-    const id = 640;
+    const id = ordinaryTile(cols, 640);
     const top = cols.topLayerOf(id);
     expect(cols.place(id, top - 1, MAT.WOOD)).toBe(true);
     expect(cols.materialAt(id, top - 1)).toBe(MAT.WOOD);
@@ -183,6 +192,34 @@ describe('columns', () => {
     const ratio = cols2.storageBytes().indexBytes / s.indexBytes;
     expect(ratio).toBeGreaterThan(3.5);
     expect(ratio).toBeLessThan(4.5);
+  });
+
+  it('generates deterministic natural arches and caves as default terrain voids', () => {
+    const caveGeo = new Goldberg(16);
+    const a = new Columns(caveGeo, layers, new Terrain('natural-caves'));
+    const b = new Columns(caveGeo, layers, new Terrain('natural-caves'));
+
+    const arch = a.naturalFeature('arch');
+    const dry = a.naturalFeature('dryCave');
+    const sea = a.naturalFeature('seaCave');
+    expect(arch).not.toBeNull();
+    expect(dry).not.toBeNull();
+    expect(sea).not.toBeNull();
+
+    for (const feature of [arch!, dry!, sea!]) {
+      expect(a.solidAt(feature.tile, feature.layer)).toBe(false);
+      expect(a.solidAt(feature.tile, a.topLayerOf(feature.tile))).toBe(true);
+      expect(feature.clearance).toBeGreaterThan(2.2);
+      expect(b.naturalFeature(feature.kind)?.tile).toBe(feature.tile);
+      expect(b.solidAt(feature.tile, feature.layer)).toBe(false);
+      if (feature.kind === 'dryCave') expect(layers.bottomRadius(feature.layer)).toBeGreaterThan(WATER_SURFACE);
+      if (feature.kind === 'seaCave') expect(feature.flooded).toBe(true);
+    }
+
+    const before = a.naturalFeature('dryCave')!;
+    const top = a.topLayerOf(before.tile);
+    expect(a.mine(before.tile, top)).toBe(true);
+    expect(a.solidAt(before.tile, before.layer)).toBe(false);
   });
 });
 
@@ -280,6 +317,13 @@ describe('chunks + mesher', () => {
     const withTree = buildChunkMesh(chunk, g, layers, colsA, treesA)!;
     const bare = buildChunkMesh(chunk, g, layers, colsA)!;
     expect(withTree.triangles).toBeGreaterThan(bare.triangles);
+    const strike = treesA.strike(treeTile);
+    expect(strike.hit).toBe(true);
+    expect(strike.felled).toBe(false);
+    expect(treesA.damageOf(treeTile)).toBeGreaterThan(0);
+    const damaged = buildChunkMesh(chunk, g, layers, colsA, treesA)!;
+    expect(damaged.triangles).toBe(withTree.triangles);
+    expect(damaged.colors).not.toEqual(withTree.colors);
     expect(treesA.chop(treeTile)).toBe(true);
     expect(treesA.chop(treeTile)).toBe(false); // already gone
     const chopped = buildChunkMesh(chunk, g, layers, colsA, treesA)!;
@@ -306,6 +350,13 @@ describe('chunks + mesher', () => {
     const chunk = [...chunks.values()][3];
     const before = buildChunkMesh(chunk, g, layers, cols)!;
     const victim = chunk.tiles[Math.floor(chunk.tiles.length / 2)];
+    const top = cols.topLayerOf(victim);
+    const mining = new MineProgress();
+    mining.strike(victim, top, 1, 4);
+    const cracked = buildChunkMesh(chunk, g, layers, cols, undefined, mining)!;
+    expect(cracked.triangles).toBe(before.triangles);
+    expect(cracked.colors).not.toEqual(before.colors);
+    expect(cols.solidAt(victim, top)).toBe(true);
     cols.mine(victim, cols.topLayerOf(victim));
     const after = buildChunkMesh(chunk, g, layers, cols)!;
     // mesh changed

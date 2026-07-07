@@ -13,6 +13,7 @@ import type { Goldberg } from '../geo/goldberg';
 import type { Layers } from './layers';
 import { PLANET_RADIUS } from './layers';
 import { MAT, type MaterialId, Terrain } from './terrain';
+import { NATURAL_VOID_SCAN_LAYERS, NaturalCaves, type NaturalVoidKind, type NaturalVoidSample } from './caves';
 
 export interface ColumnEdit {
   solid: Uint32Array;
@@ -22,6 +23,20 @@ export interface ColumnEdit {
 }
 
 const TOP_SENTINEL = -32768;
+const VOID_FLAG_UNKNOWN = -1;
+const VOID_FLAG_NONE = 0;
+const VOID_FLAG_HAS = 1;
+
+export interface NaturalFeature {
+  tile: number;
+  layer: number;
+  layerEnd: number;
+  kind: NaturalVoidKind;
+  depth: number;
+  flooded: boolean;
+  spring?: boolean;
+  clearance: number;
+}
 
 export class Columns {
   readonly geo: Goldberg;
@@ -31,6 +46,8 @@ export class Columns {
   /** lazily generated surface layer per tile (the on-demand "generation" index) */
   private readonly tops: Int16Array;
   private readonly heights: Float32Array;
+  private readonly naturalVoidFlags: Int8Array;
+  private readonly caves: NaturalCaves;
   /** sparse: only edited tiles */
   readonly edits = new Map<number, ColumnEdit>();
   generatedCount = 0;
@@ -42,6 +59,8 @@ export class Columns {
     this.words = Math.ceil(layers.L / 32);
     this.tops = new Int16Array(geo.count).fill(TOP_SENTINEL);
     this.heights = new Float32Array(geo.count).fill(NaN);
+    this.naturalVoidFlags = new Int8Array(geo.count).fill(VOID_FLAG_UNKNOWN);
+    this.caves = new NaturalCaves(terrain.seed);
   }
 
   /** surface height (m, relative to planet radius) — generates on demand, deterministic. */
@@ -67,11 +86,91 @@ export class Columns {
     return this.edits.get(id);
   }
 
+  naturalVoidAt(id: number, k: number): NaturalVoidSample | null {
+    if (k < 0 || k >= this.layers.L - 1) return null;
+    const top = this.topLayerOf(id);
+    if (k <= top || k > top + NATURAL_VOID_SCAN_LAYERS) return null;
+    const c = this.geo.centers;
+    const h = this.heightOf(id);
+    return this.caves.sample(
+      c[id * 3],
+      c[id * 3 + 1],
+      c[id * 3 + 2],
+      h,
+      this.layers.topRadius(top),
+      this.layers.topRadius(k),
+      this.layers.bottomRadius(k),
+    );
+  }
+
+  hasNaturalVoids(id: number): boolean {
+    let flag = this.naturalVoidFlags[id];
+    if (flag !== VOID_FLAG_UNKNOWN) return flag === VOID_FLAG_HAS;
+    const top = this.topLayerOf(id);
+    const max = Math.min(this.layers.L - 2, top + NATURAL_VOID_SCAN_LAYERS);
+    flag = VOID_FLAG_NONE;
+    for (let k = top + 1; k <= max; k++) {
+      if (this.naturalVoidAt(id, k)) {
+        flag = VOID_FLAG_HAS;
+        break;
+      }
+    }
+    this.naturalVoidFlags[id] = flag;
+    return flag === VOID_FLAG_HAS;
+  }
+
+  naturalScanMax(id: number): number {
+    return this.hasNaturalVoids(id)
+      ? Math.min(this.layers.L - 1, this.topLayerOf(id) + NATURAL_VOID_SCAN_LAYERS)
+      : this.topLayerOf(id);
+  }
+
+  naturalFeature(kind?: NaturalVoidKind, startTile = 0, springOnly = false): NaturalFeature | null {
+    const n = this.geo.count;
+    const start = Math.max(0, Math.min(n - 1, Math.trunc(startTile)));
+    for (let pass = 0; pass < 2; pass++) {
+      const from = pass === 0 ? start : 0;
+      const to = pass === 0 ? n : start;
+      for (let id = from; id < to; id++) {
+        if (!this.hasNaturalVoids(id)) continue;
+        const top = this.topLayerOf(id);
+        const max = Math.min(this.layers.L - 2, top + NATURAL_VOID_SCAN_LAYERS);
+        for (let k = top + 1; k <= max; k++) {
+          const sample = this.naturalVoidAt(id, k);
+          if (!sample || (kind && sample.kind !== kind)) continue;
+          if (springOnly && !sample.spring) continue;
+          let end = k;
+          while (end + 1 <= max && this.naturalVoidAt(id, end + 1)?.kind === sample.kind) end++;
+          const floorLayer = end + 1;
+          const clearance = this.layers.topRadius(k) - this.layers.topRadius(floorLayer);
+          if (clearance >= 2.35) {
+            return {
+              tile: id,
+              layer: k,
+              layerEnd: end,
+              kind: sample.kind,
+              depth: sample.depth,
+              flooded: sample.flooded,
+              spring: sample.spring === true,
+              clearance,
+            };
+          }
+          k = end;
+        }
+      }
+    }
+    return null;
+  }
+
+  private defaultSolidAt(id: number, k: number): boolean {
+    return k >= this.topLayerOf(id) && !this.naturalVoidAt(id, k);
+  }
+
   solidAt(id: number, k: number): boolean {
     if (k < 0 || k >= this.layers.L) return false;
     const e = this.edits.get(id);
     if (e) return (e.solid[k >> 5] & (1 << (k & 31))) !== 0;
-    return k >= this.topLayerOf(id);
+    return this.defaultSolidAt(id, k);
   }
 
   /** materialize the default mask for a tile (solid from topLayer down) */
@@ -81,7 +180,7 @@ export class Columns {
     const top = this.topLayerOf(id);
     const solid = new Uint32Array(this.words);
     for (let k = Math.max(0, top); k < this.layers.L; k++) {
-      solid[k >> 5] |= 1 << (k & 31);
+      if (this.defaultSolidAt(id, k)) solid[k >> 5] |= 1 << (k & 31);
     }
     e = { solid, placed: new Uint32Array(this.words) };
     this.edits.set(id, e);

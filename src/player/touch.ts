@@ -31,6 +31,10 @@ export interface TouchFrame {
   down: boolean;
   /** plane button edge (craft/board/stow) */
   plane: boolean;
+  /** use/interact button edge */
+  use: boolean;
+  /** long-press use button edge for packing a nearby placed prop */
+  pack: boolean;
   /** taps to mine/chop at, in client px */
   mines: { x: number; y: number }[];
   /** long-press placements at, in client px */
@@ -47,6 +51,11 @@ export class TouchControls {
   private jumpHeld = false;
   private downHeld = false;
   private planeTap = false;
+  private useTap = false;
+  private packTap = false;
+  private usePackedDuringPress = false;
+  private useDownAt = 0;
+  private useHoldTimer: ReturnType<typeof setTimeout> | null = null;
   private mines: { x: number; y: number }[] = [];
   private places: { x: number; y: number }[] = [];
 
@@ -74,6 +83,7 @@ export class TouchControls {
   private btnJump = document.getElementById('btn-jump')!;
   private btnDown = document.getElementById('btn-down')!;
   private btnPlane = document.getElementById('btn-plane')!;
+  private btnUse = document.getElementById('btn-use')!;
   private planeState: PlaneButtonState = 'hidden';
   private planeLabel = '';
 
@@ -121,6 +131,45 @@ export class TouchControls {
     });
     this.btnPlane.addEventListener('pointerup', () => this.btnPlane.classList.remove('press'));
     this.btnPlane.addEventListener('pointercancel', () => this.btnPlane.classList.remove('press'));
+    this.btnUse.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      try {
+        this.btnUse.setPointerCapture(e.pointerId);
+      } catch { /* synthetic pointer */ }
+      this.btnUse.classList.add('press');
+      this.usePackedDuringPress = false;
+      this.useDownAt = performance.now();
+      if (this.useHoldTimer !== null) clearTimeout(this.useHoldTimer);
+      this.useHoldTimer = setTimeout(() => {
+        this.packTap = true;
+        this.usePackedDuringPress = true;
+        navigator.vibrate?.(16);
+      }, HOLD_MS);
+    });
+    this.btnUse.addEventListener('pointerup', () => {
+      if (this.useHoldTimer !== null) {
+        clearTimeout(this.useHoldTimer);
+        this.useHoldTimer = null;
+      }
+      this.btnUse.classList.remove('press');
+      const heldMs = performance.now() - this.useDownAt;
+      if (!this.usePackedDuringPress && heldMs >= HOLD_MS) {
+        this.packTap = true;
+        this.usePackedDuringPress = true;
+      }
+      if (!this.usePackedDuringPress) this.useTap = true;
+      this.usePackedDuringPress = false;
+      this.useDownAt = 0;
+    });
+    this.btnUse.addEventListener('pointercancel', () => {
+      if (this.useHoldTimer !== null) {
+        clearTimeout(this.useHoldTimer);
+        this.useHoldTimer = null;
+      }
+      this.btnUse.classList.remove('press');
+      this.usePackedDuringPress = false;
+      this.useDownAt = 0;
+    });
   }
 
   private capture(id: number): void {
@@ -272,10 +321,14 @@ export class TouchControls {
       jump: this.jumpHeld,
       down: this.downHeld,
       plane: this.planeTap,
+      use: this.useTap,
+      pack: this.packTap,
       mines: this.mines,
       places: this.places,
     };
     this.planeTap = false;
+    this.useTap = false;
+    this.packTap = false;
     this.mines = [];
     this.places = [];
     return out;
@@ -293,5 +346,9 @@ export class TouchControls {
 
   setDownVisible(v: boolean): void {
     this.btnDown.classList.toggle('show', v);
+  }
+
+  setUseVisible(v: boolean): void {
+    this.btnUse.classList.toggle('show', v);
   }
 }

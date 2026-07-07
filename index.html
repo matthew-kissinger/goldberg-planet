@@ -8,6 +8,11 @@
   <title>Goldberg Planet</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='16,2 28,9 28,23 16,30 4,23 4,9' fill='%236fae4e' stroke='%232c4a22' stroke-width='2'/%3E%3C/svg%3E" />
   <style>
+    :root {
+      --hotbar-slot: 50px;
+      --hotbar-gap: 5px;
+      --ux-touch-target: 44px;
+    }
     html, body {
       margin: 0; padding: 0; overflow: hidden; background: #05060a; height: 100%;
       user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
@@ -66,10 +71,10 @@
     #splash .bar > div { height: 100%; width: 0%; background: #5b8fd6; transition: width 0.2s; }
     #hotbar {
       bottom: calc(12px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
-      display: flex; gap: 5px; pointer-events: auto;
+      display: flex; gap: var(--hotbar-gap); pointer-events: auto;
     }
     #hotbar .slot {
-      width: 50px; height: 50px; position: relative; border-radius: 8px;
+      width: var(--hotbar-slot); height: var(--hotbar-slot); position: relative; border-radius: 8px;
       background: rgba(10, 14, 22, 0.5); border: 1.5px solid rgba(150, 165, 185, 0.3);
       box-sizing: border-box; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
     }
@@ -80,6 +85,251 @@
     }
     #hotbar .key { position: absolute; top: 2px; left: 5px; font-size: 9px; color: #93a3b8; }
     #hotbar .count { position: absolute; bottom: 2px; right: 5px; font-size: 11px; color: #eef3fa; text-shadow: 0 1px 2px rgba(0,0,0,0.9); }
+    #crafting {
+      top: calc(18px + env(safe-area-inset-top)); right: calc(16px + env(safe-area-inset-right));
+      width: min(460px, calc(100vw - 32px)); max-height: min(70vh, 620px); overflow: auto;
+      pointer-events: auto; display: flex; flex-direction: column; gap: 7px;
+      background: rgba(7, 11, 18, 0.68); border: 1px solid rgba(165, 185, 210, 0.18); border-radius: 8px;
+      padding: 9px; box-sizing: border-box; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+    #crafting.hide { display: none; }
+    #crafting .craft-head {
+      display: flex; align-items: center; justify-content: space-between;
+      color: #dce7f4; font-size: 12px; letter-spacing: 0; padding: 0 2px 2px;
+    }
+    #crafting .craft-head span:last-child {
+      color: #8fa2bb; border: 1px solid rgba(165, 185, 210, 0.22); border-radius: 4px;
+      min-width: 20px; height: 18px; display: inline-flex; align-items: center; justify-content: center;
+      font-size: 10px;
+    }
+    #crafting .craft-row {
+      display: grid; grid-template-columns: 30px 38px minmax(0, 1fr); gap: 6px; align-items: start;
+      border-top: 1px solid rgba(165, 185, 210, 0.11); padding-top: 7px;
+    }
+    #crafting button {
+      width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(180, 205, 230, 0.36);
+      background: rgba(34, 54, 75, 0.72); color: #eff7ff; font: 18px/1 Consolas, monospace;
+      cursor: pointer;
+    }
+    #crafting button[data-place] {
+      width: 38px; border-radius: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0;
+    }
+    #crafting button:disabled {
+      cursor: default; color: #617189; border-color: rgba(130, 150, 175, 0.18);
+      background: rgba(18, 24, 34, 0.48);
+    }
+    #crafting .ready button { border-color: rgba(154, 220, 156, 0.62); color: #d8f4d5; }
+    #crafting .selected button[data-place] { border-color: rgba(255, 210, 105, 0.72); color: #ffe1a0; }
+    #crafting .craft-copy { min-width: 0; }
+    #crafting strong { color: #f0f5fb; font-weight: 600; font-size: 12px; }
+    #crafting em { color: #93a8c0; font-style: normal; font-size: 10px; margin-left: 6px; }
+    #crafting .owned { color: #bcd3a2; font-size: 10px; margin-left: 6px; }
+    #crafting p { margin: 2px 0 4px; color: #91a2b8; line-height: 1.35; font-size: 10.5px; }
+    #crafting .craft-req { display: flex; flex-wrap: wrap; gap: 4px; }
+    #crafting .craft-req span {
+      border-radius: 4px; border: 1px solid rgba(165, 185, 210, 0.13);
+      padding: 2px 5px; color: #aebdd0; font-size: 9.5px; line-height: 1.2;
+    }
+    #crafting .craft-req .ok { color: #cfe8c9; border-color: rgba(146, 206, 143, 0.28); }
+    #crafting .craft-req .miss { color: #d0a69b; border-color: rgba(218, 141, 118, 0.22); }
+    #crafting .pack-ledger {
+      border-top: 1px solid rgba(165, 185, 210, 0.14);
+      border-bottom: 1px solid rgba(165, 185, 210, 0.1);
+      padding: 7px 0 8px; margin-bottom: 1px;
+    }
+    #crafting .ledger-head {
+      display: grid; grid-template-columns: minmax(74px, auto) minmax(0, 1fr);
+      gap: 8px; align-items: start; margin-bottom: 6px;
+    }
+    #crafting .ledger-head strong { color: #f2f7ff; font-size: 11.5px; white-space: nowrap; }
+    #crafting .ledger-head span { color: #9cafc5; font-size: 10px; line-height: 1.3; }
+    #crafting .ledger-grid {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;
+    }
+    #crafting .ledger-burden {
+      display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: center;
+      margin: 0 0 6px; padding: 5px 6px; border-radius: 6px;
+      border: 1px solid rgba(165, 185, 210, 0.11); background: rgba(10, 16, 25, 0.48);
+    }
+    #crafting .ledger-burden span { color: #e8f2fb; font-size: 10.5px; white-space: nowrap; }
+    #crafting .ledger-burden p {
+      margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      color: #91a4bc; font-size: 9.5px;
+    }
+    #crafting .ledger-burden.field { border-color: rgba(180, 205, 230, 0.2); }
+    #crafting .ledger-burden.heavy { border-color: rgba(255, 210, 105, 0.32); }
+    #crafting .ledger-burden.heavy span { color: #ffe1a0; }
+    #crafting .ledger-burden.overloaded { border-color: rgba(226, 138, 112, 0.36); }
+    #crafting .ledger-burden.overloaded span { color: #f0b4a4; }
+    #crafting .ledger-section {
+      min-width: 0; padding: 6px; border-radius: 6px;
+      background: rgba(13, 19, 29, 0.48); border: 1px solid rgba(165, 185, 210, 0.1);
+    }
+    #crafting .ledger-section-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 6px;
+      color: #d6e3f1; font-size: 10px; line-height: 1.2; margin-bottom: 4px;
+    }
+    #crafting .ledger-section-head b { color: #bcd3a2; font-weight: 600; }
+    #crafting .ledger-items { display: grid; gap: 4px; }
+    #crafting .ledger-entry {
+      display: grid; grid-template-columns: 11px minmax(0, 1fr) auto; column-gap: 5px; align-items: center;
+      min-width: 0;
+    }
+    #crafting .ledger-swatch {
+      width: 11px; height: 11px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16);
+    }
+    #crafting .ledger-name {
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      color: #ecf4fc; font-size: 10px;
+    }
+    #crafting .ledger-count { color: #eff7ff; font-size: 10px; }
+    #crafting .ledger-detail {
+      grid-column: 2 / 4; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      color: #8495ac; font-size: 9px; line-height: 1.2;
+    }
+    #crafting .ledger-more,
+    #crafting .ledger-empty { color: #8d9eb5; font-size: 9.5px; line-height: 1.25; }
+    #route {
+      top: calc(18px + env(safe-area-inset-top)); right: calc(16px + env(safe-area-inset-right));
+      width: min(340px, calc(100vw - 32px));
+      background: rgba(7, 11, 18, 0.66); border: 1px solid rgba(165, 185, 210, 0.18); border-radius: 8px;
+      padding: 9px; box-sizing: border-box; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      opacity: 1; transition: opacity 0.2s; z-index: 4;
+    }
+    #route.hide { display: none; }
+    #route .route-head {
+      display: flex; align-items: center; justify-content: space-between;
+      color: #dce7f4; font-size: 12px; padding-bottom: 5px;
+    }
+    #route .route-head span:last-child {
+      color: #8fa2bb; border: 1px solid rgba(165, 185, 210, 0.22); border-radius: 4px;
+      min-width: 20px; height: 18px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px;
+    }
+    #route .route-summary {
+      color: #9fb4cc; font-size: 10.5px; line-height: 1.3; padding-bottom: 5px;
+      border-bottom: 1px solid rgba(165, 185, 210, 0.11);
+    }
+    #route .route-pin {
+      display: grid; grid-template-columns: 9px minmax(0, 1fr); gap: 7px; padding-top: 7px; align-items: start;
+    }
+    #route .route-dot {
+      width: 7px; height: 7px; border-radius: 50%; margin-top: 4px;
+      background: #8fa2bb; box-shadow: 0 0 8px rgba(143, 162, 187, 0.3);
+    }
+    #route .route-pin.ready .route-dot {
+      background: #a6d790; box-shadow: 0 0 10px rgba(166, 215, 144, 0.45);
+    }
+    #route strong { color: #eef4fb; font-weight: 600; font-size: 11.5px; }
+    #route p { margin: 2px 0 0; color: #91a2b8; line-height: 1.3; font-size: 10.5px; }
+    #journal {
+      top: calc(18px + env(safe-area-inset-top)); left: calc(16px + env(safe-area-inset-left));
+      width: min(760px, calc(100vw - 32px)); max-height: min(78vh, 720px); overflow: auto;
+      pointer-events: auto; z-index: 6;
+      background: rgba(7, 11, 18, 0.76); border: 1px solid rgba(165, 185, 210, 0.2); border-radius: 8px;
+      padding: 10px; box-sizing: border-box; backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+    }
+    #journal.hide { display: none; }
+    #journal .journal-head {
+      display: flex; align-items: start; justify-content: space-between; gap: 14px;
+      border-bottom: 1px solid rgba(165, 185, 210, 0.13); padding-bottom: 8px;
+    }
+    #journal .journal-head strong { color: #f0f5fb; font-size: 13px; font-weight: 600; }
+    #journal .journal-head p { margin: 2px 0 0; color: #8fa2bb; font-size: 10.5px; line-height: 1.35; }
+    #journal .journal-head button {
+      width: 30px; height: 30px; flex: 0 0 auto; border-radius: 50%;
+      border: 1px solid rgba(180, 205, 230, 0.34); background: rgba(20, 28, 40, 0.7);
+      color: #e6eef8; font: 18px/1 Consolas, monospace; cursor: pointer;
+    }
+    #journal .journal-next {
+      display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; padding: 8px 0 10px;
+      border-bottom: 1px solid rgba(165, 185, 210, 0.11);
+    }
+    #journal .journal-next-item {
+      min-height: 54px; border: 1px solid rgba(165, 185, 210, 0.14); border-radius: 7px;
+      padding: 7px; box-sizing: border-box; background: rgba(18, 25, 36, 0.55);
+    }
+    #journal .journal-next-item strong {
+      display: block; color: #edf5fc; font-size: 11px; font-weight: 600; line-height: 1.2;
+    }
+    #journal .journal-next-item span { display: block; color: #9eb0c8; font-size: 9.8px; line-height: 1.3; margin-top: 3px; }
+    #journal .journal-next-item.warn { border-color: rgba(226, 164, 118, 0.32); }
+    #journal .journal-next-item.ready { border-color: rgba(154, 220, 156, 0.34); }
+    #journal .journal-next-item.wonder { border-color: rgba(185, 156, 255, 0.34); }
+    #journal .journal-sections {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding-top: 9px;
+    }
+    #journal .journal-section {
+      border-top: 1px solid rgba(165, 185, 210, 0.13); padding-top: 7px; min-width: 0;
+    }
+    #journal .journal-section-head {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 5px;
+    }
+    #journal .journal-section-head strong { color: #eaf2fb; font-size: 11.5px; font-weight: 600; }
+    #journal .journal-section-head span {
+      color: #8295ad; font-size: 9.5px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    #journal .journal-entry {
+      display: grid; grid-template-columns: minmax(88px, 0.35fr) minmax(0, 1fr); gap: 8px;
+      border-top: 1px solid rgba(165, 185, 210, 0.08); padding: 5px 0;
+    }
+    #journal .journal-entry span { color: #dce7f4; font-size: 10.5px; line-height: 1.25; }
+    #journal .journal-entry p { margin: 0; color: #93a5bb; font-size: 10px; line-height: 1.3; }
+    #journal .journal-entry.warn span { color: #f0c3a7; }
+    #journal .journal-entry.ready span { color: #d5edcd; }
+    #journal .journal-entry.wonder span { color: #dccdff; }
+    #storage {
+      top: calc(18px + env(safe-area-inset-top)); right: calc(16px + env(safe-area-inset-right));
+      width: min(430px, calc(100vw - 32px)); max-height: min(70vh, 620px); overflow: auto;
+      pointer-events: auto; z-index: 7;
+      background: rgba(7, 11, 18, 0.76); border: 1px solid rgba(165, 185, 210, 0.2); border-radius: 8px;
+      padding: 10px; box-sizing: border-box; backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+    }
+    #storage.hide { display: none; }
+    #storage .storage-head {
+      display: flex; align-items: start; justify-content: space-between; gap: 12px;
+      border-bottom: 1px solid rgba(165, 185, 210, 0.13); padding-bottom: 8px;
+    }
+    #storage .storage-head strong { color: #f0f5fb; font-size: 13px; font-weight: 600; }
+    #storage .storage-head p { margin: 2px 0 0; color: #8fa2bb; font-size: 10.5px; line-height: 1.35; }
+    #storage .storage-head button {
+      width: 30px; height: 30px; flex: 0 0 auto; border-radius: 50%;
+      border: 1px solid rgba(180, 205, 230, 0.34); background: rgba(20, 28, 40, 0.7);
+      color: #e6eef8; font: 18px/1 Consolas, monospace; cursor: pointer;
+    }
+    #storage .storage-labels,
+    #storage .storage-row {
+      display: grid; grid-template-columns: minmax(94px, 1fr) 44px 48px 148px; gap: 7px; align-items: center;
+    }
+    #storage .storage-labels {
+      padding: 7px 0 4px; color: #7f91aa; font-size: 9px; text-transform: uppercase; letter-spacing: 0;
+    }
+    #storage .storage-row {
+      min-height: 35px; border-top: 1px solid rgba(165, 185, 210, 0.09);
+    }
+    #storage .storage-item {
+      display: flex; align-items: center; gap: 7px; min-width: 0; color: #e5edf7; font-size: 11px;
+    }
+    #storage .storage-item span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #storage .storage-swatch {
+      width: 15px; height: 15px; flex: 0 0 auto; border-radius: 4px;
+      box-shadow: inset -1px -2px 0 rgba(0,0,0,0.28), inset 1px 1px 0 rgba(255,255,255,0.18);
+    }
+    #storage .storage-count {
+      height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 5px;
+      border: 1px solid rgba(165, 185, 210, 0.13); color: #8fa2bb; font-size: 10px;
+      background: rgba(18, 25, 36, 0.44);
+    }
+    #storage .storage-count.ready { color: #d9ebd0; border-color: rgba(154, 220, 156, 0.24); }
+    #storage .storage-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+    #storage .storage-actions button {
+      height: 28px; min-width: 0; border-radius: 6px; border: 1px solid rgba(180, 205, 230, 0.3);
+      background: rgba(34, 54, 75, 0.72); color: #eff7ff; font: 11px/1 Consolas, monospace;
+      cursor: pointer;
+    }
+    #storage .storage-actions button:disabled {
+      cursor: default; color: #617189; border-color: rgba(130, 150, 175, 0.16);
+      background: rgba(18, 24, 34, 0.42);
+    }
 
     /* --- touch controls (enabled by adding .touch to body) --- */
     #joy {
@@ -114,17 +364,153 @@
       right: calc(30px + env(safe-area-inset-right)); bottom: calc(214px + env(safe-area-inset-bottom));
     }
     #btn-plane.ready { border-color: rgba(150, 210, 145, 0.7); color: #cdeec8; }
+    #btn-use {
+      width: 58px; height: 58px; font-size: 18px;
+      right: calc(108px + env(safe-area-inset-right)); bottom: calc(178px + env(safe-area-inset-bottom));
+    }
+    #btn-journal {
+      width: 58px; height: 42px; font-size: 11px; border-radius: 8px;
+      left: calc(10px + env(safe-area-inset-left)); top: calc(10px + env(safe-area-inset-top));
+    }
+    #btn-journal.active { border-color: rgba(185, 156, 255, 0.58); color: #dccdff; }
+    #btn-craft {
+      width: 66px; height: 42px; font-size: 11px; border-radius: 8px;
+      left: calc(10px + env(safe-area-inset-left)); top: calc(58px + env(safe-area-inset-top));
+    }
+    #btn-craft.active { border-color: rgba(255, 210, 105, 0.58); color: #ffe1a0; }
+    body.touch #btn-use.show { display: flex; }
+    body.touch #btn-journal { display: flex; }
+    body.touch #btn-craft { display: flex; }
+    body.touch.crafting-open #btn-jump,
+    body.touch.crafting-open #btn-down,
+    body.touch.crafting-open #btn-use,
+    body.touch.crafting-open #btn-plane { display: none !important; }
 
     body.touch #help { display: none; }
     body.touch #crosshair { display: none; }
     body.touch #btn-jump { display: flex; }
     body.touch #btn-down.show { display: flex; }
     body.touch #btn-plane.show { display: flex; }
-    body.touch #hotbar .slot { width: 46px; height: 46px; }
+    body.touch { --hotbar-slot: 46px; --hotbar-gap: 5px; }
     body.touch #hotbar .key { display: none; }
+    body.touch #crafting {
+      top: auto; left: calc(10px + env(safe-area-inset-left)); right: calc(10px + env(safe-area-inset-right));
+      bottom: calc(174px + env(safe-area-inset-bottom)); width: auto; max-height: 42vh;
+    }
+    body.touch #route {
+      top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right));
+      width: min(320px, calc(100vw - 20px));
+    }
+    body.touch #journal {
+      top: calc(58px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left));
+      right: calc(10px + env(safe-area-inset-right)); width: auto;
+      max-height: calc(100vh - 188px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    }
+    body.touch #storage {
+      top: auto; left: calc(10px + env(safe-area-inset-left)); right: calc(10px + env(safe-area-inset-right));
+      bottom: calc(174px + env(safe-area-inset-bottom)); width: auto; max-height: 44vh;
+    }
+    body.touch #storage .storage-labels,
+    body.touch #storage .storage-row { grid-template-columns: minmax(82px, 1fr) 40px 44px 112px; gap: 5px; }
+    body.touch #storage .storage-row { min-height: 72px; }
+    body.touch #storage .storage-actions { grid-template-columns: repeat(2, minmax(44px, 1fr)); gap: 5px; }
+    body.touch #storage .storage-actions button { height: 32px; }
+    body.touch #journal .journal-next { grid-template-columns: 1fr; }
+    body.touch #journal .journal-sections { grid-template-columns: 1fr; }
+    body.touch #journal .journal-entry { grid-template-columns: minmax(82px, 0.38fr) minmax(0, 1fr); }
+
+    body.ux-gamepad #hotbar .slot.sel {
+      border-color: rgba(210, 235, 255, 0.95);
+      box-shadow: 0 0 0 2px rgba(102, 152, 220, 0.28), 0 8px 24px rgba(0,0,0,0.28);
+    }
+    body.ux-gamepad #crafting .craft-head span:last-child,
+    body.ux-gamepad #route .route-head span:last-child {
+      min-width: 44px;
+    }
+    body.ux-laptop #crafting,
+    body.ux-laptop #storage { max-height: min(62vh, 540px); }
+    body.ux-laptop #journal { max-height: min(72vh, 620px); }
+    body.ux-compact #diag {
+      max-width: calc(100vw - 20px); max-height: 46vh; overflow: auto;
+      white-space: pre-wrap;
+    }
+    body.ux-phone { --hotbar-slot: 42px; --hotbar-gap: 4px; }
+    body.ux-phone #vitals {
+      left: calc(74px + env(safe-area-inset-left));
+      right: calc(10px + env(safe-area-inset-right));
+      max-width: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-size: 10px;
+    }
+    body.ux-phone #route {
+      top: calc(58px + env(safe-area-inset-top));
+      right: calc(10px + env(safe-area-inset-right));
+      width: min(320px, calc(100vw - 20px));
+      max-height: 34vh; overflow: auto;
+    }
+    body.ux-phone #msg {
+      bottom: calc(72px + var(--hotbar-slot) + env(safe-area-inset-bottom));
+      max-width: calc(100vw - 34px);
+    }
+    body.ux-phone #flight { bottom: calc(62px + var(--hotbar-slot) + env(safe-area-inset-bottom)); }
+    body.ux-phone #slotname { bottom: calc(44px + var(--hotbar-slot) + env(safe-area-inset-bottom)); }
+    body.ux-phone #crafting,
+    body.ux-phone #storage {
+      left: calc(8px + env(safe-area-inset-left));
+      right: calc(8px + env(safe-area-inset-right));
+      bottom: calc(158px + env(safe-area-inset-bottom));
+      max-height: 43vh;
+      padding: 8px;
+    }
+    body.ux-phone #crafting .ledger-grid { grid-template-columns: 1fr; }
+    body.ux-phone #crafting .ledger-head { grid-template-columns: 1fr; gap: 2px; }
+    body.ux-phone #crafting .ledger-burden { grid-template-columns: 1fr; gap: 2px; }
+    body.ux-phone #journal {
+      top: calc(58px + env(safe-area-inset-top));
+      left: calc(8px + env(safe-area-inset-left));
+      right: calc(8px + env(safe-area-inset-right));
+      max-height: calc(100vh - 176px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+      padding: 8px;
+    }
+    body.ux-phone #journal .journal-entry { grid-template-columns: 1fr; gap: 2px; }
+    body.ux-phone #storage .storage-labels,
+    body.ux-phone #storage .storage-row { grid-template-columns: minmax(74px, 1fr) 34px 38px 96px; gap: 4px; }
+    body.ux-phone #storage .storage-actions button { font-size: 10px; }
+    body.ux-phone #btn-jump {
+      width: 72px; height: 72px;
+      right: calc(18px + env(safe-area-inset-right)); bottom: calc(108px + env(safe-area-inset-bottom));
+    }
+    body.ux-phone #btn-plane {
+      right: calc(24px + env(safe-area-inset-right)); bottom: calc(202px + env(safe-area-inset-bottom));
+    }
+    body.ux-phone #btn-use {
+      right: calc(100px + env(safe-area-inset-right)); bottom: calc(168px + env(safe-area-inset-bottom));
+    }
+    body.ux-phone #btn-craft {
+      left: calc(8px + env(safe-area-inset-left)); top: calc(58px + env(safe-area-inset-top));
+      width: 64px;
+    }
+    body.ux-phone #btn-down {
+      right: calc(104px + env(safe-area-inset-right)); bottom: calc(88px + env(safe-area-inset-bottom));
+    }
+    body.ux-tablet.touch { --hotbar-slot: 52px; --hotbar-gap: 6px; }
+    body.ux-tablet.touch #btn-jump { width: 88px; height: 88px; font-size: 30px; }
+    body.ux-tablet.touch #btn-plane,
+    body.ux-tablet.touch #btn-use,
+    body.ux-tablet.touch #btn-down { width: 66px; height: 66px; }
+    body.ux-tablet #journal { width: min(760px, calc(100vw - 28px)); }
+    body.ux-tablet.ux-portrait #journal .journal-next { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    body.ux-tablet.ux-portrait #journal .journal-sections { grid-template-columns: 1fr; }
+    body.ux-phone.ux-landscape #crafting,
+    body.ux-phone.ux-landscape #storage { max-height: 58vh; bottom: calc(72px + env(safe-area-inset-bottom)); }
+    body.ux-phone.ux-landscape #route { max-height: 42vh; }
     @media (max-width: 480px) {
-      body.touch #hotbar .slot { width: 42px; height: 42px; }
-      body.touch #hotbar { gap: 4px; }
+      #crafting { font-size: 11px; }
+      #storage .storage-labels,
+      #storage .storage-row { grid-template-columns: minmax(82px, 1fr) 36px 42px 104px; gap: 5px; }
+      #storage .storage-actions { grid-template-columns: repeat(2, minmax(42px, 1fr)); gap: 4px; }
+      #storage .storage-actions button { height: 32px; font-size: 10px; }
+      #journal .journal-next { grid-template-columns: 1fr; }
+      #journal .journal-sections { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -137,14 +523,21 @@
   <div id="flight" class="hud"></div>
   <div id="slotname" class="hud"></div>
   <div id="crosshair" class="hud"></div>
+  <div id="crafting" class="hud hide"></div>
+  <div id="route" class="hud hide"></div>
+  <div id="journal" class="hud hide"></div>
+  <div id="storage" class="hud hide"></div>
   <div id="hotbar" class="hud"></div>
   <div id="help" class="hud">WASD move · space jump · shift sprint · wheel zoom
-LMB mine + chop trees · RMB build · 1-5 pick block
-Plane: chop 2 trees for 12 wood, then press E to craft + board
+LMB mine + chop trees · RMB build · 1-5 pick block · Q eat
+Plane: chop 2 trees for 12 wood · B craft · R use/open chest/farm/fish/forage · Shift+R pack prop · M chart · P itinerary · Shift+P clear · J journal · E board/stow
 F free-flight · F3 stats · H help</div>
   <div id="joy"><div id="joyknob"></div></div>
   <div id="btn-jump" class="tbtn">▲</div>
   <div id="btn-down" class="tbtn">▼</div>
+  <div id="btn-use" class="tbtn">use</div>
+  <div id="btn-journal" class="tbtn">log</div>
+  <div id="btn-craft" class="tbtn">craft</div>
   <div id="btn-plane" class="tbtn">✈</div>
   <script type="module" src="/src/main.ts"></script>
 </body>

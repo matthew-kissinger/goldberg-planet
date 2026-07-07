@@ -33,6 +33,15 @@ export interface TreeParams {
   tint: number;
 }
 
+export interface TreeStrikeResult {
+  hit: boolean;
+  felled: boolean;
+  progress: number;
+  needed: number;
+  remaining: number;
+}
+
+export const TREE_CHOP_STAGES = 4;
 const FOREST_MIN = 0.33;
 
 /**
@@ -53,6 +62,7 @@ export function treeTangentFrame(ux: number, uy: number, uz: number, out: Float6
 
 export class Trees {
   readonly chopped = new Set<number>();
+  readonly chopProgress = new Map<number, number>();
   private readonly seedHash: number;
 
   constructor(
@@ -95,7 +105,30 @@ export class Trees {
   chop(id: number): boolean {
     if (!this.hasTree(id)) return false;
     this.chopped.add(id);
+    this.chopProgress.delete(id);
     return true;
+  }
+
+  /** staged chop hit. Returns a progress payload; fells the tree once enough work lands. */
+  strike(id: number, power = 1, needed = TREE_CHOP_STAGES): TreeStrikeResult {
+    const required = Math.max(1, Number.isFinite(needed) ? needed : TREE_CHOP_STAGES);
+    if (!this.hasTree(id)) {
+      return { hit: false, felled: false, progress: 0, needed: required, remaining: required };
+    }
+    const next = Math.min(required, Math.max(0, this.chopProgress.get(id) ?? 0) + Math.max(0.1, Number.isFinite(power) ? power : 1));
+    if (next >= required) {
+      this.chopped.add(id);
+      this.chopProgress.delete(id);
+      return { hit: true, felled: true, progress: required, needed: required, remaining: 0 };
+    }
+    this.chopProgress.set(id, next);
+    return { hit: true, felled: false, progress: next, needed: required, remaining: required - next };
+  }
+
+  damageOf(id: number, needed = TREE_CHOP_STAGES): number {
+    if (!this.hasTree(id)) return 0;
+    const required = Math.max(1, Number.isFinite(needed) ? needed : TREE_CHOP_STAGES);
+    return Math.max(0, Math.min(0.98, (this.chopProgress.get(id) ?? 0) / required));
   }
 
   paramsFor(id: number): TreeParams {

@@ -16,6 +16,7 @@ import type { Layers } from '../world/layers';
 import type { Columns } from '../world/columns';
 import type { ChunkInfo } from '../world/chunks';
 import { treeTangentFrame, type Trees } from '../world/trees';
+import type { CellDamageProvider } from '../sim/mining';
 import { PLANET_RADIUS } from '../world/layers';
 import { materialColor, TRUNK_COLOR, LEAF_COLOR } from './palette';
 
@@ -66,6 +67,7 @@ export function buildChunkMesh(
   layers: Layers,
   columns: Columns,
   trees?: Trees,
+  cellDamage?: CellDamageProvider,
 ): ChunkMeshData | null {
   sink.reset();
   const ax = chunk.cx * PLANET_RADIUS, ay = chunk.cy * PLANET_RADIUS, az = chunk.cz * PLANET_RADIUS;
@@ -80,19 +82,18 @@ export function buildChunkMesh(
     const top = columns.topLayerOf(id);
     const solidHere = (k: number): boolean => {
       if (k < 0 || k >= L) return false;
-      if (edit) return (edit.solid[k >> 5] & (1 << (k & 31))) !== 0;
-      return k >= top;
+      return columns.solidAt(id, k);
     };
 
     // scan window: from the highest possibly-solid layer of this tile down to where
     // this tile and all neighbors are permanently solid (default columns below their tops).
     let kMin = edit ? 0 : top;
-    let kMax = top; // deepest layer at which a wall could still be exposed
+    let kMax = edit ? L - 1 : columns.naturalScanMax(id); // deepest layer at which a wall could still be exposed
     for (let e = 0; e < deg; e++) {
       const n = geo.nbrs[id * 6 + e];
       if (columns.editOf(n)) { kMax = L - 1; break; }
-      const nTop = columns.topLayerOf(n);
-      if (nTop > kMax) kMax = nTop;
+      const nMax = columns.naturalScanMax(n);
+      if (nMax > kMax) kMax = nMax;
     }
     if (edit) kMax = L - 1;
     if (kMin < 0) kMin = 0;
@@ -108,11 +109,11 @@ export function buildChunkMesh(
       if (above && below) continue;
       if (!above) {
         // top cap at bounds[k]
-        emitCap(deg, bounds[k], tcx, tcy, tcz, ax, ay, az, false, columns.materialAt(id, k), id, isPent);
+        emitCap(deg, bounds[k], tcx, tcy, tcz, ax, ay, az, false, columns.materialAt(id, k), id, isPent, cellDamage?.damageOf(id, k) ?? 0);
       }
       if (!below && k < L - 1) {
         // bottom cap (cave ceiling) at bounds[k+1]
-        emitCap(deg, bounds[k + 1], tcx, tcy, tcz, ax, ay, az, true, columns.materialAt(id, k), id, isPent);
+        emitCap(deg, bounds[k + 1], tcx, tcy, tcz, ax, ay, az, true, columns.materialAt(id, k), id, isPent, cellDamage?.damageOf(id, k) ?? 0);
       }
     }
 
@@ -129,7 +130,7 @@ export function buildChunkMesh(
         const mat = exposed ? columns.materialAt(id, k) : -1;
         if (exposed && bandStart === -1) { bandStart = k; bandMat = mat; }
         else if (bandStart !== -1 && (!exposed || mat !== bandMat)) {
-          emitWall(cAx, cAy, cAz, cBx, cBy, cBz, bounds[bandStart], bounds[k], tcx, tcy, tcz, ax, ay, az, bandMat, id, isPent);
+          emitWall(cAx, cAy, cAz, cBx, cBy, cBz, bounds[bandStart], bounds[k], tcx, tcy, tcz, ax, ay, az, bandMat, id, isPent, cellDamage?.damageOf(id, bandStart) ?? 0);
           bandStart = exposed ? k : -1;
           bandMat = mat;
         }
@@ -142,7 +143,7 @@ export function buildChunkMesh(
     for (const id of chunk.tiles) {
       if (!trees.hasTree(id)) continue;
       const rG = layers.topRadius(columns.topLayerOf(id));
-      emitTree(cen[id * 3], cen[id * 3 + 1], cen[id * 3 + 2], rG, trees.paramsFor(id), ax, ay, az);
+      emitTree(cen[id * 3], cen[id * 3 + 1], cen[id * 3 + 2], rG, trees.paramsFor(id), ax, ay, az, trees.damageOf(id));
     }
   }
 
@@ -160,10 +161,13 @@ function emitCap(
   deg: number, r: number,
   ncx: number, ncy: number, ncz: number,
   ax: number, ay: number, az: number,
-  flip: boolean, mat: number, tileId: number, isPent: boolean,
+  flip: boolean, mat: number, tileId: number, isPent: boolean, damage = 0,
 ): void {
   materialColor(mat, tileId, isPent, colorScratch);
+  const dmg = Math.max(0, Math.min(0.98, damage));
   const cr = colorScratch[0], cg = colorScratch[1], cb = colorScratch[2];
+  const shade = 1 - dmg * 0.2;
+  const crackTriangles = Math.ceil(dmg * Math.max(1, deg - 2));
   const nx = flip ? -ncx : ncx, ny = flip ? -ncy : ncy, nz = flip ? -ncz : ncz;
   sink.ensure((deg - 2) * 3);
   const c = cornerScratch;
@@ -171,9 +175,11 @@ function emitCap(
   for (let t = 1; t < deg - 1; t++) {
     const i1 = flip ? t + 1 : t;
     const i2 = flip ? t : t + 1;
-    sink.vert(x0, y0, z0, nx, ny, nz, cr, cg, cb);
-    sink.vert(c[i1 * 3] * r - ax, c[i1 * 3 + 1] * r - ay, c[i1 * 3 + 2] * r - az, nx, ny, nz, cr, cg, cb);
-    sink.vert(c[i2 * 3] * r - ax, c[i2 * 3 + 1] * r - ay, c[i2 * 3 + 2] * r - az, nx, ny, nz, cr, cg, cb);
+    const crack = dmg > 0.01 && t <= crackTriangles;
+    const dark = crack ? 0.34 : shade;
+    sink.vert(x0, y0, z0, nx, ny, nz, cr * dark, cg * dark, cb * dark);
+    sink.vert(c[i1 * 3] * r - ax, c[i1 * 3 + 1] * r - ay, c[i1 * 3 + 2] * r - az, nx, ny, nz, cr * dark, cg * dark, cb * dark);
+    sink.vert(c[i2 * 3] * r - ax, c[i2 * 3 + 1] * r - ay, c[i2 * 3 + 2] * r - az, nx, ny, nz, cr * dark, cg * dark, cb * dark);
   }
 }
 
@@ -182,23 +188,27 @@ function emitTree(
   ux: number, uy: number, uz: number, rG: number,
   p: { trunk: number; canopy: number; spread: number; girth: number; offA: number; offB: number; tint: number },
   ax: number, ay: number, az: number,
+  damage = 0,
 ): void {
   // tangent frame at the tile (shared with the picker)
   treeTangentFrame(ux, uy, uz, frameScratch);
   const t1x = frameScratch[0], t1y = frameScratch[1], t1z = frameScratch[2];
   const t2x = frameScratch[3], t2y = frameScratch[4], t2z = frameScratch[5];
+  const tint = p.tint;
+  const phase = tint * 7.3;
 
   // base sits a touch below the surface so it roots into the terrain step
-  const bx = ux * (rG - 0.2) + t1x * p.offA + t2x * p.offB;
-  const by = uy * (rG - 0.2) + t1y * p.offA + t2y * p.offB;
-  const bz = uz * (rG - 0.2) + t1z * p.offA + t2z * p.offB;
+  const shake = Math.max(0, Math.min(0.98, damage));
+  const leanA = Math.sin(phase) * 0.14 * shake;
+  const leanB = Math.cos(phase * 1.3) * 0.12 * shake;
+  const bx = ux * (rG - 0.2) + t1x * (p.offA + leanA) + t2x * (p.offB + leanB);
+  const by = uy * (rG - 0.2) + t1y * (p.offA + leanA) + t2y * (p.offB + leanB);
+  const bz = uz * (rG - 0.2) + t1z * (p.offA + leanA) + t2z * (p.offB + leanB);
   const trunkTop = 0.2 + p.trunk;
 
-  const tint = p.tint;
   const tr = TRUNK_COLOR[0] * tint, tg = TRUNK_COLOR[1] * tint, tb = TRUNK_COLOR[2] * tint;
   const leafT = 0.75 + tint * 0.35;
   const lr = Math.min(1, LEAF_COLOR[0] * leafT), lg = Math.min(1, LEAF_COLOR[1] * leafT), lb = Math.min(1, LEAF_COLOR[2] * leafT);
-  const phase = tint * 7.3;
 
   sink.ensure(5 * 6 + 6 * 6);
 
@@ -216,12 +226,16 @@ function emitTree(
     const v2x = v1x + ux * trunkTop, v2y = v1y + uy * trunkTop, v2z = v1z + uz * trunkTop;
     const v3x = v0x + ux * trunkTop, v3y = v0y + uy * trunkTop, v3z = v0z + uz * trunkTop;
     const nx = (d0x + d1x) / 2, ny = (d0y + d1y) / 2, nz = (d0z + d1z) / 2;
-    sink.vert(v0x, v0y, v0z, nx, ny, nz, tr, tg, tb);
-    sink.vert(v1x, v1y, v1z, nx, ny, nz, tr, tg, tb);
-    sink.vert(v2x, v2y, v2z, nx, ny, nz, tr, tg, tb);
-    sink.vert(v0x, v0y, v0z, nx, ny, nz, tr, tg, tb);
-    sink.vert(v2x, v2y, v2z, nx, ny, nz, tr, tg, tb);
-    sink.vert(v3x, v3y, v3z, nx, ny, nz, tr, tg, tb);
+    const crack = damage > 0.01 && s < Math.ceil(damage * 4.6);
+    const cr = crack ? tr * 0.34 : tr;
+    const cg = crack ? tg * 0.28 : tg;
+    const cb = crack ? tb * 0.24 : tb;
+    sink.vert(v0x, v0y, v0z, nx, ny, nz, cr, cg, cb);
+    sink.vert(v1x, v1y, v1z, nx, ny, nz, cr, cg, cb);
+    sink.vert(v2x, v2y, v2z, nx, ny, nz, cr, cg, cb);
+    sink.vert(v0x, v0y, v0z, nx, ny, nz, cr, cg, cb);
+    sink.vert(v2x, v2y, v2z, nx, ny, nz, cr, cg, cb);
+    sink.vert(v3x, v3y, v3z, nx, ny, nz, cr, cg, cb);
   }
 
   // canopy: 6-sided cone from a ring at the trunk top to an apex, plus an underside skirt
@@ -241,9 +255,10 @@ function emitTree(
     // upper cone face (outward+up normal)
     let nx = (d0x + d1x) * 0.5 + ux * 0.55, ny = (d0y + d1y) * 0.5 + uy * 0.55, nz = (d0z + d1z) * 0.5 + uz * 0.55;
     let nl = Math.hypot(nx, ny, nz) || 1;
-    sink.vert(r0x, r0y, r0z, nx / nl, ny / nl, nz / nl, lr, lg, lb);
-    sink.vert(r1x, r1y, r1z, nx / nl, ny / nl, nz / nl, lr, lg, lb);
-    sink.vert(apX, apY, apZ, nx / nl, ny / nl, nz / nl, lr, lg, lb);
+    const leafDrop = 1 - damage * 0.18;
+    sink.vert(r0x, r0y, r0z, nx / nl, ny / nl, nz / nl, lr * leafDrop, lg * leafDrop, lb * leafDrop);
+    sink.vert(r1x, r1y, r1z, nx / nl, ny / nl, nz / nl, lr * leafDrop, lg * leafDrop, lb * leafDrop);
+    sink.vert(apX, apY, apZ, nx / nl, ny / nl, nz / nl, lr * leafDrop, lg * leafDrop, lb * leafDrop);
     // skirt face (outward+down normal), wound to face outward from below
     nx = (d0x + d1x) * 0.5 - ux * 0.6; ny = (d0y + d1y) * 0.5 - uy * 0.6; nz = (d0z + d1z) * 0.5 - uz * 0.6;
     nl = Math.hypot(nx, ny, nz) || 1;
@@ -259,10 +274,12 @@ function emitWall(
   rTop: number, rBot: number,
   tcx: number, tcy: number, tcz: number,
   ax: number, ay: number, az: number,
-  mat: number, tileId: number, isPent: boolean,
+  mat: number, tileId: number, isPent: boolean, damage = 0,
 ): void {
   materialColor(mat, tileId, isPent, colorScratch);
-  const cr = colorScratch[0], cg = colorScratch[1], cb = colorScratch[2];
+  const dmg = Math.max(0, Math.min(0.98, damage));
+  const dark = dmg > 0.01 ? 1 - dmg * 0.28 : 1;
+  const cr = colorScratch[0] * dark, cg = colorScratch[1] * dark, cb = colorScratch[2] * dark;
   // quad corners (world, then relative to anchor)
   const v0x = cAx * rTop, v0y = cAy * rTop, v0z = cAz * rTop;
   const v1x = cBx * rTop, v1y = cBy * rTop, v1z = cBz * rTop;
