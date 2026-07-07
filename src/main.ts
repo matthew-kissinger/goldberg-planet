@@ -637,7 +637,7 @@ async function boot(): Promise<void> {
   const landmarkRenderer = new LandmarkRenderer(scene, pentagonTiles, kilnAssets);
   const domainResourceRenderer = new DomainResourceRenderer(scene, kilnAssets);
   const skyfallRenderer = new SkyfallRenderer(scene, kilnAssets);
-  const caveMouthRenderer = new CaveMouthRenderer(scene);
+  const caveMouthRenderer = new CaveMouthRenderer(scene, kilnAssets);
   const routeRenderer = new RouteRenderer(scene);
   const murmurRenderer = new MurmurRenderer(scene);
   const seasonAfterglowRenderer = new SeasonAfterglowRenderer(scene);
@@ -4872,6 +4872,42 @@ async function boot(): Promise<void> {
     return { ...feature, floorLayer: floorK, radius: r };
   };
 
+  const spawnBesideNaturalFeature = (kind?: unknown) => {
+    const feature = columns.naturalFeature(naturalFeatureKind(kind), player.tile) ?? columns.naturalFeature(naturalFeatureKind(kind), 0);
+    if (!feature) return null;
+    let stand = feature.tile;
+    let score = Infinity;
+    const featureHeight = columns.heightOf(feature.tile);
+    for (const candidate of tilesAroundTile(feature.tile, 2)) {
+      if (candidate === feature.tile) continue;
+      const height = columns.heightOf(candidate);
+      const waterPenalty = height < SEA_LEVEL_HEIGHT + 0.35 ? 8 : 0;
+      const treePenalty = trees.hasTree(candidate) ? 5 : 0;
+      const cavePenalty = columns.naturalVoidAt(candidate, feature.layer) ? 1.5 : 0;
+      const s = Math.abs(height - featureHeight) + waterPenalty + treePenalty + cavePenalty;
+      if (s < score) {
+        score = s;
+        stand = candidate;
+      }
+    }
+    player.spawnAt(stand);
+    player.vx = 0; player.vy = 0; player.vz = 0;
+    player.mode = 'walk';
+    player.grounded = true;
+    player.submerged = Math.max(0, WATER_SURFACE - player.radius());
+    player.planeSpeed = 0;
+    player.stepSmooth = 0;
+    facePlayerTowardTile(feature.tile);
+    streamer.refreshDesired(...player.up(), player.altitudeAGL());
+    updatePicks(player.fwdX, player.fwdY, player.fwdZ);
+    return {
+      ...feature,
+      standTile: stand,
+      standHeight: columns.heightOf(stand),
+      standScore: score,
+    };
+  };
+
   const spawnAtSpring = () => {
     const feature = columns.naturalFeature('dryCave', player.tile, true) ?? columns.naturalFeature('dryCave', 0, true);
     if (!feature) return null;
@@ -5342,6 +5378,8 @@ async function boot(): Promise<void> {
     fishVisuals: () => ({ site: currentFishVisualSite(), renderer: fishSchoolRenderer.stats() }),
     skyLife: () => ({ sites: currentSkyLifeSites(), renderer: skyLifeRenderer.stats() }),
     debugSpawnAtSkyLifeKind,
+    debugSpawnAtNaturalFeature: spawnAtNaturalFeature,
+    debugSpawnBesideNaturalFeature: spawnBesideNaturalFeature,
     forage: () => currentForage(),
     gatherForage: () => tryForage(),
     caves: () => ({ current: currentNaturalVoid(), signal: nearbyCaveSignal(), resonance: caveResonanceDiagnostics(), mouths: caveMouthDiagnostics(), pressure: currentCavePressure(), lastAction: lastCaveAction, glowCrystal: itemCount(counts, craftedItems, 'glowCrystal'), lantern: itemCount(counts, craftedItems, 'lantern'), echoLantern: itemCount(counts, craftedItems, 'echoLantern') }),

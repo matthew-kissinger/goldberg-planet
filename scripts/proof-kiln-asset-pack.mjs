@@ -335,8 +335,8 @@ function validatePromotedAssets() {
       if (!asset.unusedReason) fail(`${asset.slug} is unused but has no unusedReason`);
       if (existsSync(path.join(modelsRoot, `${asset.slug}.glb`))) fail(`${asset.slug} is unused but has a promoted model file`);
     }
-    if (asset.slug.startsWith('cave-mouth-') && asset.status !== 'unused') {
-      fail(`${asset.slug} should stay unused because carved cave mouths are already the stronger runtime asset`);
+    if (asset.slug.startsWith('cave-mouth-') && asset.status === 'ready' && !asset.replaces?.includes('GLB skin over carved cave signal')) {
+      fail(`${asset.slug} must document the GLB-over-carved-cave runtime contract`);
     }
     if (asset.modularKit && !asset.wiringRisk) fail(`${asset.slug} is modularKit but has no wiringRisk note`);
     if (asset.replaces == null && asset.status === 'ready') warn(`${asset.slug} has no replaces pointer; verify the procedural owner before wiring`);

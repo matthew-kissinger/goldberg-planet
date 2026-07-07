@@ -100,6 +100,9 @@ const baseFamilySlugs = {
     'crater-emberfall',
     'crater-glassrain',
     'crater-starbloom',
+    'cave-mouth-arch',
+    'cave-mouth-dry',
+    'cave-mouth-sea',
   ],
 };
 
@@ -307,6 +310,14 @@ function assertViewerState(label, state, expected) {
     if (slug.startsWith('shrine-')) {
       if (record.orientation.policy !== 'preserve-y-up-x-front-to-z' || record.orientation.sourceForwardAxis !== '+x') {
         throw new Error(`${label}: ${slug} missing shrine forward policy ${JSON.stringify(record)}`);
+      }
+    }
+    if (slug.startsWith('cave-mouth-')) {
+      if (record.orientation.policy !== 'preserve-y-up-x-front-to-z' || record.orientation.sourceForwardAxis !== '+x') {
+        throw new Error(`${label}: ${slug} missing cave-mouth forward policy ${JSON.stringify(record)}`);
+      }
+      if (record.socketRole !== 'cave-mouth dressing skin' || record.socketGrid !== 'carved cave signal socket') {
+        throw new Error(`${label}: ${slug} missing cave-mouth socket contract ${JSON.stringify(record)}`);
       }
     }
   }

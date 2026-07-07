@@ -172,6 +172,9 @@ const FAMILY_SLUGS: Record<KilnViewerFamily, readonly string[]> = {
     'crater-emberfall',
     'crater-glassrain',
     'crater-starbloom',
+    'cave-mouth-arch',
+    'cave-mouth-dry',
+    'cave-mouth-sea',
   ],
   adopted: [],
   ready: [],
@@ -212,7 +215,7 @@ function familyForSlug(slug: string): KilnViewerFamily {
 function orientationPolicyFor(slug: string, asset?: KilnManifestAsset): KilnInstancedOrientationPolicy {
   if (slug === 'tree-pine' || slug === 'tree-broadleaf' || slug === 'tree-dead-snag') return 'longest-axis-to-y';
   if (slug === 'lantern-post' || slug === 'weather-vane') return 'longest-axis-to-y';
-  if (slug.startsWith('shrine-')) return 'preserve-y-up-x-front-to-z';
+  if (slug.startsWith('shrine-') || slug.startsWith('cave-mouth-')) return 'preserve-y-up-x-front-to-z';
   if (slug.startsWith('creature-') && slug !== 'creature-driftjelly') return 'preserve-y-up-neg-x-front-to-z';
   void asset;
   return 'preserve-y-up';
@@ -248,6 +251,11 @@ function socketProfileFor(slug: string, family: KilnViewerFamily, asset?: KilnMa
   }
   if (slug.startsWith('crater-')) {
     return { role: 'skyfall crater shell', grid: 'single-hex terrain dressing', footprint: 5.25, height: 1.15, ringColor: 0xffbd75 };
+  }
+  if (slug.startsWith('cave-mouth-')) {
+    const height = slug === 'cave-mouth-arch' ? 1.35 : slug === 'cave-mouth-sea' ? 1.05 : 1.0;
+    const footprint = slug === 'cave-mouth-arch' ? 2.55 : slug === 'cave-mouth-sea' ? 2.35 : 2.2;
+    return { role: 'cave-mouth dressing skin', grid: 'carved cave signal socket', footprint, height, ringColor: 0x88d7d0 };
   }
   if (slug === 'shore-net') return { role: 'shoreline utility', grid: 'edge-aligned shore socket', footprint: 3.6, height: 2.4, ringColor: 0x87d9e8 };
   if (slug === 'dock-segment') return { role: 'waterline build socket', grid: 'edge-aligned shore socket', footprint: 4.7, height: 1.8, ringColor: 0x87d9e8 };

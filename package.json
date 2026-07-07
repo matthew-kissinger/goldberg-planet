@@ -27,6 +27,7 @@
     "proof:k6-creatures": "node scripts/proof-k6-creature-skins.mjs",
     "proof:k6r-roaming": "node scripts/proof-k6r-native-roaming.mjs",
     "proof:k7-wonders": "node scripts/proof-k7-wonder-skins.mjs",
+    "proof:cave-mouth-dressing": "node scripts/proof-cave-mouth-dressing.mjs",
     "proof:k9-fish-visuals": "node scripts/proof-k9-fish-visuals.mjs",
     "proof:k11-sky-life": "node scripts/proof-k11-sky-life.mjs",
     "proof:k7-native-targeting": "node scripts/proof-k7-native-creature-targeting.mjs",

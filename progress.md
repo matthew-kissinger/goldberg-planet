@@ -3,6 +3,16 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-07
 
+- Promoted and wired the three cave-mouth GLBs instead of leaving them as unused
+  references. `public/assets/kiln/models/` now contains 73 committed GLBs, the manifest is
+  73 ready / 0 unused / 0 missing, and `CaveMouthRenderer` reports
+  `visualPolicy = glb-skin-over-carved-void`. Dry, sea, and arch mouth signals now request
+  `cave-mouth-dry`, `cave-mouth-sea`, and `cave-mouth-arch` from committed model paths,
+  attach them as skins over the carved cave signal, keep shadow cuts/tide/spring/route
+  glyphs as code-owned overlays/fallback, and reject `assets/kiln/generated/` runtime
+  requests in `npm run proof:cave-mouth-dressing`. Sidecar asset audit now ranks the
+  remaining visual debt as house shell skins first, generic non-wood/non-rock pickups
+  second, and player equipment/avatar props third.
 - Diagnosed the confusing first-spawn ground cluster. Fresh empty-profile and
   `nosave/resetSave` probes both reported `resourceDrops.count = 0`, so the apparent
   plank/ore object was not `drop-wood-logs`, `drop-ore-chunk`, or a persisted GLB pickup
@@ -54,9 +64,9 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   all three crater GLBs with zero fallback, zero generated-path runtime requests, and
   screenshots under `output/playwright/k7-wonder-skins/`.
 - Expanded the Kiln alignment viewer for the accepted K7 subset. The `structures`
-  family now includes `cave-anchor`, the `wonders` family covers shrine and crater
-  shells, and `adopted` now proves all 70 ready GLBs. `npm run
-  proof:kiln-asset-viewer` passes with 10 overview screenshots, all 70 ready
+  family now includes `cave-anchor`, the `wonders` family covers shrine, crater, and
+  cave-mouth shells, and `adopted` now proves all 73 ready GLBs. `npm run
+  proof:kiln-asset-viewer` passes with 10 overview screenshots, all 73 ready
   single-asset screenshots, zero page/console errors, and zero generated-path runtime
   requests.
 - Closed the H5/K4 utility and waterline GLB adoption slice. `compost-bin`,
@@ -70,7 +80,7 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   `output/playwright/k4-utility-structure-skins/`.
 - Repaired the Kiln alignment viewer overview layout for the expanded structure family.
   Structures now wrap to six columns by default instead of flattening into one unreadable
-  row, and `npm run proof:kiln-asset-viewer` passes for 54 adopted GLBs, all 70 ready
+  row, and `npm run proof:kiln-asset-viewer` passes for the committed ready pack's
   single-asset screenshots, zero page/console errors, and zero generated-path runtime
   requests.
 - Closed the K3 camp/home prop skin slice. `workbench`, `campfire`, `chest`, `bedroll`,
@@ -116,10 +126,10 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   shells remain future C6 work.
 - Promoted and wired the K11 singleton bird pack. `bird-sky-kite`, `bird-shore-gull`,
   `bird-forest-flutter`, and `bird-storm-finch` now live under committed
-  `public/assets/kiln/models/`, and the manifest is rebuilt at 73 total records: 70 ready,
-  3 unused cave-mouth records. `KilnRuntimeAssets` preserves Y-up, normalizes each bird
-  into a sky-life body socket, requires `idle` plus `flap` or `glide`, and reports
-  clip/fit/mixer-band diagnostics.
+  `public/assets/kiln/models/`. After the cave-mouth correction, the manifest is rebuilt at
+  73 total records: 73 ready, 0 unused, and 0 missing. `KilnRuntimeAssets` preserves Y-up,
+  normalizes each bird into a sky-life body socket, requires `idle` plus `flap` or `glide`,
+  and reports clip/fit/mixer-band diagnostics.
 - Added `SkyLifeRenderer` plus `skyLifeSitesAround`. Nearby weather, shore, forest, and
   high-sky cues choose visual-only bird sites; the renderer draws a few distance-gated
   animated GLB anchors and point flocks for the rest, with procedural birds only as
@@ -128,8 +138,8 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 - Added `npm run proof:k11-sky-life`. With `NODE_PATH` pointed at the existing Playwright
   install, it proves all four promoted bird GLBs load from committed models, zero
   generated-path requests occur, fallback stays at zero, and screenshots land under
-  `output/playwright/k11-sky-life/`. The full alignment viewer proof now covers 70 ready
-  assets, 9 overview screenshots including `birds`, and 70 per-asset screenshots.
+  `output/playwright/k11-sky-life/`. The full alignment viewer proof now covers 73 ready
+  assets, 9 overview screenshots including `birds`, and 73 per-asset screenshots.
 - Promoted and wired the corrected K9 aquatic singleton bodies. `fish-shore-minnow`,
   `fish-storm-runner`, `fish-cave-shimmer`, `fish-reed-fry`, and `creature-driftjelly` now
   live under committed `public/assets/kiln/models/`. The old generated
@@ -193,12 +203,12 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   orientation metadata, and wiring warnings for modular-kit, mesh, material, triangle, and
   axis risks.
 - Expanded `npm run proof:kiln-asset-viewer` into the repeatable reviewer packet: it loads
-  all 70 ready GLBs from committed `assets/kiln/models/`, captures 9 overview screenshots
-  plus 70 single-asset screenshots under `output/playwright/kiln-asset-viewer/assets/`,
+  all 73 ready GLBs from committed `assets/kiln/models/`, captures 9 overview screenshots
+  plus 73 single-asset screenshots under `output/playwright/kiln-asset-viewer/assets/`,
   writes per-slug socket/fit diagnostics to `proof.json`, rejects `generated/` runtime
   requests, and passed with zero page/console errors and nonblank PNG pixel probes.
 - Promoted full approved Kiln pack adoption to a goal-level Hearth and Horizon track. H4
-  remains the intake/proof gate, while new H5 treats the 70 ready GLBs as the target visual
+  remains the intake/proof gate, while new H5 treats the 73 ready GLBs as the target visual
   backlog for replacing janky procedural world art across pickups, rocks/resource nodes,
   home props, waterline utilities, trees, creatures, landmarks, and remaining modular kits.
   The current craftable plane is the explicit exception because it already reads well.
@@ -480,19 +490,19 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   supper/trail-focus effects, screenshot pixels, and page/console cleanliness.
 - Reconciled the parallel Kiln Drop 1 branch into the H4 DAG node instead of treating it
   as a competing source of truth. Local `main` now carries the promoted pack with
-  `public/assets/kiln/ASSET_MANIFEST.json`, 70 committed GLBs under
-  `public/assets/kiln/models/`, and 3 unused cave-mouth records that stay rejected for
-  runtime because carved terrain entrances are stronger.
+  `public/assets/kiln/ASSET_MANIFEST.json`, 73 committed GLBs under
+  `public/assets/kiln/models/`, and no unused records; cave-mouth GLBs are runtime skins
+  over carved cave signals.
 - Hardened `npm run proof:kiln-assets` as the authoritative promoted-pack gate. The proof
   now validates manifest/model parity, GLB headers and lengths, animation metadata, palette
-  ids, cave-mouth rejection, modular-kit wiring risk, tracked raw-drop hygiene, and local
-  generated provenance when present. Current result: 70 curated assets accepted, 5.92 MiB,
-  29 runtime pilot candidates, 41 deferred, 3 rejected, 27 warnings, 0 failures.
+  ids, cave-mouth GLB promotion, modular-kit wiring risk, tracked raw-drop hygiene, and
+  local generated provenance when present. Current result: 73 curated assets accepted,
+  6.56 MiB, 0 runtime rejections, and no generated-path runtime use.
 - Merged the stale asset handoff into one canonical doc at `docs/kiln-asset-intake.md`.
   `public/assets/kiln/HANDOFF.md` is now only a pointer. The doc records the promotion
   order, source-of-truth split between proof/promote/build-manifest helpers, modular
-  house-kit snap risk, cave-mouth rejection, creature AnimationMixer follow-up, and the
-  room-for-wonder lane.
+  house-kit snap risk, cave-mouth GLB-over-carved-signal wiring, creature AnimationMixer
+  follow-up, and the room-for-wonder lane.
 - Wired the first constrained runtime pilot: `waystone` loads through
   `src/render/kilnAssets.ts` as a manifest-driven decorative shell on top of the existing
   procedural waystone socket. The code hides only `waystoneBase`, `waystoneCore`, and

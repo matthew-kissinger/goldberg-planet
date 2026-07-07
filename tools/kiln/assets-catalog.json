@@ -598,8 +598,7 @@
       "role": "poi",
       "tier": "standard",
       "footprint": "landmark",
-      "prompt": "A weathered stone cave-entrance arch: two leaning rock piers and a lintel, mossy rugged rock, a natural gateway.",
-      "unused": true
+      "prompt": "A weathered stone cave-entrance arch: two leaning rock piers and a lintel, mossy rugged rock, a natural gateway."
     },
     {
       "slug": "cave-mouth-dry",
@@ -608,8 +607,7 @@
       "role": "poi",
       "tier": "standard",
       "footprint": "landmark",
-      "prompt": "A rocky cave mouth framed by rugged stone lips with a stacked-stone cairn marker beside the opening.",
-      "unused": true
+      "prompt": "A rocky cave mouth framed by rugged stone lips with a stacked-stone cairn marker beside the opening."
     },
     {
       "slug": "cave-mouth-sea",
@@ -618,8 +616,7 @@
       "role": "poi",
       "tier": "standard",
       "footprint": "landmark",
-      "prompt": "A sea-cave mouth in wet dark rock with a stacked-stone cairn and a horizontal tide-line mark.",
-      "unused": true
+      "prompt": "A sea-cave mouth in wet dark rock with a stacked-stone cairn and a horizontal tide-line mark."
     },
     {
       "slug": "tree-pine",

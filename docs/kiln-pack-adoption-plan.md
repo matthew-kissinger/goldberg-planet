@@ -60,10 +60,9 @@ scene graphs. The default implementation target is:
 
 ## Scope
 
-The current promoted pack contains 70 ready GLBs plus 3 unused cave-mouth records. The
-adoption goal is to use the 70 ready assets broadly across the game and to revisit the
-cave-mouth assets as possible dressing or regeneration references instead of silently
-forgetting them.
+The current promoted pack contains 73 ready GLBs and 0 unused records. The adoption goal is
+to use the approved assets broadly across the game, including the three cave-mouth GLBs as
+runtime dressing skins over real carved cave signals.
 
 ## Rollout Waves
 
@@ -79,7 +78,7 @@ forgetting them.
 | K6 native creatures | all `creature-*` GLBs | `NativeLifeRenderer` plus native-life/combat sim | Passing first slice: `npm run proof:k6-creatures` loads all nine committed creature GLBs, requires idle/walk clips, distance-gates mixers, proves tend/ward responses, captures desktop/phone screenshots, and rejects `generated/` runtime requests |
 | K6T native targetability | Native creature ray pick, tend/ward routing, HUD feedback, and occupied-tile placement blockers | `src/edit/pick.ts`, `src/main.ts`, native-life sim | Passing first slice: `npm run proof:k7-native-targeting` proves desktop and phone native targeting beats terrain mining, harmless and territorial interactions resolve, drops spawn or collect, and occupied native-life tiles block building |
 | K6R native roaming and ecology state | Harmless grazing/fleeing, territorial patrol/telegraph/recover, shore/cave/fish interactions, pathing across adjacent hexes, and animation state selection | Native-life sim plus `NativeLifeRenderer` | Passing first slice: `npm run proof:k6r-roaming` proves visible creatures derive stable roaming motion from deterministic home sites, move between valid nearby hexes, expose walk/idle clip hints, keep current-tile picking, use approved GLB skins, and avoid generated runtime requests |
-| K7 landmarks and wonder | `cave-anchor`, crater shells, shrines, cave-mouth dressing/reference | Structure, skyfall, landmark, cave-mouth, and route renderers | Passing for the approved pack: `cave-anchor`, `crater-emberfall`, `crater-glassrain`, `crater-starbloom`, and all 12 `shrine-*` landmark shells load as committed GLB skins while glyphs, route state, threshold overlays, skyfall beams, sparks, and reward timing stay code-owned. Cave-mouth GLBs remain superseded by carved terrain entrances |
+| K7 landmarks and wonder | `cave-anchor`, crater shells, shrines, cave-mouth dressing skins | Structure, skyfall, landmark, cave-mouth, and route renderers | Passing for the approved pack: `cave-anchor`, `crater-emberfall`, `crater-glassrain`, `crater-starbloom`, all 12 `shrine-*` landmark shells, and the three `cave-mouth-*` shells load as committed GLB skins while glyphs, route state, threshold overlays, carved-void cues, skyfall beams, sparks, and reward timing stay code-owned. `npm run proof:cave-mouth-dressing` proves dry, sea, and arch mouths request committed cave-mouth GLBs, keep procedural route overlays, and do not leak generated runtime requests |
 | K8 remaining modular kits | door/window/roof already started; expand to any remaining build pieces | `StructureRenderer` and build sockets | Measured fit, socket-local preview, fallback, and room/shelter proof for each modular family |
 | K9 aquatic life and fish visibility | Generated Kiln single fish bodies: shore minnow, storm runner, cave shimmer, reed fry, plus a single driftjelly body over existing fishing systems | Fishing sim, waterline structures, `FishSchoolRenderer`, `KilnRuntimeAssets` | Passing first slice: corrected singleton fish are promoted to `models/`, fish-school state selects the matching body, the renderer shows up to two animated GLB anchors plus a point school, mixers are distance-gated, and `npm run proof:k9-fish-visuals` proves the cave-shimmer GLB loads from committed assets with fallback at zero |
 | K11 sky life and biome expansion | Promoted Kiln singleton bird bodies and future new-biome tree variants | `SkyLifeRenderer`, `KilnRuntimeAssets`, weather/shore/forest site selection | Passing first slice: four bird bodies are promoted to `models/`, reviewed in the asset viewer, selected from sky/shore/forest/storm cues, rendered as a few distance-gated animated GLB anchors plus point flocks, and `npm run proof:k11-sky-life` proves all four committed bird GLBs load with fallback at zero |
@@ -114,7 +113,7 @@ The asset-pack adoption track is done when:
   direction, local `+Z` as tile-forward tangent, center-XZ/bottom-Y pivots, socket rings,
   bounds, orientation metadata, and review warnings for modular-kit, mesh-count, material,
   triangle, and axis-correction risk.
-- `npm run proof:kiln-asset-viewer` covers 9 overview screenshots plus 70 single-asset
+- `npm run proof:kiln-asset-viewer` covers 9 overview screenshots plus 73 single-asset
   screenshots under `output/playwright/kiln-asset-viewer/assets/`, proves every ready GLB
   is requested from committed `assets/kiln/models/`, rejects `generated/` runtime requests,
   and writes `proof.json` with per-slug fit/socket diagnostics.
@@ -238,6 +237,14 @@ The asset-pack adoption track is done when:
   model paths, and `npm run proof:k7-wonders` proves all three crater GLBs plus all 12
   shrine GLBs with zero fallback, zero `generated/` runtime requests, and surface/skin
   up-plus-forward alignment gates.
+- Cave-mouth records are now explicit K7 runtime GLB dressing, not rejected references.
+  `CaveMouthRenderer` reports `visualPolicy: glb-skin-over-carved-void`, requests
+  `cave-mouth-arch`, `cave-mouth-dry`, and `cave-mouth-sea` from committed
+  `assets/kiln/models/`, and keeps low shadow cuts, tide/spring marks, and route glyphs as
+  code-owned overlays/fallback. `npm run proof:cave-mouth-dressing` spawns beside dry, sea,
+  and arch mouths on desktop and phone, captures screenshots, asserts target GLB visibility
+  with zero pending/fallback after load, asserts `standingMarkers = 0`, and rejects
+  `assets/kiln/generated/` runtime requests.
 - Hex terrain material variety now stays in the procedural/material lane. `src/render/palette.ts`
   uses deterministic per-material swatch ramps for grass, dirt, rock, sand, snow, bedrock,
   built blocks, seabed, and wood while preserving the single shared vertex-color material.
@@ -403,10 +410,8 @@ shader, or instanced runtime systems keyed to the palette.
 
 These are still procedural or code-authored, with different reasons:
 
-- **Approved-pack GLBs not yet runtime-wired**: none. All 70 ready GLBs are adopted
-  as runtime skins, runtime dressing, or explicit code-owned/superseded decisions. The
-  3 cave-mouth records remain intentionally unused because carved terrain entrances read
-  better than small decorative arch props in the current cave system.
+- **Approved-pack GLBs not yet runtime-wired**: none. All 73 ready GLBs are adopted
+  as runtime skins or runtime dressing, including cave-mouth skins over carved cave signals.
 - **Intentional code-owned systems**: terrain hex materials, block faces, mining cracks,
   water, sky, route ribbons, telegraph rings, warmth/light/glow overlays, particles, and
   house snap/collision/enclosure sockets. These should stay procedural/material/shader
@@ -424,6 +429,11 @@ These are still procedural or code-authored, with different reasons:
   shared-scale house shell skins, K10 additional drop/ore expansion after item taxonomy,
   avatar/equipment authored assets, and optional future wonder/cave dressing beyond the
   current approved pack.
+
+Current sidecar asset audit priority, 2026-07-07: house shell pieces are the highest
+player-facing visual debt, generic non-wood/non-rock pickup drops are next, and player-held
+equipment/avatar props follow. Cave mouths are no longer the highest-risk asset gap unless
+future playtest screenshots show the embedded terrain threshold still failing to read.
 
 ## Next Critical Slice
 

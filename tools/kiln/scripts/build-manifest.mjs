@@ -42,9 +42,9 @@ const REPLACES = {
   'weather-vane': 'src/render/structures.ts makeWeatherVane() with spinning needle overlay retained',
   'lantern-post': 'src/render/structures.ts makeLantern()',
   waystone: 'src/render/structures.ts makeWaystone() with attuned route glyph overlays retained',
-  'cave-mouth-arch': 'src/render/caveMouths.ts makeMouth() [arch] retained; GLB rejected by manifest',
-  'cave-mouth-dry': 'src/render/caveMouths.ts makeMouth() [dryCave] retained; GLB rejected by manifest',
-  'cave-mouth-sea': 'src/render/caveMouths.ts makeMouth() [seaCave] retained; GLB rejected by manifest',
+  'cave-mouth-arch': 'src/render/caveMouths.ts makeMouth() [arch] as GLB skin over carved cave signal',
+  'cave-mouth-dry': 'src/render/caveMouths.ts makeMouth() [dryCave] as GLB skin over carved cave signal',
+  'cave-mouth-sea': 'src/render/caveMouths.ts makeMouth() [seaCave] as GLB skin over carved cave signal',
 };
 
 function replacementFor(a) {
@@ -149,7 +149,6 @@ for (const a of CATALOG.assets) {
 }
 
 function unusedReason(slug) {
-  if (slug.startsWith('cave-mouth-')) return 'Caves are real carved voxel voids; a hex-sized arch prop reads as a small door inside a bigger hole. Keep the bare carved entrance.';
   if (slug === 'roof-bundle') return 'Text-to-3D repeatedly hallucinated a whole house from the word "roof". Procedural plank panels are cleaner. (Revisit if the wedge version passes review.)';
   return 'Left to existing procedural geometry — Kiln fights this shape.';
 }

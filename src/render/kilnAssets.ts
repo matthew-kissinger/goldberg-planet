@@ -6,6 +6,7 @@ import type { FishSchoolKind } from '../sim/fishing';
 import type { PentagonExpeditionSiteKind } from '../sim/landmarks';
 import type { NativeCreatureKind } from '../sim/nativeLife';
 import type { SkyfallKind } from '../sim/skyfall';
+import type { NaturalVoidKind } from '../world/caves';
 import type { TreeVisualKind } from '../world/trees';
 
 export type KilnStructureSkinSlug =
@@ -79,6 +80,7 @@ export type KilnLandmarkSkinSlug =
   | 'shrine-reed-crown'
   | 'shrine-deep-bell'
   | 'shrine-last-horizon';
+export type KilnCaveMouthSkinSlug = 'cave-mouth-arch' | 'cave-mouth-dry' | 'cave-mouth-sea';
 
 type KilnAssetStatus = 'ready' | 'unused' | 'missing';
 
@@ -204,6 +206,10 @@ export interface KilnAssetSnapshot {
   landmarkSkins?: {
     enabled: readonly KilnLandmarkSkinSlug[];
     loaded: readonly KilnLandmarkSkinSlug[];
+  };
+  caveMouthSkins?: {
+    enabled: readonly KilnCaveMouthSkinSlug[];
+    loaded: readonly KilnCaveMouthSkinSlug[];
   };
 }
 
@@ -499,6 +505,39 @@ export interface KilnLandmarkSkinTemplate {
 
 export interface LandmarkSkinProvider {
   createLandmarkSkinTemplate(slug: KilnLandmarkSkinSlug): Promise<KilnLandmarkSkinTemplate | null>;
+  snapshot?(): KilnAssetSnapshot;
+}
+
+export interface KilnCaveMouthSkinFitSnapshot {
+  slug: KilnCaveMouthSkinSlug;
+  kind: NaturalVoidKind;
+  socketRole: 'cave-mouth-dressing';
+  sourceBboxSize: readonly number[];
+  runtimeSourceBboxSize: readonly number[];
+  orientedSourceBboxSize: readonly number[];
+  normalizedBboxSize: readonly number[];
+  normalizePolicy: 'center-xz-bottom-y-fit-footprint-height';
+  orientation: KilnInstancedOrientationSnapshot;
+  animationPolicy: 'static-glb-with-procedural-route-overlays';
+  sourceUrl: string;
+  sourceMeshCount: number;
+  materialCount?: number;
+  targetFootprint: number;
+  targetHeight: number;
+  acceptanceNote: string;
+}
+
+export interface KilnCaveMouthSkinTemplate {
+  slug: KilnCaveMouthSkinSlug;
+  kind: NaturalVoidKind;
+  manifest: KilnManifestAsset;
+  sourceUrl: string;
+  template: THREE.Object3D;
+  fit: KilnCaveMouthSkinFitSnapshot;
+}
+
+export interface CaveMouthSkinProvider {
+  createCaveMouthSkinTemplate(slug: KilnCaveMouthSkinSlug): Promise<KilnCaveMouthSkinTemplate | null>;
   snapshot?(): KilnAssetSnapshot;
 }
 
@@ -1181,6 +1220,32 @@ const RUNTIME_LANDMARK_SKINS: Record<KilnLandmarkSkinSlug, {
   },
 };
 
+const RUNTIME_CAVE_MOUTH_SKINS: Record<KilnCaveMouthSkinSlug, {
+  kind: NaturalVoidKind;
+  targetFootprint: number;
+  targetHeight: number;
+  acceptanceNote: string;
+}> = {
+  'cave-mouth-arch': {
+    kind: 'arch',
+    targetFootprint: 2.55,
+    targetHeight: 1.35,
+    acceptanceNote: 'accepted as land-arch cave-mouth shell; carved void, route glyph, spring/tide cues, and traversal state remain code-authored',
+  },
+  'cave-mouth-dry': {
+    kind: 'dryCave',
+    targetFootprint: 2.2,
+    targetHeight: 1.0,
+    acceptanceNote: 'accepted as dry-cave mouth shell; carved void, spring seep, route glyph, and cave-pressure state remain code-authored',
+  },
+  'cave-mouth-sea': {
+    kind: 'seaCave',
+    targetFootprint: 2.35,
+    targetHeight: 1.05,
+    acceptanceNote: 'accepted as sea-cave mouth shell; flooded opening, tide line, route glyph, and waterline state remain code-authored',
+  },
+};
+
 function publicAssetUrl(relativePath: string, base = import.meta.env.BASE_URL || '/'): string {
   const cleanBase = base.endsWith('/') ? base : `${base}/`;
   return `${cleanBase}${relativePath.replace(/^\/+/, '')}`;
@@ -1831,7 +1896,7 @@ function normalizeLandmarkTemplate(source: THREE.Object3D, slug: string, targetF
   };
 }
 
-export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSkinProvider, DomainResourceSkinProvider, TreeSkinProvider, CreatureSkinProvider, FishSkinProvider, BirdSkinProvider, SkyfallSkinProvider, LandmarkSkinProvider {
+export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSkinProvider, DomainResourceSkinProvider, TreeSkinProvider, CreatureSkinProvider, FishSkinProvider, BirdSkinProvider, SkyfallSkinProvider, LandmarkSkinProvider, CaveMouthSkinProvider {
   private readonly enabled = new Set<KilnStructureSkinSlug>([
     'waystone',
     'cave-anchor',
@@ -1912,6 +1977,11 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
     'shrine-deep-bell',
     'shrine-last-horizon',
   ]);
+  private readonly enabledCaveMouthSkins = new Set<KilnCaveMouthSkinSlug>([
+    'cave-mouth-arch',
+    'cave-mouth-dry',
+    'cave-mouth-sea',
+  ]);
   private readonly loader = new GLTFLoader();
   private readonly loaded = new Set<KilnStructureSkinSlug>();
   private readonly loadedResourceDrops = new Set<KilnResourceDropSkinSlug>();
@@ -1922,6 +1992,7 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
   private readonly loadedBirdSkins = new Set<KilnBirdSkinSlug>();
   private readonly loadedSkyfallSkins = new Set<KilnSkyfallSkinSlug>();
   private readonly loadedLandmarkSkins = new Set<KilnLandmarkSkinSlug>();
+  private readonly loadedCaveMouthSkins = new Set<KilnCaveMouthSkinSlug>();
   private readonly failed: string[] = [];
   private readonly modelRequests: string[] = [];
   private manifestPromise: Promise<KilnManifest | null> | null = null;
@@ -1935,6 +2006,7 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
   private readonly birdTemplates = new Map<KilnBirdSkinSlug, Promise<KilnBirdSkinTemplate | null>>();
   private readonly skyfallTemplates = new Map<KilnSkyfallSkinSlug, Promise<KilnSkyfallSkinTemplate | null>>();
   private readonly landmarkTemplates = new Map<KilnLandmarkSkinSlug, Promise<KilnLandmarkSkinTemplate | null>>();
+  private readonly caveMouthTemplates = new Map<KilnCaveMouthSkinSlug, Promise<KilnCaveMouthSkinTemplate | null>>();
   private readonly baseUrl: string;
 
   readonly manifestUrl: string;
@@ -1998,6 +2070,10 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
     return this.loadLandmarkTemplate(slug);
   }
 
+  async createCaveMouthSkinTemplate(slug: KilnCaveMouthSkinSlug): Promise<KilnCaveMouthSkinTemplate | null> {
+    return this.loadCaveMouthTemplate(slug);
+  }
+
   snapshot(): KilnAssetSnapshot {
     return {
       enabled: [...this.enabled],
@@ -2043,6 +2119,10 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
       landmarkSkins: {
         enabled: [...this.enabledLandmarkSkins],
         loaded: [...this.loadedLandmarkSkins],
+      },
+      caveMouthSkins: {
+        enabled: [...this.enabledCaveMouthSkins],
+        loaded: [...this.loadedCaveMouthSkins],
       },
     };
   }
@@ -2608,6 +2688,61 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
       });
 
     this.landmarkTemplates.set(slug, promise);
+    return promise;
+  }
+
+  private loadCaveMouthTemplate(slug: KilnCaveMouthSkinSlug): Promise<KilnCaveMouthSkinTemplate | null> {
+    if (!this.enabledCaveMouthSkins.has(slug)) return Promise.resolve(null);
+    const existing = this.caveMouthTemplates.get(slug);
+    if (existing) return existing;
+
+    const promise = this.loadManifest()
+      .then(async (manifest) => {
+        const asset = manifest?.assets?.find((entry) => entry.slug === slug);
+        if (!asset || asset.status !== 'ready' || !asset.file) {
+          this.failed.push(`${slug}: missing ready manifest record`);
+          return null;
+        }
+        const sourceUrl = publicAssetUrl(`assets/kiln/${asset.file}`, this.baseUrl);
+        this.modelRequests.push(sourceUrl);
+        const gltf = await this.loader.loadAsync(sourceUrl);
+        const mouth = RUNTIME_CAVE_MOUTH_SKINS[slug];
+        const { template, runtimeSourceBboxSize, orientedSourceBboxSize, normalizedBboxSize, sourceMeshCount, orientation } =
+          normalizeLandmarkTemplate(gltf.scene as unknown as THREE.Object3D, slug, mouth.targetFootprint, mouth.targetHeight, []);
+        this.loadedCaveMouthSkins.add(slug);
+        const fit: KilnCaveMouthSkinFitSnapshot = {
+          slug,
+          kind: mouth.kind,
+          socketRole: 'cave-mouth-dressing',
+          sourceBboxSize: sourceBboxSize(asset),
+          runtimeSourceBboxSize,
+          orientedSourceBboxSize,
+          normalizedBboxSize,
+          normalizePolicy: 'center-xz-bottom-y-fit-footprint-height',
+          orientation,
+          animationPolicy: 'static-glb-with-procedural-route-overlays',
+          sourceUrl,
+          sourceMeshCount,
+          materialCount: asset.geometry?.materialCount,
+          targetFootprint: mouth.targetFootprint,
+          targetHeight: mouth.targetHeight,
+          acceptanceNote: mouth.acceptanceNote,
+        };
+        return {
+          slug,
+          kind: mouth.kind,
+          manifest: asset,
+          sourceUrl,
+          template,
+          fit,
+        };
+      })
+      .catch((err: unknown) => {
+        this.failed.push(`${slug}: ${err instanceof Error ? err.message : String(err)}`);
+        return null;
+      });
+
+    this.caveMouthTemplates.set(slug, promise);
     return promise;
   }
 }
