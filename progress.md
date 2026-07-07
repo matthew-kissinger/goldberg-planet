@@ -3,6 +3,22 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-07
 
+- Advanced E4 from staged route-adjacent waterline prep into route-arrival consumption.
+  When a saved Horizon Chart route reaches its target, the game now recomputes eligible
+  ready fish traps and shore nets along the completed origin/target corridor, clears those
+  trap/net set timers, increments their check counters, marks the save dirty, and reports
+  `waterline resupply spent` in the route-arrival readback without awarding duplicate
+  inventory.
+- Added `consumeWaterlineRouteResupply()` in `src/sim/structures.ts` with focused structure
+  coverage proving wrong-kind IDs, duplicate source IDs, unset nets, and off-route traps
+  are not accidentally consumed. The runtime wiring keeps source selection in `src/main.ts`
+  and leaves the pure route-corridor math in `src/sim/navigation.ts`.
+- Expanded `proof:e4-ecology-route` again: the five-profile browser proof now seeds an
+  active saved route plan, imports the player at the target, waits for the normal arrival
+  tick, asserts the route trap/net were spent, asserts distinct off-route trap/net sources
+  remain ready, restores the ready pre-arrival state for the visible Route Slate screenshot,
+  and records `arrivalLastAction` plus `arrivalConsumed` in
+  `output/playwright/e4-ecology-route/proof.json`.
 - Advanced E4 from global capped resupply to route-adjacent waterline staging. The
   expedition plan now counts ready fish traps and shore nets only when their tile sits at
   the route origin, destination, or along the active great-circle route corridor; ready

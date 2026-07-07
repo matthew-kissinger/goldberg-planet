@@ -119,6 +119,20 @@ export interface FishTrapContext {
   school: FishSchoolReport;
 }
 
+export type WaterlineRouteResupplyKind = 'fishTrap' | 'shoreNet';
+
+export interface WaterlineRouteResupplySource {
+  id: number;
+  kind: WaterlineRouteResupplyKind;
+}
+
+export interface WaterlineRouteResupplyConsumption {
+  consumed: number;
+  traps: number;
+  nets: number;
+  sourceIds: number[];
+}
+
 export interface CropPlotEnvironment {
   watered: boolean;
   naturalWater?: boolean;
@@ -1420,6 +1434,46 @@ function clearNetSetState(net: StructureSave): void {
   delete next.netSetDay;
   delete next.netSetMinute;
   net.state = Object.keys(next).length > 0 ? next : undefined;
+}
+
+export function consumeWaterlineRouteResupply(
+  structures: StructureSave[],
+  sources: readonly WaterlineRouteResupplySource[],
+): WaterlineRouteResupplyConsumption {
+  const trapIds = new Set<number>();
+  const netIds = new Set<number>();
+  for (const source of sources) {
+    const id = Math.max(0, Math.trunc(source.id));
+    if (id <= 0) continue;
+    if (source.kind === 'fishTrap') trapIds.add(id);
+    else if (source.kind === 'shoreNet') netIds.add(id);
+  }
+
+  const consumedIds: number[] = [];
+  let traps = 0;
+  let nets = 0;
+  for (const structure of structures) {
+    if (structure.item === 'fishTrap' && trapIds.has(structure.id) && structure.state?.trapSetDay !== undefined) {
+      const checks = Math.max(0, Math.trunc(structure.state?.trapChecks ?? 0)) + 1;
+      clearTrapSetState(structure);
+      structure.state = { ...structure.state, trapChecks: checks };
+      consumedIds.push(structure.id);
+      traps++;
+    } else if (structure.item === 'shoreNet' && netIds.has(structure.id) && structure.state?.netSetDay !== undefined) {
+      const checks = Math.max(0, Math.trunc(structure.state?.netChecks ?? 0)) + 1;
+      clearNetSetState(structure);
+      structure.state = { ...structure.state, netChecks: checks };
+      consumedIds.push(structure.id);
+      nets++;
+    }
+  }
+
+  return {
+    consumed: traps + nets,
+    traps,
+    nets,
+    sourceIds: consumedIds,
+  };
 }
 
 function useShoreNet(net: StructureSave, craftedItems?: InventoryItems, ctx?: FishTrapContext): StructureInteractionResult {

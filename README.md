@@ -287,9 +287,11 @@ same route becomes a high-altitude atlas overlay with bright arc dashes plus ori
 destination halos, so the planet itself reads as the map instead of only a local compass.
 Press `P` to pin the current route candidates into a saved itinerary: the first stop becomes
 the Route Slate primary, owns the route ribbon, and advances to the next saved stop when
-reached. Pressing `P` again can append a new distinct stop, `Shift+P` clears the itinerary,
-and the whole line survives save/export/import and appears in the Hearth Journal so a trip
-can be resumed after detours. `J` opens the Hearth Journal, a
+reached. Ready route-adjacent fish traps and shore nets can cover part of a long route's
+packed-food burden, and when that saved Horizon Chart route is reached the eligible staged
+sources are checked and cleared while off-route gear stays ready. Pressing `P` again can
+append a new distinct stop, `Shift+P` clears the itinerary, and the whole line survives
+save/export/import and appears in the Hearth Journal so a trip can be resumed after detours. `J` opens the Hearth Journal, a
 persistent in-game memory surface that gathers home quality, survival pressure, packed food,
 garden state, Route Slate prep, pentagon progress, domain resources, Skyfall, World Murmurs,
 caves, fish, and forage into short next-goal notes. If you have set a home bedroll, the Hearth Beacon reads home direction even

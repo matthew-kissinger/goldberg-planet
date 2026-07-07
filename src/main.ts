@@ -92,6 +92,7 @@ import {
   addStructure,
   caveAnchorKindLabel,
   chestStorageView,
+  consumeWaterlineRouteResupply,
   dismantleStructure as dismantlePlacedStructure,
   homeScore,
   interactStructure,
@@ -111,6 +112,7 @@ import {
   type FishTrapContext,
   type PlaceableItemId,
   type StructureSave,
+  type WaterlineRouteResupplySource,
   type WeatherVaneContext,
   type WaystoneContext,
 } from './sim/structures';
@@ -185,9 +187,11 @@ import {
   nextHorizonChartSignal,
   normalizeRoutePlan,
   planExpedition,
+  routeAdjacentTile,
   routeEcologyForExpedition,
   routeGuide,
   routeGuideCandidates,
+  routePlanItineraryStatus,
   routePlanSignal,
   routeSlate,
   type RouteGuide,
@@ -2917,6 +2921,40 @@ async function boot(): Promise<void> {
       };
     });
 
+  const waterlineRouteResupplySources = (originTile: number, targetTile: number): WaterlineRouteResupplySource[] => {
+    const origin = Math.max(0, Math.trunc(originTile));
+    const target = Math.max(0, Math.trunc(targetTile));
+    const adjacent = (tile: number) => routeAdjacentTile(geo.centers, origin, target, tile, PLANET_RADIUS);
+    const traps = fishTrapDiagnostics()
+      .filter((trap) => trap.ready && adjacent(trap.tile))
+      .map((trap) => ({ id: trap.id, kind: 'fishTrap' as const }));
+    const nets = shoreNetDiagnostics()
+      .filter((net) => net.ready && adjacent(net.tile))
+      .map((net) => ({ id: net.id, kind: 'shoreNet' as const }));
+    return [...traps, ...nets];
+  };
+
+  const consumeRouteArrivalWaterlineResupply = (): string => {
+    const status = routePlanItineraryStatus(activeRoutePlan);
+    if (!status || status.complete || status.active.reached === true) return '';
+    const active = status.active;
+    if (active.sourceKind !== 'target') return '';
+    const routeDistanceM = greatCircleDistanceMeters(geo.centers, active.originTile, active.targetTile, PLANET_RADIUS);
+    if (routeDistanceM < 650) return '';
+    const consumed = consumeWaterlineRouteResupply(
+      structures,
+      waterlineRouteResupplySources(active.originTile, active.targetTile),
+    );
+    if (consumed.consumed <= 0) return '';
+    structureRenderer.setStructures(structures);
+    const parts: string[] = [];
+    if (consumed.traps > 0) parts.push(`${consumed.traps} trap${consumed.traps === 1 ? '' : 's'}`);
+    if (consumed.nets > 0) parts.push(`${consumed.nets} net${consumed.nets === 1 ? '' : 's'}`);
+    const message = `waterline resupply spent: ${parts.join(' + ')}`;
+    lastFoodAction = `route arrival:${message}`;
+    return message;
+  };
+
   const tryEatPackedFood = (): boolean => {
     const result = eatBestFood(craftedItems, survivalState);
     lastSurvivalAction = result.message;
@@ -5209,14 +5247,16 @@ async function boot(): Promise<void> {
 
     const routeArrivalSignal = currentRoutePlanSignal();
     if (routeArrivalSignal?.arrived && !routeArrivalSignal.complete && !isSeasonActionRouteSignal(routeArrivalSignal)) {
+      const waterlineResupply = consumeRouteArrivalWaterlineResupply();
       const arrival = markRoutePlanLegReached(activeRoutePlan, timeState.day, timeState.minute);
       if (arrival.changed) {
         activeRoutePlan = arrival.plan;
-        lastNavigationAction = `route itinerary arrival: ${arrival.message}`;
+        const arrivalMessage = `${arrival.message}${waterlineResupply ? ` · ${waterlineResupply}` : ''}`;
+        lastNavigationAction = `route itinerary arrival: ${arrivalMessage}`;
         triggerCharacterAction('discover', arrival.complete ? 'horizonChart' : 'map', arrival.complete ? 0.8 : 0.58);
         playAudio(arrival.complete ? 'uiConfirm' : 'routeSlate');
         markSaveDirty();
-        hud.flash(arrival.message, arrival.complete ? 4.2 : 3.4);
+        hud.flash(arrivalMessage, waterlineResupply ? 4.8 : arrival.complete ? 4.2 : 3.4);
         hud.setRouteSlate(currentRouteSlate(), arrival.complete ? 7 : 5);
         if (journalOpen) hud.setJournal(currentHearthJournal(), true);
       }

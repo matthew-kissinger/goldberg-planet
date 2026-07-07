@@ -199,11 +199,12 @@ function foodCheck(plan) {
 }
 
 async function seedEcologyRoute(page) {
-  return page.evaluate(() => {
+  return page.evaluate(async () => {
     const world = window.__world;
     if (!world?.save?.export || !world?.save?.import || !world?.spawnAtPentagon || !world?.navigation || !world?.landmarks || !world?.nearbyTiles) {
       throw new Error('missing E4 ecology proof hooks');
     }
+    const afterFrames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
     world.spawnAtPentagon(0);
     const spawned = JSON.parse(world.save.export());
@@ -253,6 +254,18 @@ async function seedEcologyRoute(page) {
     const homeTile = world.player.tile;
     const ring = world.nearbyTiles(2).filter((tile) => tile !== homeTile);
     const pickTile = (offset) => ring[offset % ring.length] ?? homeTile;
+    const playerSaveAt = (tile) => {
+      world.player.spawnAt(Math.max(0, Math.min(Math.max(0, Math.trunc(world.geo?.count ?? 1) - 1), Math.trunc(tile))));
+      world.player.mode = 'walk';
+      world.player.vx = 0;
+      world.player.vy = 0;
+      world.player.vz = 0;
+      world.player.throttle = 0;
+      world.player.planeSpeed = 0;
+      return JSON.parse(world.save.export()).player;
+    };
+    const homePlayer = playerSaveAt(homeTile);
+    const targetPlayer = playerSaveAt(targetSignal.target.tile);
     const baseStructures = [
       { id: 1, item: 'bedroll', tile: homeTile, layer: 4, yaw: 0, state: { home: true } },
       { id: 2, item: 'roofBundle', tile: pickTile(0), layer: 4, yaw: 0 },
@@ -268,13 +281,23 @@ async function seedEcologyRoute(page) {
     const soakingTrapState = { trapSetDay: 6, trapSetMinute: 790, trapBaited: true, trapChecks: 0 };
     const soakingNetState = { netSetDay: 6, netSetMinute: 790, netChecks: 0 };
 
-    const saveFor = ({ ready, offRouteTile = null, routeGear = true }) => {
+    const routeLeg = {
+      targetTile: Math.trunc(targetSignal.target.tile),
+      sourceKind: 'target',
+      label: targetSignal.target.name,
+      detail: 'Horizon Chart waterline route',
+      originTile: homeTile,
+      setDay: 6,
+      setMinute: 800,
+    };
+
+    const saveFor = ({ ready, offRouteTile = null, offRouteNetTile = null, routeGear = true, activeRoute = false, playerAtTarget = false }) => {
       const save = JSON.parse(JSON.stringify(spawned));
-      save.player = JSON.parse(world.save.export()).player;
+      save.player = playerAtTarget ? targetPlayer : homePlayer;
       save.progression = {
         ...(save.progression ?? {}),
         pentagons: pentagons.filter((_, i) => i !== targetIndex),
-        routePlan: null,
+        routePlan: activeRoute ? { ...routeLeg, legs: [{ ...routeLeg }] } : null,
       };
       save.craftedItems = { ...routeFood, horizonChart: 1, stonePick: 1, stoneAxe: 1, echoLantern: 1 };
       save.planeCrafted = true;
@@ -305,7 +328,11 @@ async function seedEcologyRoute(page) {
       if (Number.isFinite(offRouteTile)) {
         save.structures.push(
           { id: 10, item: 'fishTrap', tile: Math.trunc(offRouteTile), layer: 4, yaw: 0.6, state: readyTrapState },
-          { id: 11, item: 'shoreNet', tile: Math.trunc(offRouteTile), layer: 4, yaw: 0.9, state: readyNetState },
+        );
+      }
+      if (Number.isFinite(offRouteNetTile)) {
+        save.structures.push(
+          { id: 11, item: 'shoreNet', tile: Math.trunc(offRouteNetTile), layer: 4, yaw: 0.9, state: readyNetState },
         );
       }
       return save;
@@ -319,6 +346,9 @@ async function seedEcologyRoute(page) {
       return {
         label,
         signal: nav.signal,
+        routePlan: nav.routePlan,
+        savedRoutePlan: nav.savedRoutePlan,
+        lastAction: nav.lastAction,
         plan: nav.plan,
         foodCheck: nav.plan.checks.find((check) => check.id === 'food'),
         slate: nav.slate,
@@ -328,7 +358,7 @@ async function seedEcologyRoute(page) {
       };
     };
 
-    const findOffRouteTile = () => {
+    const findOffRouteTiles = () => {
       const totalTiles = Math.max(0, Math.trunc(world.geo?.count ?? 0));
       const stride = Math.max(1, Math.floor(totalTiles / 180));
       const candidates = [
@@ -336,6 +366,7 @@ async function seedEcologyRoute(page) {
         ...Array.from({ length: Math.min(220, totalTiles) }, (_, index) => (index * stride) % Math.max(1, totalTiles)),
       ];
       const seen = new Set();
+      const found = [];
       for (const tile of candidates) {
         const t = Math.max(0, Math.min(Math.max(0, totalTiles - 1), Math.trunc(tile)));
         if (seen.has(t) || t === homeTile || t === targetSignal.target.tile) continue;
@@ -344,26 +375,37 @@ async function seedEcologyRoute(page) {
         if (!world.save.import(JSON.stringify(offRouteSave))) continue;
         const nav = world.navigation();
         const food = nav.plan?.checks?.find((check) => check.id === 'food')?.detail ?? '';
-        if (nav.plan?.missing?.includes('packed food') && food.includes('off-route')) return t;
+        if (nav.plan?.missing?.includes('packed food') && food.includes('off-route')) {
+          found.push(t);
+          if (found.length >= 2) return found;
+        }
       }
-      return null;
+      return found;
     };
 
-    const offRouteTile = findOffRouteTile();
+    const offRouteTiles = findOffRouteTiles();
+    const offRouteTile = offRouteTiles[0];
+    const offRouteNetTile = offRouteTiles[1];
     if (!Number.isFinite(offRouteTile)) throw new Error('could not find an off-route waterline staging tile');
+    if (!Number.isFinite(offRouteNetTile)) throw new Error('could not find a second off-route waterline staging tile');
 
-    const offRouteSave = saveFor({ ready: true, routeGear: false, offRouteTile });
+    const offRouteSave = saveFor({ ready: true, routeGear: false, offRouteTile, offRouteNetTile });
     if (!world.save.import(JSON.stringify(offRouteSave))) throw new Error('failed to import off-route waterline save');
     const offRoute = sample('off-route');
 
     const unreadySave = saveFor({ ready: false });
     if (!world.save.import(JSON.stringify(unreadySave))) throw new Error('failed to import unready waterline save');
     const unready = sample('unready');
-    const readySave = saveFor({ ready: true, offRouteTile });
+    const readySave = saveFor({ ready: true, offRouteTile, offRouteNetTile });
     if (!world.save.import(JSON.stringify(readySave))) throw new Error('failed to import ready waterline save');
     const ready = sample('ready');
+    const arrivalSave = saveFor({ ready: true, offRouteTile, offRouteNetTile, activeRoute: true, playerAtTarget: true });
+    if (!world.save.import(JSON.stringify(arrivalSave))) throw new Error('failed to import arrival waterline save');
+    await afterFrames();
+    const arrived = sample('arrived');
+    if (!world.save.import(JSON.stringify(readySave))) throw new Error('failed to restore ready waterline save');
 
-    return { targetIndex, targetName: targetSignal.target.name, offRouteTile, offRoute, unready, ready };
+    return { targetIndex, targetName: targetSignal.target.name, offRouteTile, offRouteNetTile, offRoute, unready, ready, arrived };
   });
 }
 
@@ -386,6 +428,24 @@ function assertEcologyRoute(result, name) {
   const netsReady = result.ready.structures.shoreNets.filter((net) => net.ready).length;
   if (trapsReady < 1 || netsReady < 1) throw new Error(`${name}: ready structure diagnostics missing trap/net readiness`);
   if (!JSON.stringify(result.ready.text).includes('waterline')) throw new Error(`${name}: render_game_to_text lacks waterline proof`);
+  if (!result.arrived.routePlan?.complete) throw new Error(`${name}: arrival did not complete the active route plan: ${JSON.stringify(result.arrived.routePlan)}`);
+  if (!String(result.arrived.lastAction || '').includes('waterline resupply spent')) throw new Error(`${name}: arrival readback lacks waterline consumption: ${result.arrived.lastAction}`);
+  const routeTrap = result.arrived.structures.fishTraps.find((trap) => trap.id === 8);
+  const routeNet = result.arrived.structures.shoreNets.find((net) => net.id === 9);
+  const offRouteTrap = result.arrived.structures.fishTraps.find((trap) => trap.id === 10);
+  const offRouteNet = result.arrived.structures.shoreNets.find((net) => net.id === 11);
+  if (!routeTrap || routeTrap.ready || routeTrap.state?.trapSetDay !== undefined || routeTrap.state?.trapChecks !== 1) {
+    throw new Error(`${name}: route trap was not consumed on arrival: ${JSON.stringify(routeTrap)}`);
+  }
+  if (!routeNet || routeNet.ready || routeNet.state?.netSetDay !== undefined || routeNet.state?.netChecks !== 1) {
+    throw new Error(`${name}: route net was not consumed on arrival: ${JSON.stringify(routeNet)}`);
+  }
+  if (!offRouteTrap?.ready || offRouteTrap.state?.trapSetDay === undefined || (offRouteTrap.state?.trapChecks ?? 0) !== 0) {
+    throw new Error(`${name}: off-route trap was disturbed by arrival: ${JSON.stringify(offRouteTrap)}`);
+  }
+  if (!offRouteNet?.ready || offRouteNet.state?.netSetDay === undefined || (offRouteNet.state?.netChecks ?? 0) !== 0) {
+    throw new Error(`${name}: off-route net was disturbed by arrival: ${JSON.stringify(offRouteNet)}`);
+  }
 }
 
 async function openVisibleRouteSlate(page, name, options = {}) {
@@ -478,15 +538,23 @@ async function runViewport(browser, url, name, viewport, options = {}) {
     screenshot,
     targetName: result.targetName,
     offRouteTile: result.offRouteTile,
+    offRouteNetTile: result.offRouteNetTile,
     targetDistance: result.ready.signal.distanceLabel,
     offRouteFood: result.offRoute.foodCheck.detail,
     unreadyFood: result.unready.foodCheck.detail,
     readyFood: result.ready.foodCheck.detail,
+    arrivalLastAction: result.arrived.lastAction,
     readyPrepLabel: result.ready.plan.prepLabel,
     routeText,
     ui,
     trapReady: result.ready.structures.fishTraps.filter((trap) => trap.ready).length,
     netReady: result.ready.structures.shoreNets.filter((net) => net.ready).length,
+    arrivalConsumed: {
+      trapChecks: result.arrived.structures.fishTraps.find((trap) => trap.id === 8)?.state?.trapChecks ?? 0,
+      netChecks: result.arrived.structures.shoreNets.find((net) => net.id === 9)?.state?.netChecks ?? 0,
+      offRouteTrapReady: result.arrived.structures.fishTraps.find((trap) => trap.id === 10)?.ready === true,
+      offRouteNetReady: result.arrived.structures.shoreNets.find((net) => net.id === 11)?.ready === true,
+    },
     pixelProbe: { canvas: canvasProbe, screenshot: screenshotProbe },
     consoleErrors,
     pageErrors,
@@ -540,9 +608,11 @@ try {
       offRouteFood: result.offRouteFood,
       unreadyFood: result.unreadyFood,
       readyFood: result.readyFood,
+      arrivalLastAction: result.arrivalLastAction,
       readyPrepLabel: result.readyPrepLabel,
       trapReady: result.trapReady,
       netReady: result.netReady,
+      arrivalConsumed: result.arrivalConsumed,
       consoleErrors: result.consoleErrors.length,
       pageErrors: result.pageErrors.length,
     })),

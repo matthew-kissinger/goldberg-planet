@@ -3,6 +3,7 @@ import {
   addStructure,
   caveAnchorKindLabel,
   chestStorageView,
+  consumeWaterlineRouteResupply,
   dismantleStructure,
   homeScore,
   interactStructure,
@@ -187,6 +188,31 @@ describe('Hearth and Horizon structures', () => {
       { id: 9, item: 'shoreNet', tile: 18, layer: 3, yaw: 0.5, state: { netSetDay: 2.8, netSetMinute: 70.9, netChecks: 3.5 } },
     ], 50, 8);
     expect(normalized).toEqual([{ id: 9, item: 'shoreNet', tile: 18, layer: 3, yaw: 0.5, state: { netSetDay: 2, netSetMinute: 70, netChecks: 3 } }]);
+  });
+
+  it('consumes staged waterline route sources without awarding duplicate inventory', () => {
+    const structures: StructureSave[] = [
+      { id: 1, item: 'fishTrap', tile: 10, layer: 2, yaw: 0, state: { trapSetDay: 4, trapSetMinute: 120, trapBaited: true, trapChecks: 2 } },
+      { id: 2, item: 'shoreNet', tile: 11, layer: 2, yaw: 0, state: { netSetDay: 4, netSetMinute: 130, netChecks: 1 } },
+      { id: 3, item: 'fishTrap', tile: 12, layer: 2, yaw: 0, state: { trapSetDay: 4, trapSetMinute: 140, trapBaited: true, trapChecks: 0 } },
+      { id: 4, item: 'shoreNet', tile: 13, layer: 2, yaw: 0 },
+    ];
+    const food: InventoryItems = {};
+
+    const result = consumeWaterlineRouteResupply(structures, [
+      { id: 1, kind: 'fishTrap' },
+      { id: 2, kind: 'shoreNet' },
+      { id: 2, kind: 'shoreNet' },
+      { id: 3, kind: 'shoreNet' },
+      { id: 4, kind: 'shoreNet' },
+    ]);
+
+    expect(result).toEqual({ consumed: 2, traps: 1, nets: 1, sourceIds: [1, 2] });
+    expect(food).toEqual({});
+    expect(structures[0].state).toEqual({ trapChecks: 3 });
+    expect(structures[1].state).toEqual({ netChecks: 2 });
+    expect(structures[2].state).toEqual({ trapSetDay: 4, trapSetMinute: 140, trapBaited: true, trapChecks: 0 });
+    expect(structures[3].state).toBeUndefined();
   });
 
   it('uses drying racks to preserve fish into trail rations', () => {
