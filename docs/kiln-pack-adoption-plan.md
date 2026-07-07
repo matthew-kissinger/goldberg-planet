@@ -37,6 +37,10 @@ scene graphs. The default implementation target is:
 - Normalize orientation before pivot/scale/instancing. Any upright family whose exported
   local up axis is suspect must declare an orientation policy, record the source up axis and
   correction, and prove the corrected bounds before it can replace procedural art.
+- Surface-placed GLBs must use the shared right-handed planet-local frame: local `+Y` is
+  the hex normal, local `+Z` is the family yaw/facing tangent, and local `+X` is derived from
+  those vectors. Do not build ad hoc `east, normal, north` matrices; they can become
+  reflected and make upright assets appear tilted on the sphere.
 - Keep per-instance transforms, tint, phase, and simple state in instance attributes where
   that is cheaper than unique meshes.
 - Use code-authored overlays for dynamic gameplay signals such as glows, route glyphs,
@@ -75,7 +79,7 @@ forgetting them.
 | K6 native creatures | all `creature-*` GLBs | `NativeLifeRenderer` plus native-life/combat sim | Passing first slice: `npm run proof:k6-creatures` loads all nine committed creature GLBs, requires idle/walk clips, distance-gates mixers, proves tend/ward responses, captures desktop/phone screenshots, and rejects `generated/` runtime requests |
 | K6T native targetability | Native creature ray pick, tend/ward routing, HUD feedback, and occupied-tile placement blockers | `src/edit/pick.ts`, `src/main.ts`, native-life sim | Passing first slice: `npm run proof:k7-native-targeting` proves desktop and phone native targeting beats terrain mining, harmless and territorial interactions resolve, drops spawn or collect, and occupied native-life tiles block building |
 | K6R native roaming and ecology state | Harmless grazing/fleeing, territorial patrol/telegraph/recover, shore/cave/fish interactions, pathing across adjacent hexes, and animation state selection | Native-life sim plus `NativeLifeRenderer` | Passing first slice: `npm run proof:k6r-roaming` proves visible creatures derive stable roaming motion from deterministic home sites, move between valid nearby hexes, expose walk/idle clip hints, keep current-tile picking, use approved GLB skins, and avoid generated runtime requests |
-| K7 landmarks and wonder | `cave-anchor`, crater shells, shrines, cave-mouth dressing/reference | Structure, skyfall, landmark, cave-mouth, and route renderers | First passing slice: `cave-anchor`, `crater-emberfall`, `crater-glassrain`, and `crater-starbloom` load as committed GLB skins while glyphs, route state, skyfall beams, sparks, and reward timing stay code-owned. Remaining shrine shells need socket-specific fit screenshots before wiring |
+| K7 landmarks and wonder | `cave-anchor`, crater shells, shrines, cave-mouth dressing/reference | Structure, skyfall, landmark, cave-mouth, and route renderers | Passing for the approved pack: `cave-anchor`, `crater-emberfall`, `crater-glassrain`, `crater-starbloom`, and all 12 `shrine-*` landmark shells load as committed GLB skins while glyphs, route state, threshold overlays, skyfall beams, sparks, and reward timing stay code-owned. Cave-mouth GLBs remain superseded by carved terrain entrances |
 | K8 remaining modular kits | door/window/roof already started; expand to any remaining build pieces | `StructureRenderer` and build sockets | Measured fit, socket-local preview, fallback, and room/shelter proof for each modular family |
 | K9 aquatic life and fish visibility | Generated Kiln single fish bodies: shore minnow, storm runner, cave shimmer, reed fry, plus a single driftjelly body over existing fishing systems | Fishing sim, waterline structures, `FishSchoolRenderer`, `KilnRuntimeAssets` | Passing first slice: corrected singleton fish are promoted to `models/`, fish-school state selects the matching body, the renderer shows up to two animated GLB anchors plus a point school, mixers are distance-gated, and `npm run proof:k9-fish-visuals` proves the cave-shimmer GLB loads from committed assets with fallback at zero |
 | K11 sky life and biome expansion | Promoted Kiln singleton bird bodies and future new-biome tree variants | `SkyLifeRenderer`, `KilnRuntimeAssets`, weather/shore/forest site selection | Passing first slice: four bird bodies are promoted to `models/`, reviewed in the asset viewer, selected from sky/shore/forest/storm cues, rendered as a few distance-gated animated GLB anchors plus point flocks, and `npm run proof:k11-sky-life` proves all four committed bird GLBs load with fallback at zero |
@@ -206,17 +210,22 @@ The asset-pack adoption track is done when:
   high-sky cues choose a few animated GLB anchors, while point flocks carry the wider
   group. `npm run proof:k11-sky-life` proves all four bird GLBs load from committed
   `assets/kiln/models/`, with zero generated requests and zero fallback.
-- K7 first wonder slice is runtime-wired for `cave-anchor`, `crater-emberfall`,
-  `crater-glassrain`, and `crater-starbloom`. Cave anchors use the existing
+- K7 wonders and landmarks are runtime-wired for `cave-anchor`, `crater-emberfall`,
+  `crater-glassrain`, `crater-starbloom`, and all 12 `shrine-*` landmark shells.
+  Cave anchors use the existing
   `StructureRenderer` decorative-skin path: the GLB hides duplicated stone/post/rail
   parts, while cave glyphs, rope pulses, flood/spring markers, route readback, and active
   glow stay procedural. `SkyfallRenderer` now takes the shared `KilnRuntimeAssets`
   provider, normalizes crater shells under the existing 2.8x skyfall parent scale, and
   hides only duplicated crater floor/ring/rocks/shards after GLB success. Omen beams,
-  core glow, sparks, harvest state, and reward timing remain code-owned. `npm run
+  core glow, sparks, harvest state, and reward timing remain code-owned.
+  `LandmarkRenderer` now takes the shared provider, maps the 12 pentagon indices to
+  per-shrine fitted landmark shells, hides duplicated procedural ring/pillar/body parts
+  only after GLB success, and keeps the landscape apron, domain halo, quiet/awake glows,
+  signal beam, and every threshold part code-owned. `npm run
   proof:route-markers` now proves five waystones plus three cave anchors on committed
-  model paths, and `npm run proof:k7-wonders` proves all three crater GLBs with zero
-  fallback and zero `generated/` runtime requests.
+  model paths, and `npm run proof:k7-wonders` proves all three crater GLBs plus all 12
+  shrine GLBs with zero fallback and zero `generated/` runtime requests.
 - Hex terrain material variety now stays in the procedural/material lane. `src/render/palette.ts`
   uses deterministic per-material swatch ramps for grass, dirt, rock, sand, snow, bedrock,
   built blocks, seabed, and wood while preserving the single shared vertex-color material.
@@ -375,15 +384,10 @@ shader, or instanced runtime systems keyed to the palette.
 
 These are still procedural or code-authored, with different reasons:
 
-- **Approved-pack GLBs not yet runtime-wired**: 58 of 70 ready GLBs are now adopted.
-  The remaining 12 ready GLBs are the shrine landmark shells:
-  `shrine-first-hearth`, `shrine-rainward-gate`, `shrine-salt-mirror`,
-  `shrine-high-lantern`, `shrine-root-vault`, `shrine-red-cairn`,
-  `shrine-snow-dial`, `shrine-glass-shoal`, `shrine-storm-seat`,
-  `shrine-reed-crown`, `shrine-deep-bell`, and `shrine-last-horizon`.
-  These should be wired through a dedicated landmark-skin provider only after
-  per-shrine socket fit, threshold overlay ownership, water/glow stripping, and
-  screenshot proof are explicit.
+- **Approved-pack GLBs not yet runtime-wired**: none. All 70 ready GLBs are adopted
+  as runtime skins, runtime dressing, or explicit code-owned/superseded decisions. The
+  3 cave-mouth records remain intentionally unused because carved terrain entrances read
+  better than small decorative arch props in the current cave system.
 - **Intentional code-owned systems**: terrain hex materials, block faces, mining cracks,
   water, sky, route ribbons, telegraph rings, warmth/light/glow overlays, particles, and
   house snap/collision/enclosure sockets. These should stay procedural/material/shader
@@ -397,15 +401,16 @@ These are still procedural or code-authored, with different reasons:
   procedural/code-owned sockets. Decorative GLB skins should come only from a shared-scale
   house-shell pack after edge-based shelter coverage, collision, and broader room-shape
   rules are proven.
-- **Runtime families still awaiting GLB wiring from the approved pack**: K7 shrine
-  landmarks, K8 remaining modular kits or dressing decisions, and K10 additional drop/ore
-  expansion after item taxonomy.
+- **Runtime families still awaiting new GLB generation or later art decisions**: K8
+  shared-scale house shell skins, K10 additional drop/ore expansion after item taxonomy,
+  avatar/equipment authored assets, and optional future wonder/cave dressing beyond the
+  current approved pack.
 
 ## Next Critical Slice
 
-K1, K2, K3, K4, K5, K6, K6T, K6R, first K7, K9, K11, and the edge-socket K3W/C6 wall-shell slice now
+K1, K2, K3, K4, K5, K6, K6T, K6R, K7, K9, K11, and the edge-socket K3W/C6 wall-shell slice now
 prove the repeated static-family, utility/waterline skin, first animated-family, native
 targetability, sparse creature-roaming, aquatic singleton, sky-life singleton, and
-code-owned house-shell socket paths. Continue with K7 shrine skins, edge-based shelter
-coverage/collision polish, richer G5/K6R creature behavior, K10 pickup/ore expansion,
-remaining modular kit decisions, and the avatar/equipment authored-asset path.
+code-owned house-shell socket paths. Continue with edge-based shelter coverage/collision
+polish, richer G5/K6R creature behavior, K10 pickup/ore expansion, shared-scale house-shell
+skin decisions, and the avatar/equipment authored-asset path.

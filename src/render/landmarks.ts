@@ -10,6 +10,13 @@ import {
   type PentagonLandscapeSilhouette,
   type PentagonSiteThresholdShape,
 } from '../sim/landmarks';
+import type {
+  KilnAssetSnapshot,
+  KilnLandmarkSkinFitSnapshot,
+  KilnLandmarkSkinSlug,
+  LandmarkSkinProvider,
+} from './kilnAssets';
+import { makeSurfaceBasisFromYaw } from './surfaceFrame';
 
 function mat(color: number, roughness = 0.8, metalness = 0.02, emissive = 0x000000, intensity = 0.6): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness, emissive, emissiveIntensity: emissive === 0 ? 0 : intensity });
@@ -50,6 +57,41 @@ const box = new THREE.BoxGeometry(1, 1, 1);
 const cone5 = new THREE.ConeGeometry(0.5, 1, 5);
 const cone6 = new THREE.ConeGeometry(0.5, 1, 6);
 const sphere = new THREE.SphereGeometry(0.5, 10, 8);
+
+const KILN_LANDMARK_SKIN_BY_INDEX: readonly KilnLandmarkSkinSlug[] = [
+  'shrine-first-hearth',
+  'shrine-rainward-gate',
+  'shrine-salt-mirror',
+  'shrine-high-lantern',
+  'shrine-root-vault',
+  'shrine-red-cairn',
+  'shrine-snow-dial',
+  'shrine-glass-shoal',
+  'shrine-storm-seat',
+  'shrine-reed-crown',
+  'shrine-deep-bell',
+  'shrine-last-horizon',
+];
+
+const PROCEDURAL_LANDMARK_SHELL_PARTS = new Set([
+  'landscapeOuterRing',
+  'landscapeRib',
+  'landscapeMarker',
+  'landscapeCrown',
+  'pentagonBase',
+  'metalRim',
+  'outerPillar',
+  'runeSlab',
+  'topCap',
+]);
+
+const PROCEDURAL_LANDMARK_OVERLAYS = new Set(['landscapeApron', 'domainHalo', 'quietCore', 'awakenedOrb', 'signalBeam']);
+
+function basisDeterminant(x: THREE.Vector3, y: THREE.Vector3, z: THREE.Vector3): number {
+  return x.x * (y.y * z.z - y.z * z.y)
+    - x.y * (y.x * z.z - y.z * z.x)
+    + x.z * (y.x * z.y - y.y * z.x);
+}
 
 function mesh(geom: THREE.BufferGeometry, material: THREE.Material, pos: [number, number, number], scale: [number, number, number], name: string): THREE.Mesh {
   const m = new THREE.Mesh(geom, material);
@@ -272,8 +314,9 @@ function makeLandmark(index: number): THREE.Group {
 export class LandmarkRenderer {
   readonly group = new THREE.Group();
   private readonly objects = new Map<number, THREE.Group>();
+  private readonly kilnSkinStatus = new Map<number, 'pending' | 'loaded' | 'fallback'>();
 
-  constructor(scene: THREE.Scene, pentagonTiles: readonly number[]) {
+  constructor(scene: THREE.Scene, pentagonTiles: readonly number[], private readonly kilnAssets?: LandmarkSkinProvider) {
     this.group.name = 'pentagon-landmarks';
     scene.add(this.group);
     for (let i = 0; i < pentagonTiles.length; i++) {
@@ -283,6 +326,7 @@ export class LandmarkRenderer {
       obj.userData.index = i;
       this.objects.set(tile, obj);
       this.group.add(obj);
+      this.attachKilnSkin(i, tile, obj);
     }
   }
 
@@ -307,20 +351,9 @@ export class LandmarkRenderer {
       if (!obj) continue;
       const frame = geo.frameOf(tile);
       const yaw = i * 0.31;
-      const ca = Math.cos(yaw);
-      const sa = Math.sin(yaw);
-      vX.set(
-        frame.east[0] * ca + frame.north[0] * sa,
-        frame.east[1] * ca + frame.north[1] * sa,
-        frame.east[2] * ca + frame.north[2] * sa,
-      );
-      vY.set(...frame.normal);
-      vZ.set(
-        -frame.east[0] * sa + frame.north[0] * ca,
-        -frame.east[1] * sa + frame.north[1] * ca,
-        -frame.east[2] * sa + frame.north[2] * ca,
-      );
-      m.makeBasis(vX, vY, vZ);
+      makeSurfaceBasisFromYaw(frame, yaw, m, vX, vY, vZ);
+      obj.userData.surfaceBasisDeterminant = basisDeterminant(vX, vY, vZ);
+      obj.userData.surfaceUpDot = vY.x * frame.normal[0] + vY.y * frame.normal[1] + vY.z * frame.normal[2];
       obj.setRotationFromMatrix(m);
       const ground = layers.topRadius(columns.groundLayerBelow(tile, layers.bounds[0]));
       const r = Math.max(ground + 0.05, WATER_SURFACE + 0.18);
@@ -375,25 +408,161 @@ export class LandmarkRenderer {
     }
   }
 
-  stats(): { groups: number; meshes: number; landscapeMeshes: number; thresholdMeshes: number; profiles: number; thresholds: number; thresholdAssetRoles: number } {
+  private attachKilnSkin(index: number, tile: number, obj: THREE.Group): void {
+    if (!this.kilnAssets) return;
+    const slug = KILN_LANDMARK_SKIN_BY_INDEX[index % KILN_LANDMARK_SKIN_BY_INDEX.length];
+    this.kilnSkinStatus.set(tile, 'pending');
+    obj.userData.kilnLandmarkSkinStatus = 'pending';
+    obj.userData.kilnAssetSlug = slug;
+    obj.userData.kilnLandmarkIndex = index;
+    void this.kilnAssets.createLandmarkSkinTemplate(slug)
+      .then((template) => {
+        const current = this.objects.get(tile);
+        if (current !== obj || obj.parent !== this.group) return;
+        if (!template) {
+          this.kilnSkinStatus.set(tile, 'fallback');
+          obj.userData.kilnLandmarkSkinStatus = 'fallback';
+          return;
+        }
+        const skin = template.template.clone(true);
+        skin.name = `kiln-landmark-skin-${slug}`;
+        skin.userData.kilnAssetSlug = slug;
+        skin.userData.kilnLandmarkIndex = index;
+        skin.userData.kilnLandmarkSkin = true;
+        skin.userData.kilnLandmarkFit = template.fit;
+        skin.traverse((child) => {
+          child.userData.kilnAssetSlug = slug;
+          child.userData.kilnLandmarkIndex = index;
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            mesh.castShadow = false;
+            mesh.receiveShadow = true;
+          }
+        });
+        obj.add(skin);
+        this.hideProceduralLandmarkShell(obj);
+        this.kilnSkinStatus.set(tile, 'loaded');
+        obj.userData.kilnLandmarkSkinStatus = 'loaded';
+        obj.userData.kilnAssetSlug = slug;
+        obj.userData.kilnAssetFile = template.manifest.file;
+        obj.userData.kilnAssetSourceUrl = template.sourceUrl;
+        obj.userData.kilnLandmarkSkinFit = template.fit;
+      })
+      .catch((err: unknown) => {
+        const current = this.objects.get(tile);
+        if (current !== obj || obj.parent !== this.group) return;
+        this.kilnSkinStatus.set(tile, 'fallback');
+        obj.userData.kilnLandmarkSkinStatus = 'fallback';
+        obj.userData.kilnLandmarkSkinError = err instanceof Error ? err.message : String(err);
+      });
+  }
+
+  private hideProceduralLandmarkShell(obj: THREE.Group): void {
+    obj.traverse((child) => {
+      if (child.userData.kilnAssetSlug) return;
+      if (PROCEDURAL_LANDMARK_SHELL_PARTS.has(child.name)) child.visible = false;
+    });
+  }
+
+  stats(): {
+    groups: number;
+    meshes: number;
+    landscapeMeshes: number;
+    thresholdMeshes: number;
+    profiles: number;
+    thresholds: number;
+    thresholdAssetRoles: number;
+    proceduralLandmarkShellPartsVisible: number;
+    proceduralLandmarkOverlaysVisible: number;
+    proceduralThresholdPartsVisible: number;
+    kilnLandmarkSkinsLoaded: number;
+    kilnLandmarkSkinsPending: number;
+    kilnLandmarkSkinFallbacks: number;
+    kilnLandmarkGlbMeshesVisible: number;
+    surfaceBasisDeterminantMin: number;
+    surfaceUpDotMin: number;
+    kilnLandmarkSkinsBySlug: Partial<Record<KilnLandmarkSkinSlug, { loaded: number; pending: number; fallback: number }>>;
+    kilnLandmarkSkinFits: Partial<Record<KilnLandmarkSkinSlug, KilnLandmarkSkinFitSnapshot>>;
+    kilnAssets?: KilnAssetSnapshot;
+  } {
     let meshes = 0;
     let landscapeMeshes = 0;
     let thresholdMeshes = 0;
+    let proceduralLandmarkShellPartsVisible = 0;
+    let proceduralLandmarkOverlaysVisible = 0;
+    let proceduralThresholdPartsVisible = 0;
+    let kilnLandmarkSkinsLoaded = 0;
+    let kilnLandmarkSkinsPending = 0;
+    let kilnLandmarkSkinFallbacks = 0;
+    let kilnLandmarkGlbMeshesVisible = 0;
+    let surfaceBasisDeterminantMin = Infinity;
+    let surfaceUpDotMin = Infinity;
+    const kilnLandmarkSkinsBySlug: Partial<Record<KilnLandmarkSkinSlug, { loaded: number; pending: number; fallback: number }>> = {};
+    const kilnLandmarkSkinFits: Partial<Record<KilnLandmarkSkinSlug, KilnLandmarkSkinFitSnapshot>> = {};
     const profiles = new Set<string>();
     const thresholds = new Set<string>();
     const thresholdAssetRoles = new Set<string>();
     for (const obj of this.objects.values()) {
       if (typeof obj.userData.landscapeProfile?.silhouette === 'string') profiles.add(obj.userData.landscapeProfile.silhouette);
       if (typeof obj.userData.thresholdProfile?.shape === 'string') thresholds.add(obj.userData.thresholdProfile.shape);
+      const skinStatus = obj.userData.kilnLandmarkSkinStatus as 'pending' | 'loaded' | 'fallback' | undefined;
+      const skinSlug = obj.userData.kilnAssetSlug as KilnLandmarkSkinSlug | undefined;
+      if (skinStatus === 'loaded') kilnLandmarkSkinsLoaded++;
+      if (skinStatus === 'pending') kilnLandmarkSkinsPending++;
+      if (skinStatus === 'fallback') kilnLandmarkSkinFallbacks++;
+      if (skinSlug && skinStatus) {
+        const entry = kilnLandmarkSkinsBySlug[skinSlug] ?? { loaded: 0, pending: 0, fallback: 0 };
+        entry[skinStatus] += 1;
+        kilnLandmarkSkinsBySlug[skinSlug] = entry;
+      }
+      if (skinSlug && obj.userData.kilnLandmarkSkinFit) {
+        kilnLandmarkSkinFits[skinSlug] = obj.userData.kilnLandmarkSkinFit as KilnLandmarkSkinFitSnapshot;
+      }
+      if (typeof obj.userData.surfaceBasisDeterminant === 'number') {
+        surfaceBasisDeterminantMin = Math.min(surfaceBasisDeterminantMin, obj.userData.surfaceBasisDeterminant);
+      }
+      if (typeof obj.userData.surfaceUpDot === 'number') {
+        surfaceUpDotMin = Math.min(surfaceUpDotMin, obj.userData.surfaceUpDot);
+      }
       obj.traverse((child) => {
         if ((child as THREE.Mesh).isMesh) {
           meshes++;
           if (child.name.startsWith('landscape')) landscapeMeshes++;
           if (child.name.startsWith('threshold')) thresholdMeshes++;
           if (child.name.startsWith('threshold') && typeof child.userData.assetRole === 'string') thresholdAssetRoles.add(child.userData.assetRole);
+          if (child.userData.kilnAssetSlug && child.visible) kilnLandmarkGlbMeshesVisible++;
+          if (!child.userData.kilnAssetSlug && PROCEDURAL_LANDMARK_SHELL_PARTS.has(child.name) && child.visible) {
+            proceduralLandmarkShellPartsVisible++;
+          }
+          if (!child.userData.kilnAssetSlug && PROCEDURAL_LANDMARK_OVERLAYS.has(child.name) && child.visible) {
+            proceduralLandmarkOverlaysVisible++;
+          }
+          if (!child.userData.kilnAssetSlug && child.name.startsWith('threshold') && child.visible) {
+            proceduralThresholdPartsVisible++;
+          }
         }
       });
     }
-    return { groups: this.objects.size, meshes, landscapeMeshes, thresholdMeshes, profiles: profiles.size, thresholds: thresholds.size, thresholdAssetRoles: thresholdAssetRoles.size };
+    return {
+      groups: this.objects.size,
+      meshes,
+      landscapeMeshes,
+      thresholdMeshes,
+      profiles: profiles.size,
+      thresholds: thresholds.size,
+      thresholdAssetRoles: thresholdAssetRoles.size,
+      proceduralLandmarkShellPartsVisible,
+      proceduralLandmarkOverlaysVisible,
+      proceduralThresholdPartsVisible,
+      kilnLandmarkSkinsLoaded,
+      kilnLandmarkSkinsPending,
+      kilnLandmarkSkinFallbacks,
+      kilnLandmarkGlbMeshesVisible,
+      surfaceBasisDeterminantMin: Number.isFinite(surfaceBasisDeterminantMin) ? surfaceBasisDeterminantMin : 0,
+      surfaceUpDotMin: Number.isFinite(surfaceUpDotMin) ? surfaceUpDotMin : 0,
+      kilnLandmarkSkinsBySlug,
+      kilnLandmarkSkinFits,
+      kilnAssets: this.kilnAssets?.snapshot?.(),
+    };
   }
 }

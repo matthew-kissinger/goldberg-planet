@@ -3,6 +3,7 @@ import type { Goldberg } from '../geo/goldberg';
 import type { Layers } from '../world/layers';
 import { homeScore, structureSocketOccupancy, type ShelterReport, type StructureSave, type StructureSocketSpec } from '../sim/structures';
 import type { KilnAssetSnapshot, KilnSkinFitSnapshot, KilnStructureSkinSlug, StructureSkinProvider } from './kilnAssets';
+import { makeSurfaceBasisFromYaw } from './surfaceFrame';
 
 type PropFactory = () => THREE.Group;
 type StructureSilhouette = 'cave-anchor-belay-marker' | 'waystone-attuned-marker';
@@ -923,19 +924,7 @@ export class StructureRenderer {
       obj.userData.structureTile = s.tile;
       obj.userData.structureSocket = structureSocketOccupancy(s);
       const frame = geo.frameOf(s.tile);
-      const ca = Math.cos(s.yaw), sa = Math.sin(s.yaw);
-      vX.set(
-        frame.east[0] * ca + frame.north[0] * sa,
-        frame.east[1] * ca + frame.north[1] * sa,
-        frame.east[2] * ca + frame.north[2] * sa,
-      );
-      vY.set(...frame.normal);
-      vZ.set(
-        -frame.east[0] * sa + frame.north[0] * ca,
-        -frame.east[1] * sa + frame.north[1] * ca,
-        -frame.east[2] * sa + frame.north[2] * ca,
-      );
-      m.makeBasis(vX, vY, vZ);
+      makeSurfaceBasisFromYaw(frame, s.yaw, m, vX, vY, vZ);
       obj.setRotationFromMatrix(m);
       const r = layers.topRadius(s.layer) + 0.04;
       obj.position.set(
@@ -975,19 +964,10 @@ export class StructureRenderer {
     };
     this.snapPreviewGroup.userData.snapPreviewSilhouette = silhouetteName;
     const frame = geo.frameOf(preview.tile);
-    const ca = Math.cos(preview.yaw), sa = Math.sin(preview.yaw);
-    const vX = new THREE.Vector3(
-      frame.east[0] * ca + frame.north[0] * sa,
-      frame.east[1] * ca + frame.north[1] * sa,
-      frame.east[2] * ca + frame.north[2] * sa,
-    );
-    const vY = new THREE.Vector3(...frame.normal);
-    const vZ = new THREE.Vector3(
-      -frame.east[0] * sa + frame.north[0] * ca,
-      -frame.east[1] * sa + frame.north[1] * ca,
-      -frame.east[2] * sa + frame.north[2] * ca,
-    );
-    const m = new THREE.Matrix4().makeBasis(vX, vY, vZ);
+    const vX = new THREE.Vector3();
+    const vY = new THREE.Vector3();
+    const vZ = new THREE.Vector3();
+    const m = makeSurfaceBasisFromYaw(frame, preview.yaw, new THREE.Matrix4(), vX, vY, vZ);
     this.snapPreviewGroup.setRotationFromMatrix(m);
     const c = geo.centers;
     const r = layers.topRadius(preview.layer) + 0.07;

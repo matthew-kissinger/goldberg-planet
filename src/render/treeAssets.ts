@@ -4,6 +4,7 @@ import type { ChunkInfo } from '../world/chunks';
 import type { Columns } from '../world/columns';
 import type { Layers } from '../world/layers';
 import { treeTangentFrame, type Trees, type TreeVisualKind } from '../world/trees';
+import { makeSurfaceBasisFromForward } from './surfaceFrame';
 import type {
   KilnTreeSkinFitSnapshot,
   KilnTreeSkinSlug,
@@ -225,10 +226,16 @@ export class TreeAssetRenderer {
       const uy = c[site.tile * 3 + 1];
       const uz = c[site.tile * 3 + 2];
       treeTangentFrame(ux, uy, uz, this.frameScratch);
+      const offsetAx = this.frameScratch[0];
+      const offsetAy = this.frameScratch[1];
+      const offsetAz = this.frameScratch[2];
+      const offsetBx = this.frameScratch[3];
+      const offsetBy = this.frameScratch[4];
+      const offsetBz = this.frameScratch[5];
       vX.set(this.frameScratch[0], this.frameScratch[1], this.frameScratch[2]);
       vY.set(ux, uy, uz);
       vZ.set(this.frameScratch[3], this.frameScratch[4], this.frameScratch[5]);
-      basis.makeBasis(vX, vY, vZ);
+      makeSurfaceBasisFromForward(vY, vZ, basis, vX, vY, vZ);
       q.setFromRotationMatrix(basis);
 
       const params = trees.paramsFor(site.tile);
@@ -237,17 +244,17 @@ export class TreeAssetRenderer {
       const leanA = Math.sin(phase) * 0.14 * damage;
       const leanB = Math.cos(phase * 1.3) * 0.12 * damage;
       const rG = layers.topRadius(columns.topLayerOf(site.tile));
-      const baseX = ux * (rG - 0.2) + vX.x * (params.offA + leanA) + vZ.x * (params.offB + leanB);
-      const baseY = uy * (rG - 0.2) + vX.y * (params.offA + leanA) + vZ.y * (params.offB + leanB);
-      const baseZ = uz * (rG - 0.2) + vX.z * (params.offA + leanA) + vZ.z * (params.offB + leanB);
+      const baseX = ux * (rG - 0.2) + offsetAx * (params.offA + leanA) + offsetBx * (params.offB + leanB);
+      const baseY = uy * (rG - 0.2) + offsetAy * (params.offA + leanA) + offsetBy * (params.offB + leanB);
+      const baseZ = uz * (rG - 0.2) + offsetAz * (params.offA + leanA) + offsetBz * (params.offB + leanB);
       const distToCamera = Math.hypot(baseX - camWorld.x, baseY - camWorld.y, baseZ - camWorld.z);
       const sway = distToCamera <= TREE_ANIMATION_LOD_DISTANCE
         ? Math.sin(seconds * 0.8 + site.tile * 0.013) * 0.025 * (site.kind === 'deadSnag' ? 0.35 : 1)
         : 0;
       pos.set(
-        baseX + vX.x * sway - camWorld.x,
-        baseY + vX.y * sway - camWorld.y,
-        baseZ + vX.z * sway - camWorld.z,
+        baseX + offsetAx * sway - camWorld.x,
+        baseY + offsetAy * sway - camWorld.y,
+        baseZ + offsetAz * sway - camWorld.z,
       );
       const damageScale = 1 - damage * (site.kind === 'shrub' ? 0.08 : 0.12);
       scale.setScalar(treeScale(site.kind, batch.template.fit, params) * damageScale);

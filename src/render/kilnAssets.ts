@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { DomainResourceKind } from '../sim/domainResources';
 import type { FishSchoolKind } from '../sim/fishing';
+import type { PentagonExpeditionSiteKind } from '../sim/landmarks';
 import type { NativeCreatureKind } from '../sim/nativeLife';
 import type { SkyfallKind } from '../sim/skyfall';
 import type { TreeVisualKind } from '../world/trees';
@@ -65,6 +66,19 @@ export type KilnBirdSkinSlug =
   | 'bird-storm-finch';
 export type KilnBirdKind = 'sky' | 'shore' | 'forest' | 'storm';
 export type KilnSkyfallSkinSlug = 'crater-emberfall' | 'crater-glassrain' | 'crater-starbloom';
+export type KilnLandmarkSkinSlug =
+  | 'shrine-first-hearth'
+  | 'shrine-rainward-gate'
+  | 'shrine-salt-mirror'
+  | 'shrine-high-lantern'
+  | 'shrine-root-vault'
+  | 'shrine-red-cairn'
+  | 'shrine-snow-dial'
+  | 'shrine-glass-shoal'
+  | 'shrine-storm-seat'
+  | 'shrine-reed-crown'
+  | 'shrine-deep-bell'
+  | 'shrine-last-horizon';
 
 type KilnAssetStatus = 'ready' | 'unused' | 'missing';
 
@@ -186,6 +200,10 @@ export interface KilnAssetSnapshot {
   skyfallSkins?: {
     enabled: readonly KilnSkyfallSkinSlug[];
     loaded: readonly KilnSkyfallSkinSlug[];
+  };
+  landmarkSkins?: {
+    enabled: readonly KilnLandmarkSkinSlug[];
+    loaded: readonly KilnLandmarkSkinSlug[];
   };
 }
 
@@ -443,6 +461,39 @@ export interface KilnSkyfallSkinTemplate {
 
 export interface SkyfallSkinProvider {
   createSkyfallSkinTemplate(slug: KilnSkyfallSkinSlug): Promise<KilnSkyfallSkinTemplate | null>;
+  snapshot?(): KilnAssetSnapshot;
+}
+
+export interface KilnLandmarkSkinFitSnapshot {
+  slug: KilnLandmarkSkinSlug;
+  kind: PentagonExpeditionSiteKind;
+  socketRole: 'pentagon-landmark-shell';
+  sourceBboxSize: readonly number[];
+  runtimeSourceBboxSize: readonly number[];
+  normalizedBboxSize: readonly number[];
+  normalizePolicy: 'center-xz-bottom-y-fit-footprint-height';
+  orientation: KilnInstancedOrientationSnapshot;
+  animationPolicy: 'static-shell-with-procedural-threshold-overlays';
+  sourceUrl: string;
+  sourceMeshCount: number;
+  materialCount?: number;
+  targetFootprint: number;
+  targetHeight: number;
+  hiddenGlbNames: readonly string[];
+  acceptanceNote: string;
+}
+
+export interface KilnLandmarkSkinTemplate {
+  slug: KilnLandmarkSkinSlug;
+  kind: PentagonExpeditionSiteKind;
+  manifest: KilnManifestAsset;
+  sourceUrl: string;
+  template: THREE.Object3D;
+  fit: KilnLandmarkSkinFitSnapshot;
+}
+
+export interface LandmarkSkinProvider {
+  createLandmarkSkinTemplate(slug: KilnLandmarkSkinSlug): Promise<KilnLandmarkSkinTemplate | null>;
   snapshot?(): KilnAssetSnapshot;
 }
 
@@ -1016,6 +1067,115 @@ const RUNTIME_SKYFALL_SKINS: Record<KilnSkyfallSkinSlug, {
   },
 };
 
+const shrineGlowDots = Array.from({ length: 12 }, (_, i) => `Mesh_GlowDot${i}`);
+
+const RUNTIME_LANDMARK_SKINS: Record<KilnLandmarkSkinSlug, {
+  kind: PentagonExpeditionSiteKind;
+  targetFootprint: number;
+  targetHeight: number;
+  hideGlbNames: readonly string[];
+  acceptanceNote: string;
+}> = {
+  'shrine-first-hearth': {
+    kind: 'hearthNiche',
+    targetFootprint: 4.6,
+    targetHeight: 3.0,
+    hideGlbNames: ['Mesh_HearthEmbers', 'Mesh_LanternGlow'],
+    acceptanceNote: 'accepted as First Hearth landmark shell; discovery glow, domain halo, home threshold, and warmth state remain code-authored',
+  },
+  'shrine-rainward-gate': {
+    kind: 'rainBlind',
+    targetFootprint: 4.4,
+    targetHeight: 4.2,
+    hideGlbNames: ['Mesh_LanternGlow'],
+    acceptanceNote: 'accepted as Rainward Gate landmark shell; wind pocket threshold and readable weather glow remain code-authored',
+  },
+  'shrine-salt-mirror': {
+    kind: 'tideDock',
+    targetFootprint: 4.6,
+    targetHeight: 3.3,
+    hideGlbNames: ['Mesh_AltarWater'],
+    acceptanceNote: 'accepted as Salt Mirror landmark shell; tide waterline, fish-route effects, and active water cues remain code-authored',
+  },
+  'shrine-high-lantern': {
+    kind: 'lanternLookout',
+    targetFootprint: 3.6,
+    targetHeight: 7.4,
+    hideGlbNames: ['Mesh_GlowCore', 'Mesh_SpirePeakGlow', 'Mesh_LanternGlow1', 'Mesh_LanternGlow2'],
+    acceptanceNote: 'accepted as High Lantern landmark shell; signal beam, route light, and threshold shaft state remain code-authored',
+  },
+  'shrine-root-vault': {
+    kind: 'rootShelter',
+    targetFootprint: 4.4,
+    targetHeight: 3.5,
+    hideGlbNames: [],
+    acceptanceNote: 'accepted as Root Vault landmark shell; root-room threshold, cache state, and forage bonuses remain code-authored',
+  },
+  'shrine-red-cairn': {
+    kind: 'screeCut',
+    targetFootprint: 4.2,
+    targetHeight: 3.2,
+    hideGlbNames: ['Mesh_GlowL', 'Mesh_GlowR'],
+    acceptanceNote: 'accepted as Red Cairn landmark shell; tool-pass threshold, red-stone seam, and active glow remain code-authored',
+  },
+  'shrine-snow-dial': {
+    kind: 'snowClock',
+    targetFootprint: 4.6,
+    targetHeight: 4.6,
+    hideGlbNames: shrineGlowDots,
+    acceptanceNote: 'accepted as Snow Dial landmark shell; cold-rest threshold and time/readiness glow remain code-authored',
+  },
+  'shrine-glass-shoal': {
+    kind: 'glassTerrace',
+    targetFootprint: 4.6,
+    targetHeight: 3.0,
+    hideGlbNames: ['Mesh_CoreFlame', 'Mesh_CoreGlowOrb'],
+    acceptanceNote: 'accepted as Glass Shoal landmark shell; sightline threshold and route glow remain code-authored',
+  },
+  'shrine-storm-seat': {
+    kind: 'stormBlind',
+    targetFootprint: 4.2,
+    targetHeight: 5.6,
+    hideGlbNames: ['Mesh_RuneGlowVertical', 'Mesh_RuneGlowCross1', 'Mesh_RuneGlowCross2', 'Mesh_RoofOrb', 'Mesh_Orb'],
+    acceptanceNote: 'accepted as Storm Seat landmark shell; storm-pocket threshold and weather timing signals remain code-authored',
+  },
+  'shrine-reed-crown': {
+    kind: 'reedSpring',
+    targetFootprint: 4.6,
+    targetHeight: 4.2,
+    hideGlbNames: ['Mesh_SpringWater', 'Mesh_AltarGlow', 'Mesh_PedestalLGlow', 'Mesh_PedestalRGlow', 'Mesh_LanternGlow'],
+    acceptanceNote: 'accepted as Reed Crown landmark shell; spring-mouth water, reed route state, and fish/forage boosts remain code-authored',
+  },
+  'shrine-deep-bell': {
+    kind: 'bellCave',
+    targetFootprint: 4.4,
+    targetHeight: 5.2,
+    hideGlbNames: ['Mesh_StepPillarGlowL', 'Mesh_StepPillarGlowR', 'Mesh_ResonantGlow', 'Mesh_GlowCrystalL', 'Mesh_GlowCrystalR'],
+    acceptanceNote: 'accepted as Deep Bell landmark shell; bell-chamber threshold, cave pressure, and resonance glow remain code-authored',
+  },
+  'shrine-last-horizon': {
+    kind: 'horizonGate',
+    targetFootprint: 4.0,
+    targetHeight: 6.8,
+    hideGlbNames: [
+      'Mesh_BrazierGlow_0',
+      'Mesh_BrazierGlow_1',
+      'Mesh_BrazierGlow_2',
+      'Mesh_BrazierGlow_3',
+      'Mesh_HubGlow_-1',
+      'Mesh_HubGlow_1',
+      'Mesh_ArchKeystoneGlow_F',
+      'Mesh_ArchKeystoneGlow_B',
+      'Mesh_LanternGlow_0',
+      'Mesh_LanternGlow_1',
+      'Mesh_EternalFlame',
+      'Mesh_OfferingGlow_L',
+      'Mesh_OfferingGlow_R',
+    ],
+    acceptanceNote: 'accepted as Last Horizon landmark shell; return-gate threshold, route beam, and long-route state remain code-authored',
+  },
+};
+
 function publicAssetUrl(relativePath: string, base = import.meta.env.BASE_URL || '/'): string {
   const cleanBase = base.endsWith('/') ? base : `${base}/`;
   return `${cleanBase}${relativePath.replace(/^\/+/, '')}`;
@@ -1543,7 +1703,63 @@ function normalizeSkyfallTemplate(source: THREE.Object3D, slug: string, targetFo
   };
 }
 
-export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSkinProvider, DomainResourceSkinProvider, TreeSkinProvider, CreatureSkinProvider, FishSkinProvider, BirdSkinProvider, SkyfallSkinProvider {
+function normalizeLandmarkTemplate(source: THREE.Object3D, slug: string, targetFootprint: number, targetHeight: number, hideGlbNames: readonly string[]): {
+  template: THREE.Object3D;
+  runtimeSourceBboxSize: number[];
+  normalizedBboxSize: number[];
+  sourceMeshCount: number;
+  orientation: KilnInstancedOrientationSnapshot;
+} {
+  source.updateMatrixWorld(true);
+  const sourceBox = new THREE.Box3().setFromObject(source);
+  const runtimeSourceBboxSize = bboxSizeOfBox(sourceBox);
+  const size = new THREE.Vector3();
+  sourceBox.getSize(size);
+  const center = new THREE.Vector3();
+  sourceBox.getCenter(center);
+  const footprint = Math.max(size.x, size.z);
+  const footprintScale = footprint > 0 ? targetFootprint / footprint : 1;
+  const heightScale = size.y > 0 ? targetHeight / size.y : 1;
+  const scale = Math.max(0.01, Math.min(footprintScale, heightScale));
+  const root = new THREE.Group();
+  root.name = `kiln-landmark-template-${slug}`;
+  const scaled = new THREE.Group();
+  scaled.name = `kiln-landmark-scale-${slug}`;
+  scaled.scale.setScalar(scale);
+  const body = source.clone(true);
+  body.name = `kiln-landmark-body-${slug}`;
+  body.position.set(-center.x, -sourceBox.min.y, -center.z);
+  const hiddenGlbNames = new Set(hideGlbNames);
+  let sourceMeshCount = 0;
+  body.traverse((child) => {
+    child.userData.kilnAssetSlug = slug;
+    if (hiddenGlbNames.has(child.name)) child.visible = false;
+    if ((child as THREE.Mesh).isMesh) {
+      const mesh = child as THREE.Mesh;
+      sourceMeshCount += 1;
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      mesh.frustumCulled = false;
+    }
+  });
+  scaled.add(body);
+  root.add(scaled);
+  root.updateMatrixWorld(true);
+  const normalizedBboxSize = fittedSize(root);
+  return {
+    template: root,
+    runtimeSourceBboxSize,
+    normalizedBboxSize,
+    sourceMeshCount,
+    orientation: {
+      policy: 'preserve-y-up',
+      sourceUpAxis: 'y',
+      axisCorrection: [0, 0, 0],
+    },
+  };
+}
+
+export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSkinProvider, DomainResourceSkinProvider, TreeSkinProvider, CreatureSkinProvider, FishSkinProvider, BirdSkinProvider, SkyfallSkinProvider, LandmarkSkinProvider {
   private readonly enabled = new Set<KilnStructureSkinSlug>([
     'waystone',
     'cave-anchor',
@@ -1610,6 +1826,20 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
     'crater-glassrain',
     'crater-starbloom',
   ]);
+  private readonly enabledLandmarkSkins = new Set<KilnLandmarkSkinSlug>([
+    'shrine-first-hearth',
+    'shrine-rainward-gate',
+    'shrine-salt-mirror',
+    'shrine-high-lantern',
+    'shrine-root-vault',
+    'shrine-red-cairn',
+    'shrine-snow-dial',
+    'shrine-glass-shoal',
+    'shrine-storm-seat',
+    'shrine-reed-crown',
+    'shrine-deep-bell',
+    'shrine-last-horizon',
+  ]);
   private readonly loader = new GLTFLoader();
   private readonly loaded = new Set<KilnStructureSkinSlug>();
   private readonly loadedResourceDrops = new Set<KilnResourceDropSkinSlug>();
@@ -1619,6 +1849,7 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
   private readonly loadedFishSkins = new Set<KilnFishSkinSlug>();
   private readonly loadedBirdSkins = new Set<KilnBirdSkinSlug>();
   private readonly loadedSkyfallSkins = new Set<KilnSkyfallSkinSlug>();
+  private readonly loadedLandmarkSkins = new Set<KilnLandmarkSkinSlug>();
   private readonly failed: string[] = [];
   private readonly modelRequests: string[] = [];
   private manifestPromise: Promise<KilnManifest | null> | null = null;
@@ -1631,6 +1862,7 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
   private readonly fishTemplates = new Map<KilnFishSkinSlug, Promise<KilnFishSkinTemplate | null>>();
   private readonly birdTemplates = new Map<KilnBirdSkinSlug, Promise<KilnBirdSkinTemplate | null>>();
   private readonly skyfallTemplates = new Map<KilnSkyfallSkinSlug, Promise<KilnSkyfallSkinTemplate | null>>();
+  private readonly landmarkTemplates = new Map<KilnLandmarkSkinSlug, Promise<KilnLandmarkSkinTemplate | null>>();
   private readonly baseUrl: string;
 
   readonly manifestUrl: string;
@@ -1690,6 +1922,10 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
     return this.loadSkyfallTemplate(slug);
   }
 
+  async createLandmarkSkinTemplate(slug: KilnLandmarkSkinSlug): Promise<KilnLandmarkSkinTemplate | null> {
+    return this.loadLandmarkTemplate(slug);
+  }
+
   snapshot(): KilnAssetSnapshot {
     return {
       enabled: [...this.enabled],
@@ -1731,6 +1967,10 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
       skyfallSkins: {
         enabled: [...this.enabledSkyfallSkins],
         loaded: [...this.loadedSkyfallSkins],
+      },
+      landmarkSkins: {
+        enabled: [...this.enabledLandmarkSkins],
+        loaded: [...this.loadedLandmarkSkins],
       },
     };
   }
@@ -2238,6 +2478,61 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
       });
 
     this.skyfallTemplates.set(slug, promise);
+    return promise;
+  }
+
+  private loadLandmarkTemplate(slug: KilnLandmarkSkinSlug): Promise<KilnLandmarkSkinTemplate | null> {
+    if (!this.enabledLandmarkSkins.has(slug)) return Promise.resolve(null);
+    const existing = this.landmarkTemplates.get(slug);
+    if (existing) return existing;
+
+    const promise = this.loadManifest()
+      .then(async (manifest) => {
+        const asset = manifest?.assets?.find((entry) => entry.slug === slug);
+        if (!asset || asset.status !== 'ready' || !asset.file) {
+          this.failed.push(`${slug}: missing ready manifest record`);
+          return null;
+        }
+        const sourceUrl = publicAssetUrl(`assets/kiln/${asset.file}`, this.baseUrl);
+        this.modelRequests.push(sourceUrl);
+        const gltf = await this.loader.loadAsync(sourceUrl);
+        const shrine = RUNTIME_LANDMARK_SKINS[slug];
+        const { template, runtimeSourceBboxSize, normalizedBboxSize, sourceMeshCount, orientation } =
+          normalizeLandmarkTemplate(gltf.scene as unknown as THREE.Object3D, slug, shrine.targetFootprint, shrine.targetHeight, shrine.hideGlbNames);
+        this.loadedLandmarkSkins.add(slug);
+        const fit: KilnLandmarkSkinFitSnapshot = {
+          slug,
+          kind: shrine.kind,
+          socketRole: 'pentagon-landmark-shell',
+          sourceBboxSize: sourceBboxSize(asset),
+          runtimeSourceBboxSize,
+          normalizedBboxSize,
+          normalizePolicy: 'center-xz-bottom-y-fit-footprint-height',
+          orientation,
+          animationPolicy: 'static-shell-with-procedural-threshold-overlays',
+          sourceUrl,
+          sourceMeshCount,
+          materialCount: asset.geometry?.materialCount,
+          targetFootprint: shrine.targetFootprint,
+          targetHeight: shrine.targetHeight,
+          hiddenGlbNames: shrine.hideGlbNames,
+          acceptanceNote: shrine.acceptanceNote,
+        };
+        return {
+          slug,
+          kind: shrine.kind,
+          manifest: asset,
+          sourceUrl,
+          template,
+          fit,
+        };
+      })
+      .catch((err: unknown) => {
+        this.failed.push(`${slug}: ${err instanceof Error ? err.message : String(err)}`);
+        return null;
+      });
+
+    this.landmarkTemplates.set(slug, promise);
     return promise;
   }
 }

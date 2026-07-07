@@ -3,6 +3,21 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-07
 
+- Closed the H5/K7 shrine-landmark GLB adoption slice and moved the approved ready pack
+  from 58/70 to 70/70 runtime-adopted GLBs. `LandmarkRenderer` now receives the shared
+  `KilnRuntimeAssets` provider, maps the 12 pentagon indices to the approved `shrine-*`
+  shells, normalizes them with per-shrine footprint/height targets, hides duplicated
+  procedural landmark body parts only after GLB success, and keeps the landscape apron,
+  domain halo, quiet/awake glows, signal beam, threshold meshes/materials, discovery
+  state, terrain-opening truth, and fallback code-owned. Baked water/glow nodes are hidden
+  by exact GLB node name so the art does not imply the wrong live state. The shared
+  surface-frame contract now builds right-handed planet-local matrices for shrines, trees,
+  structures, pickups, resources, creatures, fish, cave markers, and other surface props so
+  y-up GLBs stand on the local hex normal instead of inheriting reflected/tilted transforms. Added
+  `test/landmarkRenderer.test.ts` coverage for success and fallback, extended
+  `npm run proof:k7-wonders` to visit/prove all 12 shrine GLBs plus the three crater GLBs,
+  asserts shrine basis determinant/up-dot, and updated the Kiln viewer/proof to use the same
+  per-shrine socket proportions.
 - Closed the first H5/K7 wonder and route-marker GLB adoption slice. `cave-anchor`
   now loads the approved Kiln GLB through the structure skin path while preserving
   cave glyphs, rope pulses, flood/spring markers, route readback, and active glow as
@@ -15,12 +30,11 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   all three crater GLBs with zero fallback, zero generated-path runtime requests, and
   screenshots under `output/playwright/k7-wonder-skins/`.
 - Expanded the Kiln alignment viewer for the accepted K7 subset. The `structures`
-  family now includes `cave-anchor`, a new `wonders` family covers the three crater
-  shells, and `adopted` now proves 58 of 70 ready GLBs. `npm run
+  family now includes `cave-anchor`, the `wonders` family covers shrine and crater
+  shells, and `adopted` now proves all 70 ready GLBs. `npm run
   proof:kiln-asset-viewer` passes with 10 overview screenshots, all 70 ready
   single-asset screenshots, zero page/console errors, and zero generated-path runtime
-  requests. The 12 remaining ready GLBs are the shrine landmark shells, which need a
-  dedicated landmark-skin provider and per-shrine fit/overlay proof before wiring.
+  requests.
 - Closed the H5/K4 utility and waterline GLB adoption slice. `compost-bin`,
   `rain-cistern`, `root-cellar`, `dock-segment`, `fish-trap`, `shore-net`, and
   `lantern-post` now load approved Kiln GLBs as decorative skins over code-owned center

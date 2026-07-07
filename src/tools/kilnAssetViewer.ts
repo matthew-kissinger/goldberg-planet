@@ -79,6 +79,21 @@ interface KilnSocketProfile {
 const HEX_FLAT_TO_FLAT_WORLD_UNITS = 5.6;
 const HEX_RADIUS_WORLD_UNITS = HEX_FLAT_TO_FLAT_WORLD_UNITS / Math.sqrt(3);
 
+const SHRINE_SOCKET_PROFILES: Record<string, { footprint: number; height: number }> = {
+  'shrine-first-hearth': { footprint: 4.6, height: 3.0 },
+  'shrine-rainward-gate': { footprint: 4.4, height: 4.2 },
+  'shrine-salt-mirror': { footprint: 4.6, height: 3.3 },
+  'shrine-high-lantern': { footprint: 3.6, height: 7.4 },
+  'shrine-root-vault': { footprint: 4.4, height: 3.5 },
+  'shrine-red-cairn': { footprint: 4.2, height: 3.2 },
+  'shrine-snow-dial': { footprint: 4.6, height: 4.6 },
+  'shrine-glass-shoal': { footprint: 4.6, height: 3.0 },
+  'shrine-storm-seat': { footprint: 4.2, height: 5.6 },
+  'shrine-reed-crown': { footprint: 4.6, height: 4.2 },
+  'shrine-deep-bell': { footprint: 4.4, height: 5.2 },
+  'shrine-last-horizon': { footprint: 4.0, height: 6.8 },
+};
+
 const FAMILY_SLUGS: Record<KilnViewerFamily, readonly string[]> = {
   structures: [
     'waystone',
@@ -142,6 +157,18 @@ const FAMILY_SLUGS: Record<KilnViewerFamily, readonly string[]> = {
     'bird-storm-finch',
   ],
   wonders: [
+    'shrine-first-hearth',
+    'shrine-rainward-gate',
+    'shrine-salt-mirror',
+    'shrine-high-lantern',
+    'shrine-root-vault',
+    'shrine-red-cairn',
+    'shrine-snow-dial',
+    'shrine-glass-shoal',
+    'shrine-storm-seat',
+    'shrine-reed-crown',
+    'shrine-deep-bell',
+    'shrine-last-horizon',
     'crater-emberfall',
     'crater-glassrain',
     'crater-starbloom',
@@ -214,7 +241,8 @@ function socketProfileFor(slug: string, family: KilnViewerFamily, asset?: KilnMa
     return { role: 'harvest/resource node', grid: 'single-hex interactable node', footprint: 1.5, height: 1.35, ringColor: 0x94d6ff };
   }
   if (slug.startsWith('shrine-')) {
-    return { role: 'wonder landmark', grid: 'single-hex landmark socket', footprint: 4.6, height: 4.2, ringColor: 0xd7c3ff };
+    const socket = SHRINE_SOCKET_PROFILES[slug] ?? { footprint: 4.6, height: 4.2 };
+    return { role: 'wonder landmark', grid: 'single-hex landmark socket', footprint: socket.footprint, height: socket.height, ringColor: 0xd7c3ff };
   }
   if (slug.startsWith('crater-')) {
     return { role: 'skyfall crater shell', grid: 'single-hex terrain dressing', footprint: 5.25, height: 1.15, ringColor: 0xffbd75 };

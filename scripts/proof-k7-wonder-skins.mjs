@@ -28,6 +28,21 @@ const TARGETS = [
   { kind: 'starBloom', slug: 'crater-starbloom' },
 ];
 
+const LANDMARK_TARGETS = [
+  { index: 0, slug: 'shrine-first-hearth' },
+  { index: 1, slug: 'shrine-rainward-gate' },
+  { index: 2, slug: 'shrine-salt-mirror' },
+  { index: 3, slug: 'shrine-high-lantern' },
+  { index: 4, slug: 'shrine-root-vault' },
+  { index: 5, slug: 'shrine-red-cairn' },
+  { index: 6, slug: 'shrine-snow-dial' },
+  { index: 7, slug: 'shrine-glass-shoal' },
+  { index: 8, slug: 'shrine-storm-seat' },
+  { index: 9, slug: 'shrine-reed-crown' },
+  { index: 10, slug: 'shrine-deep-bell' },
+  { index: 11, slug: 'shrine-last-horizon' },
+];
+
 async function getFreePort() {
   if (requestedPort > 0) return requestedPort;
   return new Promise((resolve, reject) => {
@@ -234,6 +249,49 @@ async function waitForCraterSkin(page, slug) {
   }), slug);
 }
 
+async function seedLandmarkProgression(page) {
+  return page.evaluate(() => {
+    const world = window.__world;
+    if (!world?.save?.export || !world?.save?.import || !world?.landmarks || !world?.spawnAtPentagon) {
+      throw new Error('missing K7 shrine proof hooks');
+    }
+    const save = JSON.parse(world.save.export());
+    const tiles = world.landmarks().items.map((landmark) => landmark.tile);
+    save.progression = {
+      ...(save.progression ?? {}),
+      pentagons: tiles,
+      siteCompletions: tiles,
+    };
+    if (!world.save.import(JSON.stringify(save))) throw new Error('failed to import shrine proof progression');
+    return { tiles, landmarks: world.landmarks() };
+  });
+}
+
+async function waitForLandmarkSkin(page, slug, index) {
+  await page.evaluate((targetIndex) => {
+    window.__world.spawnAtPentagon(targetIndex, 8.5);
+  }, index);
+  await page.waitForFunction((targetSlug) => {
+    const renderer = window.__world?.landmarks?.().renderer;
+    const row = renderer?.kilnLandmarkSkinsBySlug?.[targetSlug];
+    return (row?.loaded ?? 0) === 1
+      && (row?.fallback ?? 0) === 0
+      && (renderer?.kilnLandmarkSkinFallbacks ?? 0) === 0
+      && (renderer?.kilnLandmarkGlbMeshesVisible ?? 0) >= 12
+      && (renderer?.proceduralLandmarkShellPartsVisible ?? 1) === 0
+      && (renderer?.proceduralLandmarkOverlaysVisible ?? 0) >= 24
+      && (renderer?.proceduralThresholdPartsVisible ?? 0) > 40
+      && (renderer?.surfaceBasisDeterminantMin ?? 0) > 0.995
+      && (renderer?.surfaceUpDotMin ?? 0) > 0.995;
+  }, slug, { timeout: 90000 });
+  return page.evaluate((targetSlug) => ({
+    landmarks: window.__world.landmarks(),
+    text: JSON.parse(window.render_game_to_text()),
+    kiln: window.__world.stats?.().kilnAssets ?? null,
+    slug: targetSlug,
+  }), slug);
+}
+
 async function main() {
   const { chromium } = loadPlaywright();
   await fs.mkdir(outDir, { recursive: true });
@@ -286,9 +344,24 @@ async function main() {
       runs.push({ ...targetSkin, setup, proof, screenshot, pixelProbe: { canvas: pixelProbe, screenshot: screenshotProbe } });
     }
 
+    const landmarkSetup = await seedLandmarkProgression(page);
+    const landmarkRuns = [];
+    for (const targetSkin of LANDMARK_TARGETS) {
+      const proof = await waitForLandmarkSkin(page, targetSkin.slug, targetSkin.index);
+      await page.waitForTimeout(250);
+      const screenshot = path.join(outDir, `${targetSkin.slug}.png`);
+      const screenshotBuffer = await page.screenshot({ path: screenshot, fullPage: false });
+      const pixelProbe = await canvasPixelProbe(page);
+      const screenshotProbe = pngPixelProbe(screenshotBuffer);
+      if (!pixelProbe.ok && !screenshotProbe.ok) {
+        throw new Error(`${targetSkin.slug}: pixel probe failed ${JSON.stringify({ pixelProbe, screenshotProbe })}`);
+      }
+      landmarkRuns.push({ ...targetSkin, proof, screenshot, pixelProbe: { canvas: pixelProbe, screenshot: screenshotProbe } });
+    }
+
     const generatedRequests = kilnAssetRequests.filter((url) => url.includes('/assets/kiln/generated/'));
     if (generatedRequests.length > 0) throw new Error(`K7 proof requested raw generated assets: ${JSON.stringify(generatedRequests)}`);
-    for (const targetSkin of TARGETS) {
+    for (const targetSkin of [...TARGETS, ...LANDMARK_TARGETS]) {
       const ok = kilnAssetResponses.some((asset) => asset.url.includes(`/assets/kiln/models/${targetSkin.slug}.glb`) && asset.status >= 200 && asset.status < 300);
       if (!ok) throw new Error(`Missing successful ${targetSkin.slug}.glb response`);
     }
@@ -299,6 +372,8 @@ async function main() {
       url: target,
       generatedAt: new Date().toISOString(),
       runs,
+      landmarkSetup,
+      landmarkRuns,
       kilnAssetRequests,
       kilnAssetResponses,
       generatedRequests,
@@ -308,8 +383,9 @@ async function main() {
     await fs.writeFile(path.join(outDir, 'proof.json'), JSON.stringify(proof, null, 2));
     console.log(JSON.stringify({
       ok: true,
-      slugs: TARGETS.map((entry) => entry.slug),
-      screenshots: runs.map((entry) => entry.screenshot),
+      craterSlugs: TARGETS.map((entry) => entry.slug),
+      landmarkSlugs: LANDMARK_TARGETS.map((entry) => entry.slug),
+      screenshots: [...runs, ...landmarkRuns].map((entry) => entry.screenshot),
       generatedRequests: generatedRequests.length,
       consoleErrors: consoleErrors.length,
       pageErrors: pageErrors.length,

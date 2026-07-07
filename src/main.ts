@@ -589,7 +589,7 @@ async function boot(): Promise<void> {
   const observedCaveResonances = new Set(normalizeCaveResonanceObservations(loadedSave?.progression?.caveResonanceObservations));
   const tendedNativeCreatures = new Set(normalizeNativeCreatureTends(loadedSave?.progression?.nativeCreatureTends));
   const wardedNativeCreatures = new Set(normalizeNativeCreatureWards(loadedSave?.progression?.nativeCreatureWards));
-  const landmarkRenderer = new LandmarkRenderer(scene, pentagonTiles);
+  const landmarkRenderer = new LandmarkRenderer(scene, pentagonTiles, kilnAssets);
   const domainResourceRenderer = new DomainResourceRenderer(scene, kilnAssets);
   const skyfallRenderer = new SkyfallRenderer(scene, kilnAssets);
   const caveMouthRenderer = new CaveMouthRenderer(scene);
@@ -2892,7 +2892,7 @@ async function boot(): Promise<void> {
     return true;
   };
 
-  const spawnAtPentagon = (index = 0) => {
+  const spawnAtPentagon = (index = 0, standOffInput = 4.5) => {
     const i = Math.max(0, Math.min(pentagonTiles.length - 1, Math.trunc(index)));
     const tile = pentagonTiles[i];
     if (tile === undefined) return null;
@@ -2922,7 +2922,7 @@ async function boot(): Promise<void> {
     az /= al;
     const ground = layers.topRadius(columns.groundLayerBelow(tile, layers.bounds[0]));
     const r = Math.max(ground + 0.08, WATER_SURFACE + 0.45);
-    const standOff = 4.5;
+    const standOff = Math.max(2.5, Math.min(12, Number.isFinite(standOffInput) ? Number(standOffInput) : 4.5));
     player.px = nx * r + ax * standOff;
     player.py = ny * r + ay * standOff;
     player.pz = nz * r + az * standOff;

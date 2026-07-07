@@ -85,6 +85,18 @@ const baseFamilySlugs = {
     'bird-storm-finch',
   ],
   wonders: [
+    'shrine-first-hearth',
+    'shrine-rainward-gate',
+    'shrine-salt-mirror',
+    'shrine-high-lantern',
+    'shrine-root-vault',
+    'shrine-red-cairn',
+    'shrine-snow-dial',
+    'shrine-glass-shoal',
+    'shrine-storm-seat',
+    'shrine-reed-crown',
+    'shrine-deep-bell',
+    'shrine-last-horizon',
     'crater-emberfall',
     'crater-glassrain',
     'crater-starbloom',
@@ -92,6 +104,21 @@ const baseFamilySlugs = {
 };
 
 let familySlugs = { ...baseFamilySlugs };
+
+const shrineSocketProfiles = {
+  'shrine-first-hearth': { footprint: 4.6, height: 3.0 },
+  'shrine-rainward-gate': { footprint: 4.4, height: 4.2 },
+  'shrine-salt-mirror': { footprint: 4.6, height: 3.3 },
+  'shrine-high-lantern': { footprint: 3.6, height: 7.4 },
+  'shrine-root-vault': { footprint: 4.4, height: 3.5 },
+  'shrine-red-cairn': { footprint: 4.2, height: 3.2 },
+  'shrine-snow-dial': { footprint: 4.6, height: 4.6 },
+  'shrine-glass-shoal': { footprint: 4.6, height: 3.0 },
+  'shrine-storm-seat': { footprint: 4.2, height: 5.6 },
+  'shrine-reed-crown': { footprint: 4.6, height: 4.2 },
+  'shrine-deep-bell': { footprint: 4.4, height: 5.2 },
+  'shrine-last-horizon': { footprint: 4.0, height: 6.8 },
+};
 
 async function getFreePort() {
   if (requestedPort > 0) return requestedPort;
@@ -252,6 +279,12 @@ function assertViewerState(label, state, expected) {
     if ((record.socketScale ?? 0) <= 0 || (record.meshCount ?? 0) <= 0) throw new Error(`${label}: ${slug} has invalid fit metrics ${JSON.stringify(record)}`);
     if (record.hexFlatToFlatWorldUnits !== 5.6 || !record.socketRole || !record.socketGrid) {
       throw new Error(`${label}: ${slug} missing socket diagnostics ${JSON.stringify(record)}`);
+    }
+    const shrineSocket = shrineSocketProfiles[slug];
+    if (shrineSocket) {
+      if (record.socketFootprint !== shrineSocket.footprint || record.socketTargetHeight !== shrineSocket.height) {
+        throw new Error(`${label}: ${slug} shrine socket drift ${JSON.stringify({ expected: shrineSocket, actual: { footprint: record.socketFootprint, height: record.socketTargetHeight } })}`);
+      }
     }
     if (record.placementFrame?.up !== '+Y local planet normal' || record.placementFrame?.pivot !== 'center-xz-bottom-y') {
       throw new Error(`${label}: ${slug} missing placement-frame contract ${JSON.stringify(record)}`);

@@ -13,6 +13,7 @@ import {
   type KilnFishSkinSlug,
   type KilnFishSkinTemplate,
 } from './kilnAssets';
+import { makeSurfaceBasisFromYaw } from './surfaceFrame';
 
 export interface FishSchoolVisualSite {
   id: number;
@@ -299,20 +300,10 @@ export class FishSchoolRenderer {
     const c = geo.centers;
     const frame = geo.frameOf(tile);
     const yaw = this.currentSite.id * 0.013 + seconds * 0.18;
-    const ca = Math.cos(yaw);
-    const sa = Math.sin(yaw);
-    const vY = new THREE.Vector3(...frame.normal);
-    const vX = new THREE.Vector3(
-      frame.east[0] * ca + frame.north[0] * sa,
-      frame.east[1] * ca + frame.north[1] * sa,
-      frame.east[2] * ca + frame.north[2] * sa,
-    );
-    const vZ = new THREE.Vector3(
-      -frame.east[0] * sa + frame.north[0] * ca,
-      -frame.east[1] * sa + frame.north[1] * ca,
-      -frame.east[2] * sa + frame.north[2] * ca,
-    );
-    this.group.setRotationFromMatrix(new THREE.Matrix4().makeBasis(vX, vY, vZ));
+    const vX = new THREE.Vector3();
+    const vY = new THREE.Vector3();
+    const vZ = new THREE.Vector3();
+    this.group.setRotationFromMatrix(makeSurfaceBasisFromYaw(frame, yaw, new THREE.Matrix4(), vX, vY, vZ));
     const swimBob = Math.sin(seconds * 1.45 + this.currentSite.id * 0.17) * 0.035;
     const radius = WATER_SURFACE + 0.08 + swimBob;
     this.group.position.set(

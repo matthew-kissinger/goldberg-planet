@@ -12,6 +12,7 @@ import {
   type KilnCreatureSkinSlug,
   type KilnCreatureSkinTemplate,
 } from './kilnAssets';
+import { makeSurfaceBasisFromForward, makeSurfaceBasisFromYaw } from './surfaceFrame';
 
 export const KILN_CREATURE_SKIN_SLUGS: readonly KilnCreatureSkinSlug[] = [
   'creature-moss-puff',
@@ -724,27 +725,14 @@ export class NativeLifeRenderer {
         moveDir.addScaledVector(vY, -moveDir.dot(vY));
         if (moveDir.lengthSq() > 1e-8) {
           vZ.copy(moveDir).normalize();
-          vX.crossVectors(vY, vZ).normalize();
+          makeSurfaceBasisFromForward(vY, vZ, m, vX, vY, vZ);
         } else {
-          vX.set(...frame.east);
-          vZ.set(...frame.north);
+          makeSurfaceBasisFromYaw(frame, 0, m, vX, vY, vZ);
         }
       } else {
         const yaw = site.id * 0.41 + Math.sin(seconds * 0.58 + site.id) * 0.16;
-        const ca = Math.cos(yaw);
-        const sa = Math.sin(yaw);
-        vX.set(
-          frame.east[0] * ca + frame.north[0] * sa,
-          frame.east[1] * ca + frame.north[1] * sa,
-          frame.east[2] * ca + frame.north[2] * sa,
-        );
-        vZ.set(
-          -frame.east[0] * sa + frame.north[0] * ca,
-          -frame.east[1] * sa + frame.north[1] * ca,
-          -frame.east[2] * sa + frame.north[2] * ca,
-        );
+        makeSurfaceBasisFromYaw(frame, yaw, m, vX, vY, vZ);
       }
-      m.makeBasis(vX, vY, vZ);
       obj.setRotationFromMatrix(m);
       const ground = layers.topRadius(columns.groundLayerBelow(frameTile, layers.bounds[0]));
       const hop = site.kind === 'brambleback'

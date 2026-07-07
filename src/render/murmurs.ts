@@ -4,6 +4,7 @@ import type { Columns } from '../world/columns';
 import type { Layers } from '../world/layers';
 import { WATER_SURFACE } from '../world/layers';
 import type { MurmurKind, MurmurSite } from '../sim/murmurs';
+import { makeSurfaceBasisFromYaw } from './surfaceFrame';
 
 function mat(color: number, roughness = 0.64, metalness = 0.04, emissive = 0x000000, intensity = 0.35): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
@@ -145,20 +146,7 @@ export class MurmurRenderer {
       if (!obj.visible) continue;
       const frame = geo.frameOf(site.tile);
       const yaw = site.id * 0.37;
-      const ca = Math.cos(yaw);
-      const sa = Math.sin(yaw);
-      vX.set(
-        frame.east[0] * ca + frame.north[0] * sa,
-        frame.east[1] * ca + frame.north[1] * sa,
-        frame.east[2] * ca + frame.north[2] * sa,
-      );
-      vY.set(...frame.normal);
-      vZ.set(
-        -frame.east[0] * sa + frame.north[0] * ca,
-        -frame.east[1] * sa + frame.north[1] * ca,
-        -frame.east[2] * sa + frame.north[2] * ca,
-      );
-      m.makeBasis(vX, vY, vZ);
+      makeSurfaceBasisFromYaw(frame, yaw, m, vX, vY, vZ);
       obj.setRotationFromMatrix(m);
       const ground = layers.topRadius(columns.groundLayerBelow(site.tile, layers.bounds[0]));
       const r = Math.max(ground + 0.16, WATER_SURFACE + 0.24);

@@ -4,6 +4,7 @@ import type { Columns } from '../world/columns';
 import type { Layers } from '../world/layers';
 import { WATER_SURFACE } from '../world/layers';
 import type { StrangerSeasonAfterglow } from '../sim/eventSeasons';
+import { makeSurfaceBasisFromYaw } from './surfaceFrame';
 
 function mat(color: number, roughness = 0.58, metalness = 0.04, emissive = 0x000000, intensity = 0.35): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
@@ -115,20 +116,10 @@ export class SeasonAfterglowRenderer {
 
     const frame = geo.frameOf(afterglow.tile);
     const yaw = afterglow.id * 0.29;
-    const ca = Math.cos(yaw);
-    const sa = Math.sin(yaw);
-    const vX = new THREE.Vector3(
-      frame.east[0] * ca + frame.north[0] * sa,
-      frame.east[1] * ca + frame.north[1] * sa,
-      frame.east[2] * ca + frame.north[2] * sa,
-    );
-    const vY = new THREE.Vector3(...frame.normal);
-    const vZ = new THREE.Vector3(
-      -frame.east[0] * sa + frame.north[0] * ca,
-      -frame.east[1] * sa + frame.north[1] * ca,
-      -frame.east[2] * sa + frame.north[2] * ca,
-    );
-    obj.setRotationFromMatrix(new THREE.Matrix4().makeBasis(vX, vY, vZ));
+    const vX = new THREE.Vector3();
+    const vY = new THREE.Vector3();
+    const vZ = new THREE.Vector3();
+    obj.setRotationFromMatrix(makeSurfaceBasisFromYaw(frame, yaw, new THREE.Matrix4(), vX, vY, vZ));
     const c = geo.centers;
     const ground = layers.topRadius(columns.groundLayerBelow(afterglow.tile, layers.bounds[0]));
     const r = Math.max(ground + 0.14, WATER_SURFACE + 0.22);
