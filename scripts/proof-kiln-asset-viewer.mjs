@@ -58,6 +58,12 @@ const baseFamilySlugs = {
     'creature-driftjelly',
     'fish-reed-fry',
   ],
+  birds: [
+    'bird-sky-kite',
+    'bird-shore-gull',
+    'bird-forest-flutter',
+    'bird-storm-finch',
+  ],
 };
 
 let familySlugs = { ...baseFamilySlugs };

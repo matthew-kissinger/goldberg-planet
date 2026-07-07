@@ -552,6 +552,46 @@
       "prompt": "Exactly one tiny reed-water fry fish character body for instancing: small rounded single bait fish, simple eyes, short fins, compact readable silhouette, centered at origin, no other fish, no reed scrap, no plants, no water, no base, no scene."
     },
     {
+      "slug": "bird-sky-kite",
+      "title": "Bird · Sky Kite",
+      "category": "character",
+      "role": "prop",
+      "tier": "standard",
+      "footprint": "small",
+      "animate": true,
+      "prompt": "Exactly one goofy low-poly sky-kite bird character body for instancing: wide simple wings, small rounded body, tiny tail fan, big simple eyes, centered at origin in a neutral flying pose, no other birds, no flock, no branch, no tree, no sky, no base, no scene."
+    },
+    {
+      "slug": "bird-shore-gull",
+      "title": "Bird · Shore Gull",
+      "category": "character",
+      "role": "prop",
+      "tier": "standard",
+      "footprint": "small",
+      "animate": true,
+      "prompt": "Exactly one silly low-poly shore gull bird character body for instancing: compact white-grey body, long simple beak, wide wings, tiny feet tucked close, readable single-bird silhouette, centered at origin, no other birds, no flock, no water, no dock, no rocks, no base, no scene."
+    },
+    {
+      "slug": "bird-forest-flutter",
+      "title": "Bird · Forest Flutter",
+      "category": "character",
+      "role": "prop",
+      "tier": "standard",
+      "footprint": "small",
+      "animate": true,
+      "prompt": "Exactly one goofy low-poly forest flutter bird character body for instancing: round colorful body, short wings, small tail feathers, oversized curious eyes, centered at origin in a neutral flying pose, no other birds, no flock, no branch, no leaves, no tree, no base, no scene."
+    },
+    {
+      "slug": "bird-storm-finch",
+      "title": "Bird · Storm Finch",
+      "category": "character",
+      "role": "prop",
+      "tier": "standard",
+      "footprint": "small",
+      "animate": true,
+      "prompt": "Exactly one low-poly storm finch bird character body for instancing: angular small body, swept wings, tiny crest, bright accent tips, big simple eyes, centered at origin in a neutral flying pose, no lightning effect, no other birds, no flock, no clouds, no weather scene, no base."
+    },
+    {
       "slug": "cave-mouth-arch",
       "title": "Cave Mouth · Arch",
       "category": "prop",

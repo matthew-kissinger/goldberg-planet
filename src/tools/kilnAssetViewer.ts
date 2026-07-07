@@ -7,7 +7,7 @@ import {
   type KilnInstancedOrientationSnapshot,
 } from '../render/kilnAssets';
 
-type KilnViewerFamily = 'structures' | 'drops' | 'nodes' | 'trees' | 'creatures' | 'fish' | 'adopted' | 'ready' | 'generated';
+type KilnViewerFamily = 'structures' | 'drops' | 'nodes' | 'trees' | 'creatures' | 'fish' | 'birds' | 'adopted' | 'ready' | 'generated';
 
 interface KilnManifestAsset {
   slug: string;
@@ -115,14 +115,15 @@ const FAMILY_SLUGS: Record<KilnViewerFamily, readonly string[]> = {
     'creature-driftjelly',
     'fish-reed-fry',
   ],
-  adopted: [],
-  ready: [],
-  generated: [
+  birds: [
     'bird-sky-kite',
     'bird-shore-gull',
     'bird-forest-flutter',
     'bird-storm-finch',
   ],
+  adopted: [],
+  ready: [],
+  generated: [],
 };
 
 FAMILY_SLUGS.adopted = [
@@ -132,6 +133,7 @@ FAMILY_SLUGS.adopted = [
   ...FAMILY_SLUGS.trees,
   ...FAMILY_SLUGS.creatures,
   ...FAMILY_SLUGS.fish,
+  ...FAMILY_SLUGS.birds,
 ];
 
 function publicAssetUrl(relativePath: string): string {
@@ -142,13 +144,13 @@ function publicAssetUrl(relativePath: string): string {
 
 function selectedFamily(params: URLSearchParams): KilnViewerFamily {
   const raw = params.get('family') ?? 'ready';
-  return raw === 'structures' || raw === 'drops' || raw === 'nodes' || raw === 'trees' || raw === 'creatures' || raw === 'fish' || raw === 'adopted' || raw === 'ready' || raw === 'generated'
+  return raw === 'structures' || raw === 'drops' || raw === 'nodes' || raw === 'trees' || raw === 'creatures' || raw === 'fish' || raw === 'birds' || raw === 'adopted' || raw === 'ready' || raw === 'generated'
     ? raw
     : 'ready';
 }
 
 function familyForSlug(slug: string): KilnViewerFamily {
-  for (const family of ['structures', 'drops', 'nodes', 'trees', 'creatures', 'fish'] as KilnViewerFamily[]) {
+  for (const family of ['structures', 'drops', 'nodes', 'trees', 'creatures', 'fish', 'birds'] as KilnViewerFamily[]) {
     if (FAMILY_SLUGS[family].includes(slug)) return family;
   }
   return 'ready';
@@ -171,7 +173,7 @@ function socketProfileFor(slug: string, family: KilnViewerFamily, asset?: KilnMa
     return { role: 'instanced aquatic body', grid: 'waterline/underwater school anchor socket', footprint: 1.65, height: 1.0, ringColor: 0x87d9e8 };
   }
   if (slug.startsWith('bird-')) {
-    return { role: 'generated single bird body review', grid: 'instanced sky-life/boid body socket', footprint: 1.8, height: 1.15, ringColor: 0xb6d7ff };
+    return { role: 'instanced sky-life body', grid: 'sky-life/flock anchor socket', footprint: 1.8, height: 1.15, ringColor: 0xb6d7ff };
   }
   if (slug.startsWith('creature-') || family === 'creatures') {
     return { role: 'tile-anchored native creature', grid: 'single-hex occupied tile', footprint: 1.75, height: 1.25, ringColor: 0xe4a85c };
@@ -631,7 +633,8 @@ export async function bootKilnAssetViewer(): Promise<void> {
     const sourceUrl = publicAssetUrl(`assets/kiln/${asset.file}`);
     try {
       const gltf = await loader.loadAsync(sourceUrl);
-      const built = assetFamily === 'creatures'
+      const animatedBody = assetFamily === 'creatures' || assetFamily === 'birds';
+      const built = animatedBody
         ? makeNormalizedAnimatedObject(gltf.scene as unknown as THREE.Object3D, slug, profile)
         : makeNormalizedStaticObject(gltf.scene as unknown as THREE.Object3D, slug, profile, asset);
       built.object.position.y = 0;
@@ -641,9 +644,12 @@ export async function bootKilnAssetViewer(): Promise<void> {
       const helper = new THREE.Box3Helper(box, 0xd4eef8);
       helper.name = `viewer-bounds-${slug}`;
       content.add(helper);
-      if (assetFamily === 'creatures' && gltf.animations.length > 0) {
+      if (animatedBody && gltf.animations.length > 0) {
         const mixer = new THREE.AnimationMixer(built.object);
-        const clip = gltf.animations.find((entry) => entry.name === 'idle') ?? gltf.animations[0];
+        const clip = gltf.animations.find((entry) => entry.name === 'idle')
+          ?? gltf.animations.find((entry) => entry.name === 'glide')
+          ?? gltf.animations.find((entry) => entry.name === 'flap')
+          ?? gltf.animations[0];
         mixer.clipAction(clip).play();
         mixers.push(mixer);
       }

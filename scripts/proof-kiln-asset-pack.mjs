@@ -27,6 +27,12 @@ const AQUATIC_SINGLETON_SLUGS = new Set([
   'creature-driftjelly',
   'fish-reed-fry',
 ]);
+const SKY_SINGLETON_SLUGS = new Set([
+  'bird-sky-kite',
+  'bird-shore-gull',
+  'bird-forest-flutter',
+  'bird-storm-finch',
+]);
 const mode = process.env.KILN_ASSET_STAGE || (existsSync(manifestPath) ? 'promoted' : 'generated');
 
 const failures = [];
@@ -255,7 +261,7 @@ function decisionFor(asset, glbSummary) {
   }
   const blockers = [];
   if (asset.modularKit) blockers.push('modular kit proportions must be normalized to the build grid before snapping/assembly');
-  if (asset.category === 'character' && !AQUATIC_SINGLETON_SLUGS.has(asset.slug)) blockers.push('node-transform idle/walk clips need AnimationMixer proof in game');
+  if (asset.category === 'character' && !AQUATIC_SINGLETON_SLUGS.has(asset.slug) && !SKY_SINGLETON_SLUGS.has(asset.slug)) blockers.push('node-transform idle/walk clips need AnimationMixer proof in game');
   if (asset.slug?.startsWith('tree-')) blockers.push('trees need an instanced scatter/LOD layer before replacement');
   if (asset.slug?.startsWith('shrine-')) blockers.push('shrine/landmark scale and route readability need blind screenshot proof');
   if (asset.slug?.startsWith('crater-')) blockers.push('crater assets need skyfall placement and collision/scale proof');
@@ -267,6 +273,13 @@ function decisionFor(asset, glbSummary) {
       slug: asset.slug,
       state: 'accepted-candidate',
       reason: 'accepted aquatic singleton; runtime proof owns fish-school selection, forward-axis normalization, point-school rendering, and distance-gated AnimationMixer playback',
+    };
+  }
+  if (SKY_SINGLETON_SLUGS.has(asset.slug)) {
+    return {
+      slug: asset.slug,
+      state: 'accepted-candidate',
+      reason: 'accepted sky-life singleton; runtime proof owns sky-life selection, flock point rendering, altitude/pathing, and distance-gated AnimationMixer playback',
     };
   }
   return {
@@ -348,6 +361,10 @@ function validatePromotedAssets() {
           if (AQUATIC_SINGLETON_SLUGS.has(asset.slug)) {
             if (!names.has('idle') || (!names.has('swim') && !names.has('pulse'))) {
               fail(`${asset.slug} aquatic character asset must include idle plus swim or pulse clips`);
+            }
+          } else if (SKY_SINGLETON_SLUGS.has(asset.slug)) {
+            if (!names.has('idle') || (!names.has('flap') && !names.has('glide'))) {
+              fail(`${asset.slug} sky-life character asset must include idle plus flap or glide clips`);
             }
           } else if (!names.has('idle') || !names.has('walk')) {
             fail(`${asset.slug} character asset must include idle and walk clips`);

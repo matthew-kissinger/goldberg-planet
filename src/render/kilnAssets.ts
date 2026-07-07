@@ -38,6 +38,12 @@ export type KilnFishSkinSlug =
   | 'fish-cave-shimmer'
   | 'creature-driftjelly'
   | 'fish-reed-fry';
+export type KilnBirdSkinSlug =
+  | 'bird-sky-kite'
+  | 'bird-shore-gull'
+  | 'bird-forest-flutter'
+  | 'bird-storm-finch';
+export type KilnBirdKind = 'sky' | 'shore' | 'forest' | 'storm';
 
 type KilnAssetStatus = 'ready' | 'unused' | 'missing';
 
@@ -150,6 +156,10 @@ export interface KilnAssetSnapshot {
   fishSkins?: {
     enabled: readonly KilnFishSkinSlug[];
     loaded: readonly KilnFishSkinSlug[];
+  };
+  birdSkins?: {
+    enabled: readonly KilnBirdSkinSlug[];
+    loaded: readonly KilnBirdSkinSlug[];
   };
 }
 
@@ -343,6 +353,41 @@ export interface FishSkinProvider {
   snapshot?(): KilnAssetSnapshot;
 }
 
+export interface KilnBirdSkinFitSnapshot {
+  slug: KilnBirdSkinSlug;
+  kind: KilnBirdKind;
+  socketRole: 'sky-life-body';
+  sourceBboxSize: readonly number[];
+  runtimeSourceBboxSize: readonly number[];
+  normalizedBboxSize: readonly number[];
+  normalizePolicy: 'center-xyz-fit-span-preserve-y-up';
+  orientation: KilnInstancedOrientationSnapshot;
+  animationPolicy: 'single-animated-anchors-plus-point-flock-near-freeze-far';
+  sourceUrl: string;
+  sourceMeshCount: number;
+  materialCount?: number;
+  animationClips: readonly { name: string; channels: number; durationSec: number }[];
+  activeMixerRadius: number;
+  lowRateMixerRadius: number;
+  frozenMixerRadius: number;
+  acceptanceNote: string;
+}
+
+export interface KilnBirdSkinTemplate {
+  slug: KilnBirdSkinSlug;
+  kind: KilnBirdKind;
+  manifest: KilnManifestAsset;
+  sourceUrl: string;
+  template: THREE.Object3D;
+  clips: readonly THREE.AnimationClip[];
+  fit: KilnBirdSkinFitSnapshot;
+}
+
+export interface BirdSkinProvider {
+  createBirdSkinTemplate(slug: KilnBirdSkinSlug): Promise<KilnBirdSkinTemplate | null>;
+  snapshot?(): KilnAssetSnapshot;
+}
+
 const RUNTIME_STRUCTURE_SKINS: Record<KilnStructureSkinSlug, KilnSkinTransform> = {
   waystone: {
     scale: 1.45,
@@ -514,6 +559,9 @@ export const CREATURE_FROZEN_MIXER_RADIUS = 180;
 export const FISH_ACTIVE_MIXER_RADIUS = 110;
 export const FISH_LOW_RATE_MIXER_RADIUS = 165;
 export const FISH_FROZEN_MIXER_RADIUS = 230;
+export const BIRD_ACTIVE_MIXER_RADIUS = 150;
+export const BIRD_LOW_RATE_MIXER_RADIUS = 230;
+export const BIRD_FROZEN_MIXER_RADIUS = 330;
 
 const RUNTIME_CREATURE_SKINS: Record<KilnCreatureSkinSlug, {
   kind: NativeCreatureKind;
@@ -596,6 +644,33 @@ const RUNTIME_FISH_SKINS: Record<KilnFishSkinSlug, {
     schoolKind: 'run',
     fitLength: 0.52,
     acceptanceNote: 'accepted as the animated singleton reed-fry body; school size and bait behavior remain code-authored',
+  },
+};
+
+const RUNTIME_BIRD_SKINS: Record<KilnBirdSkinSlug, {
+  kind: KilnBirdKind;
+  fitSpan: number;
+  acceptanceNote: string;
+}> = {
+  'bird-sky-kite': {
+    kind: 'sky',
+    fitSpan: 0.86,
+    acceptanceNote: 'accepted as a singleton sky-kite body; flock paths, altitude, route meaning, and spawn rules remain code-authored',
+  },
+  'bird-shore-gull': {
+    kind: 'shore',
+    fitSpan: 0.72,
+    acceptanceNote: 'accepted as a singleton shore-gull body; shore flocking and waterline hints remain code-authored',
+  },
+  'bird-forest-flutter': {
+    kind: 'forest',
+    fitSpan: 0.62,
+    acceptanceNote: 'accepted as a singleton forest-flutter body; perching, tree interest, and flock size remain code-authored',
+  },
+  'bird-storm-finch': {
+    kind: 'storm',
+    fitSpan: 0.58,
+    acceptanceNote: 'accepted as a singleton storm-finch body; storm timing and weather signal behavior remain code-authored',
   },
 };
 
@@ -1021,7 +1096,56 @@ function normalizeFishTemplate(source: THREE.Object3D, slug: string, targetLengt
   };
 }
 
-export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSkinProvider, DomainResourceSkinProvider, TreeSkinProvider, CreatureSkinProvider, FishSkinProvider {
+function normalizeBirdTemplate(source: THREE.Object3D, slug: string, targetSpan: number): {
+  template: THREE.Object3D;
+  runtimeSourceBboxSize: number[];
+  normalizedBboxSize: number[];
+  sourceMeshCount: number;
+  orientation: KilnInstancedOrientationSnapshot;
+} {
+  source.updateMatrixWorld(true);
+  const sourceBox = new THREE.Box3().setFromObject(source);
+  const runtimeSourceBboxSize = bboxSizeOfBox(sourceBox);
+  const size = new THREE.Vector3();
+  sourceBox.getSize(size);
+  const center = new THREE.Vector3();
+  sourceBox.getCenter(center);
+  const span = Math.max(size.x, size.y, size.z);
+  const scale = span > 0 ? Math.max(0.01, targetSpan / span) : 1;
+  const root = new THREE.Group();
+  root.name = `kiln-bird-template-${slug}`;
+  const body = source.clone(true);
+  body.name = `kiln-bird-body-${slug}`;
+  body.position.set(-center.x, -center.y, -center.z);
+  body.scale.setScalar(scale);
+  let sourceMeshCount = 0;
+  body.traverse((child) => {
+    child.userData.kilnAssetSlug = slug;
+    if ((child as THREE.Mesh).isMesh) {
+      const mesh = child as THREE.Mesh;
+      sourceMeshCount += 1;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.frustumCulled = false;
+    }
+  });
+  root.add(body);
+  root.updateMatrixWorld(true);
+  const normalizedBboxSize = fittedSize(root);
+  return {
+    template: root,
+    runtimeSourceBboxSize,
+    normalizedBboxSize,
+    sourceMeshCount,
+    orientation: {
+      policy: 'preserve-y-up',
+      sourceUpAxis: 'y',
+      axisCorrection: [0, 0, 0],
+    },
+  };
+}
+
+export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSkinProvider, DomainResourceSkinProvider, TreeSkinProvider, CreatureSkinProvider, FishSkinProvider, BirdSkinProvider {
   private readonly enabled = new Set<KilnStructureSkinSlug>(['waystone', 'door-kit', 'window-frame', 'roof-bundle']);
   private readonly enabledResourceDrops = new Set<KilnResourceDropSkinSlug>(['drop-wood-logs', 'drop-ore-chunk']);
   private readonly enabledDomainResourceSkins = new Set<KilnDomainResourceSkinSlug>([
@@ -1057,6 +1181,12 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
     'creature-driftjelly',
     'fish-reed-fry',
   ]);
+  private readonly enabledBirdSkins = new Set<KilnBirdSkinSlug>([
+    'bird-sky-kite',
+    'bird-shore-gull',
+    'bird-forest-flutter',
+    'bird-storm-finch',
+  ]);
   private readonly loader = new GLTFLoader();
   private readonly loaded = new Set<KilnStructureSkinSlug>();
   private readonly loadedResourceDrops = new Set<KilnResourceDropSkinSlug>();
@@ -1064,6 +1194,7 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
   private readonly loadedTreeSkins = new Set<KilnTreeSkinSlug>();
   private readonly loadedCreatureSkins = new Set<KilnCreatureSkinSlug>();
   private readonly loadedFishSkins = new Set<KilnFishSkinSlug>();
+  private readonly loadedBirdSkins = new Set<KilnBirdSkinSlug>();
   private readonly failed: string[] = [];
   private readonly modelRequests: string[] = [];
   private manifestPromise: Promise<KilnManifest | null> | null = null;
@@ -1074,6 +1205,7 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
   private readonly treeTemplates = new Map<KilnTreeSkinSlug, Promise<KilnTreeSkinTemplate | null>>();
   private readonly creatureTemplates = new Map<KilnCreatureSkinSlug, Promise<KilnCreatureSkinTemplate | null>>();
   private readonly fishTemplates = new Map<KilnFishSkinSlug, Promise<KilnFishSkinTemplate | null>>();
+  private readonly birdTemplates = new Map<KilnBirdSkinSlug, Promise<KilnBirdSkinTemplate | null>>();
   private readonly baseUrl: string;
 
   readonly manifestUrl: string;
@@ -1125,6 +1257,10 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
     return this.loadFishTemplate(slug);
   }
 
+  async createBirdSkinTemplate(slug: KilnBirdSkinSlug): Promise<KilnBirdSkinTemplate | null> {
+    return this.loadBirdTemplate(slug);
+  }
+
   snapshot(): KilnAssetSnapshot {
     return {
       enabled: [...this.enabled],
@@ -1158,6 +1294,10 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
       fishSkins: {
         enabled: [...this.enabledFishSkins],
         loaded: [...this.loadedFishSkins],
+      },
+      birdSkins: {
+        enabled: [...this.enabledBirdSkins],
+        loaded: [...this.loadedBirdSkins],
       },
     };
   }
@@ -1537,6 +1677,80 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
       });
 
     this.fishTemplates.set(slug, promise);
+    return promise;
+  }
+
+  private loadBirdTemplate(slug: KilnBirdSkinSlug): Promise<KilnBirdSkinTemplate | null> {
+    if (!this.enabledBirdSkins.has(slug)) return Promise.resolve(null);
+    const existing = this.birdTemplates.get(slug);
+    if (existing) return existing;
+
+    const promise = this.loadManifest()
+      .then(async (manifest) => {
+        const asset = manifest?.assets?.find((entry) => entry.slug === slug);
+        if (!asset || asset.status !== 'ready' || !asset.file) {
+          this.failed.push(`${slug}: missing ready manifest record`);
+          return null;
+        }
+        const sourceUrl = publicAssetUrl(`assets/kiln/${asset.file}`, this.baseUrl);
+        this.modelRequests.push(sourceUrl);
+        const gltf = await this.loader.loadAsync(sourceUrl);
+        const bird = RUNTIME_BIRD_SKINS[slug];
+        const { template, runtimeSourceBboxSize, normalizedBboxSize, sourceMeshCount, orientation } =
+          normalizeBirdTemplate(gltf.scene as unknown as THREE.Object3D, slug, bird.fitSpan);
+        const clips = gltf.animations ?? [];
+        if (clips.length === 0) {
+          this.failed.push(`${slug}: missing animation clips`);
+          return null;
+        }
+        const loadedClipNames = new Set(clips.map((clip) => clip.name));
+        if (!loadedClipNames.has('idle') || (!loadedClipNames.has('flap') && !loadedClipNames.has('glide'))) {
+          this.failed.push(`${slug}: missing required idle plus flap/glide clips`);
+          return null;
+        }
+        const animationClips = (asset.animations ?? clips.map((clip) => ({ name: clip.name, durationSec: clip.duration, channels: 0 })))
+          .filter((clip) => typeof clip.name === 'string')
+          .map((clip) => ({
+            name: String(clip.name),
+            channels: Math.max(0, Math.trunc(clip.channels ?? 0)),
+            durationSec: Number((Number(clip.durationSec ?? clips.find((loadedClip) => loadedClip.name === clip.name)?.duration ?? 0)).toFixed(3)),
+          }));
+        this.loadedBirdSkins.add(slug);
+        const fit: KilnBirdSkinFitSnapshot = {
+          slug,
+          kind: bird.kind,
+          socketRole: 'sky-life-body',
+          sourceBboxSize: sourceBboxSize(asset),
+          runtimeSourceBboxSize,
+          normalizedBboxSize,
+          normalizePolicy: 'center-xyz-fit-span-preserve-y-up',
+          orientation,
+          animationPolicy: 'single-animated-anchors-plus-point-flock-near-freeze-far',
+          sourceUrl,
+          sourceMeshCount,
+          materialCount: asset.geometry?.materialCount,
+          animationClips,
+          activeMixerRadius: BIRD_ACTIVE_MIXER_RADIUS,
+          lowRateMixerRadius: BIRD_LOW_RATE_MIXER_RADIUS,
+          frozenMixerRadius: BIRD_FROZEN_MIXER_RADIUS,
+          acceptanceNote: bird.acceptanceNote,
+        };
+        return {
+          slug,
+          kind: bird.kind,
+          manifest: asset,
+          sourceUrl,
+          template,
+          clips,
+          fit,
+        };
+      })
+      .catch((err: unknown) => {
+        this.failed.push(`${slug}: ${err instanceof Error ? err.message : String(err)}`);
+        return null;
+      });
+
+    this.birdTemplates.set(slug, promise);
     return promise;
   }
 }

@@ -3,10 +3,25 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-07
 
+- Promoted and wired the K11 singleton bird pack. `bird-sky-kite`, `bird-shore-gull`,
+  `bird-forest-flutter`, and `bird-storm-finch` now live under committed
+  `public/assets/kiln/models/`, and the manifest is rebuilt at 73 total records: 70 ready,
+  3 unused cave-mouth records. `KilnRuntimeAssets` preserves Y-up, normalizes each bird
+  into a sky-life body socket, requires `idle` plus `flap` or `glide`, and reports
+  clip/fit/mixer-band diagnostics.
+- Added `SkyLifeRenderer` plus `skyLifeSitesAround`. Nearby weather, shore, forest, and
+  high-sky cues choose visual-only bird sites; the renderer draws a few distance-gated
+  animated GLB anchors and point flocks for the rest, with procedural birds only as
+  load-failure fallback. Diagnostics now expose `window.__world.skyLife()` and
+  `render_game_to_text().skyLife`.
+- Added `npm run proof:k11-sky-life`. With `NODE_PATH` pointed at the existing Playwright
+  install, it proves all four promoted bird GLBs load from committed models, zero
+  generated-path requests occur, fallback stays at zero, and screenshots land under
+  `output/playwright/k11-sky-life/`. The full alignment viewer proof now covers 70 ready
+  assets, 9 overview screenshots including `birds`, and 70 per-asset screenshots.
 - Promoted and wired the corrected K9 aquatic singleton bodies. `fish-shore-minnow`,
   `fish-storm-runner`, `fish-cave-shimmer`, `fish-reed-fry`, and `creature-driftjelly` now
-  live under committed `public/assets/kiln/models/`, and the manifest is rebuilt at 69
-  total records: 66 ready, 3 unused cave-mouth records. The old generated
+  live under committed `public/assets/kiln/models/`. The old generated
   `fish-school-*` mini-scene attempt remains rejected quarantine material.
 - Added `FishSchoolRenderer` plus fish support in `KilnRuntimeAssets`. Fishing sim state
   remains authoritative; current shore/dock/run/storm/cave schools choose an approved
@@ -19,10 +34,8 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   `npx vitest run test\fishSchoolRenderer.test.ts test\palette.test.ts`, `npm run
   typecheck`, and `npm run proof:k9-fish-visuals`.
 - Generated the first K11 bird pack through Kiln with the corrected singleton prompt
-  discipline. Quarantine outputs are `bird-sky-kite`, `bird-shore-gull`,
-  `bird-forest-flutter`, and `bird-storm-finch`; each reports palette `sphere-planet`,
-  category `character`, role `prop`, and `idle/flap/glide/turn` clips. They are not yet
-  cataloged or promoted; review them in the generated asset viewer first.
+  discipline. Those quarantine outputs are now cataloged, promoted, viewer-proofed, and
+  runtime-wired as the first sky-life slice.
 - Added the first low-risk terrain material variety pass. `src/render/palette.ts` now uses
   deterministic per-material swatch ramps for grass, dirt, rock, sand, snow, bedrock, built
   blocks, seabed, and wood while preserving one shared vertex-color material, no texture
@@ -69,12 +82,12 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   orientation metadata, and wiring warnings for modular-kit, mesh, material, triangle, and
   axis risks.
 - Expanded `npm run proof:kiln-asset-viewer` into the repeatable reviewer packet: it loads
-  all 66 ready GLBs from committed `assets/kiln/models/`, captures 8 overview screenshots
-  plus 66 single-asset screenshots under `output/playwright/kiln-asset-viewer/assets/`,
+  all 70 ready GLBs from committed `assets/kiln/models/`, captures 9 overview screenshots
+  plus 70 single-asset screenshots under `output/playwright/kiln-asset-viewer/assets/`,
   writes per-slug socket/fit diagnostics to `proof.json`, rejects `generated/` runtime
   requests, and passed with zero page/console errors and nonblank PNG pixel probes.
 - Promoted full approved Kiln pack adoption to a goal-level Hearth and Horizon track. H4
-  remains the intake/proof gate, while new H5 treats the 66 ready GLBs as the target visual
+  remains the intake/proof gate, while new H5 treats the 70 ready GLBs as the target visual
   backlog for replacing janky procedural world art across pickups, rocks/resource nodes,
   home props, waterline utilities, trees, creatures, landmarks, and remaining modular kits.
   The current craftable plane is the explicit exception because it already reads well.
@@ -356,14 +369,14 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   supper/trail-focus effects, screenshot pixels, and page/console cleanliness.
 - Reconciled the parallel Kiln Drop 1 branch into the H4 DAG node instead of treating it
   as a competing source of truth. Local `main` now carries the promoted pack with
-  `public/assets/kiln/ASSET_MANIFEST.json`, 66 committed GLBs under
+  `public/assets/kiln/ASSET_MANIFEST.json`, 70 committed GLBs under
   `public/assets/kiln/models/`, and 3 unused cave-mouth records that stay rejected for
   runtime because carved terrain entrances are stronger.
 - Hardened `npm run proof:kiln-assets` as the authoritative promoted-pack gate. The proof
   now validates manifest/model parity, GLB headers and lengths, animation metadata, palette
   ids, cave-mouth rejection, modular-kit wiring risk, tracked raw-drop hygiene, and local
-  generated provenance when present. Current result: 66 curated assets accepted, 5.64 MiB,
-  25 runtime pilot candidates, 41 deferred, 3 rejected, 31 warnings, 0 failures.
+  generated provenance when present. Current result: 70 curated assets accepted, 5.92 MiB,
+  29 runtime pilot candidates, 41 deferred, 3 rejected, 27 warnings, 0 failures.
 - Merged the stale asset handoff into one canonical doc at `docs/kiln-asset-intake.md`.
   `public/assets/kiln/HANDOFF.md` is now only a pointer. The doc records the promotion
   order, source-of-truth split between proof/promote/build-manifest helpers, modular

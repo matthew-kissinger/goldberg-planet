@@ -9,8 +9,8 @@
     "note": "bboxLocal.size is in raw GLB units, unscaled and transforms NOT baked — rescale per asset so footprint matches its hex tile(s)."
   },
   "counts": {
-    "total": 69,
-    "ready": 66,
+    "total": 73,
+    "ready": 70,
     "unused": 3,
     "missing": 0
   },
@@ -2670,6 +2670,262 @@
       "kilnTris": 2372,
       "instanceability": "C",
       "source": "generated/fish-reed-fry/model.glb (gitignored raw drop)"
+    },
+    {
+      "slug": "bird-sky-kite",
+      "title": "Bird · Sky Kite",
+      "category": "character",
+      "role": "prop",
+      "tier": "standard",
+      "footprint": "small",
+      "status": "ready",
+      "replaces": "future SkyLifeRenderer Bird · Sky Kite singleton bird/flock body",
+      "prompt": "Exactly one goofy low-poly sky-kite bird character body for instancing: wide simple wings, small rounded body, tiny tail fan, big simple eyes, centered at origin in a neutral flying pose, no other birds, no flock, no branch, no tree, no sky, no base, no scene.",
+      "file": "models/bird-sky-kite.glb",
+      "bytes": 76876,
+      "geometry": {
+        "triangles": 1270,
+        "meshCount": 25,
+        "nodeCount": 55,
+        "materialCount": 2,
+        "hasSkin": false,
+        "bboxLocal": {
+          "min": [
+            -0.505,
+            -0.479,
+            -0.28
+          ],
+          "max": [
+            0.505,
+            0.479,
+            1.1
+          ],
+          "size": [
+            1.01,
+            0.959,
+            1.38
+          ]
+        }
+      },
+      "animations": [
+        {
+          "name": "idle",
+          "channels": 9,
+          "durationSec": 2
+        },
+        {
+          "name": "flap",
+          "channels": 11,
+          "durationSec": 0.8
+        },
+        {
+          "name": "glide",
+          "channels": 8,
+          "durationSec": 1.6
+        },
+        {
+          "name": "turn",
+          "channels": 9,
+          "durationSec": 1.5
+        }
+      ],
+      "animationPlayback": "node-transform clips — drive with THREE.AnimationMixer by clip name (no skeleton)",
+      "paletteId": "sphere-planet",
+      "kilnTris": 1886,
+      "instanceability": "B",
+      "source": "generated/bird-sky-kite/model.glb (gitignored raw drop)"
+    },
+    {
+      "slug": "bird-shore-gull",
+      "title": "Bird · Shore Gull",
+      "category": "character",
+      "role": "prop",
+      "tier": "standard",
+      "footprint": "small",
+      "status": "ready",
+      "replaces": "future SkyLifeRenderer Bird · Shore Gull singleton bird/flock body",
+      "prompt": "Exactly one silly low-poly shore gull bird character body for instancing: compact white-grey body, long simple beak, wide wings, tiny feet tucked close, readable single-bird silhouette, centered at origin, no other birds, no flock, no water, no dock, no rocks, no base, no scene.",
+      "file": "models/bird-shore-gull.glb",
+      "bytes": 60032,
+      "geometry": {
+        "triangles": 1272,
+        "meshCount": 16,
+        "nodeCount": 39,
+        "materialCount": 2,
+        "hasSkin": false,
+        "bboxLocal": {
+          "min": [
+            -0.445,
+            -0.22,
+            -0.22
+          ],
+          "max": [
+            0.445,
+            0.22,
+            0.42
+          ],
+          "size": [
+            0.89,
+            0.44,
+            0.64
+          ]
+        }
+      },
+      "animations": [
+        {
+          "name": "idle",
+          "channels": 6,
+          "durationSec": 3
+        },
+        {
+          "name": "flap",
+          "channels": 6,
+          "durationSec": 0.6
+        },
+        {
+          "name": "glide",
+          "channels": 4,
+          "durationSec": 2
+        },
+        {
+          "name": "turn",
+          "channels": 5,
+          "durationSec": 1.5
+        }
+      ],
+      "animationPlayback": "node-transform clips — drive with THREE.AnimationMixer by clip name (no skeleton)",
+      "paletteId": "sphere-planet",
+      "kilnTris": 1684,
+      "instanceability": "B",
+      "source": "generated/bird-shore-gull/model.glb (gitignored raw drop)"
+    },
+    {
+      "slug": "bird-forest-flutter",
+      "title": "Bird · Forest Flutter",
+      "category": "character",
+      "role": "prop",
+      "tier": "standard",
+      "footprint": "small",
+      "status": "ready",
+      "replaces": "future SkyLifeRenderer Bird · Forest Flutter singleton bird/flock body",
+      "prompt": "Exactly one goofy low-poly forest flutter bird character body for instancing: round colorful body, short wings, small tail feathers, oversized curious eyes, centered at origin in a neutral flying pose, no other birds, no flock, no branch, no leaves, no tree, no base, no scene.",
+      "file": "models/bird-forest-flutter.glb",
+      "bytes": 77020,
+      "geometry": {
+        "triangles": 1928,
+        "meshCount": 17,
+        "nodeCount": 34,
+        "materialCount": 2,
+        "hasSkin": false,
+        "bboxLocal": {
+          "min": [
+            -0.5,
+            -0.5,
+            -0.492
+          ],
+          "max": [
+            0.5,
+            0.5,
+            0.492
+          ],
+          "size": [
+            1,
+            1,
+            0.985
+          ]
+        }
+      },
+      "animations": [
+        {
+          "name": "idle",
+          "channels": 5,
+          "durationSec": 2
+        },
+        {
+          "name": "flap",
+          "channels": 4,
+          "durationSec": 0.5
+        },
+        {
+          "name": "glide",
+          "channels": 5,
+          "durationSec": 3
+        },
+        {
+          "name": "turn",
+          "channels": 5,
+          "durationSec": 1.5
+        }
+      ],
+      "animationPlayback": "node-transform clips — drive with THREE.AnimationMixer by clip name (no skeleton)",
+      "paletteId": "sphere-planet",
+      "kilnTris": 2848,
+      "instanceability": "B",
+      "source": "generated/bird-forest-flutter/model.glb (gitignored raw drop)"
+    },
+    {
+      "slug": "bird-storm-finch",
+      "title": "Bird · Storm Finch",
+      "category": "character",
+      "role": "prop",
+      "tier": "standard",
+      "footprint": "small",
+      "status": "ready",
+      "replaces": "future SkyLifeRenderer Bird · Storm Finch singleton bird/flock body",
+      "prompt": "Exactly one low-poly storm finch bird character body for instancing: angular small body, swept wings, tiny crest, bright accent tips, big simple eyes, centered at origin in a neutral flying pose, no lightning effect, no other birds, no flock, no clouds, no weather scene, no base.",
+      "file": "models/bird-storm-finch.glb",
+      "bytes": 78812,
+      "geometry": {
+        "triangles": 1220,
+        "meshCount": 27,
+        "nodeCount": 54,
+        "materialCount": 2,
+        "hasSkin": false,
+        "bboxLocal": {
+          "min": [
+            -0.24,
+            -0.12,
+            -0.12
+          ],
+          "max": [
+            0.24,
+            0.12,
+            0.12
+          ],
+          "size": [
+            0.48,
+            0.24,
+            0.24
+          ]
+        }
+      },
+      "animations": [
+        {
+          "name": "idle",
+          "channels": 4,
+          "durationSec": 2
+        },
+        {
+          "name": "flap",
+          "channels": 7,
+          "durationSec": 0.8
+        },
+        {
+          "name": "glide",
+          "channels": 5,
+          "durationSec": 2
+        },
+        {
+          "name": "turn",
+          "channels": 4,
+          "durationSec": 1.5
+        }
+      ],
+      "animationPlayback": "node-transform clips — drive with THREE.AnimationMixer by clip name (no skeleton)",
+      "paletteId": "sphere-planet",
+      "kilnTris": 1704,
+      "instanceability": "B",
+      "source": "generated/bird-storm-finch/model.glb (gitignored raw drop)"
     },
     {
       "slug": "cave-mouth-arch",

@@ -56,8 +56,8 @@ scene graphs. The default implementation target is:
 
 ## Scope
 
-The current promoted pack contains 66 ready GLBs plus 3 unused cave-mouth records. The
-adoption goal is to use the 66 ready assets broadly across the game and to revisit the
+The current promoted pack contains 70 ready GLBs plus 3 unused cave-mouth records. The
+adoption goal is to use the 70 ready assets broadly across the game and to revisit the
 cave-mouth assets as possible dressing or regeneration references instead of silently
 forgetting them.
 
@@ -78,7 +78,7 @@ forgetting them.
 | K7 landmarks and wonder | shrines, craters, cave-anchor, cave-mouth dressing/reference | Landmark, skyfall, cave-mouth, and route renderers | Screenshots prove each landmark reads as a place with a verb, not a random ornament |
 | K8 remaining modular kits | door/window/roof already started; expand to any remaining build pieces | `StructureRenderer` and build sockets | Measured fit, socket-local preview, fallback, and room/shelter proof for each modular family |
 | K9 aquatic life and fish visibility | Generated Kiln single fish bodies: shore minnow, storm runner, cave shimmer, reed fry, plus a single driftjelly body over existing fishing systems | Fishing sim, waterline structures, `FishSchoolRenderer`, `KilnRuntimeAssets` | Passing first slice: corrected singleton fish are promoted to `models/`, fish-school state selects the matching body, the renderer shows up to two animated GLB anchors plus a point school, mixers are distance-gated, and `npm run proof:k9-fish-visuals` proves the cave-shimmer GLB loads from committed assets with fallback at zero |
-| K11 sky life and biome expansion | Generated Kiln singleton bird bodies and future new-biome tree variants | Future `SkyLifeRenderer`, streamer vegetation, route/weather systems | Four bird bodies now exist in generated quarantine with `idle/flap/glide/turn` clips; next proof must review them in the asset viewer, promote only accepted birds, then keep sky life batched/instanced, distance-gated, and readable as ecological signals rather than decorative draw-call noise |
+| K11 sky life and biome expansion | Promoted Kiln singleton bird bodies and future new-biome tree variants | `SkyLifeRenderer`, `KilnRuntimeAssets`, weather/shore/forest site selection | Passing first slice: four bird bodies are promoted to `models/`, reviewed in the asset viewer, selected from sky/shore/forest/storm cues, rendered as a few distance-gated animated GLB anchors plus point flocks, and `npm run proof:k11-sky-life` proves all four committed bird GLBs load with fallback at zero |
 | K10 drop and ore expansion | Future pickup/drop skins plus new ore/resource node taxonomy after item design | `ResourceDropRenderer`, `DomainResourceRenderer` | Proof keeps drops/nodes instanced, collectable, and readable while new ores have explicit recipes and route/cave reasons |
 
 ## Definition Of Done
@@ -106,7 +106,7 @@ The asset-pack adoption track is done when:
   direction, local `+Z` as tile-forward tangent, center-XZ/bottom-Y pivots, socket rings,
   bounds, orientation metadata, and review warnings for modular-kit, mesh-count, material,
   triangle, and axis-correction risk.
-- `npm run proof:kiln-asset-viewer` covers 8 overview screenshots plus 66 single-asset
+- `npm run proof:kiln-asset-viewer` covers 9 overview screenshots plus 70 single-asset
   screenshots under `output/playwright/kiln-asset-viewer/assets/`, proves every ready GLB
   is requested from committed `assets/kiln/models/`, rejects `generated/` runtime requests,
   and writes `proof.json` with per-slug fit/socket diagnostics.
@@ -176,12 +176,14 @@ The asset-pack adoption track is done when:
   school members. `npm run proof:k9-fish-visuals` proves a sea-cave school loads
   `fish-cave-shimmer` from committed `assets/kiln/models/`, shows 2 visible GLB anchors and
   32 point sprites, and keeps fallback at zero.
-- K11 bird generation is complete but not promoted. The generated quarantine contains
-  `bird-sky-kite`, `bird-shore-gull`, `bird-forest-flutter`, and `bird-storm-finch`; all
-  report palette `sphere-planet`, category `character`, role `prop`, and
-  `idle/flap/glide/turn` clips. Review them through
-  `/?assetViewer=kiln&family=generated&slugs=bird-sky-kite,bird-shore-gull,bird-forest-flutter,bird-storm-finch`
-  before cataloging or wiring.
+- K11 sky life is runtime-wired for `bird-sky-kite`, `bird-shore-gull`,
+  `bird-forest-flutter`, and `bird-storm-finch`. `KilnRuntimeAssets` preserves authored
+  Y-up, normalizes each singleton body into a sky-life socket, requires `idle` plus
+  `flap` or `glide`, and exposes clip/fit/distance-band diagnostics. `SkyLifeRenderer`
+  keeps bird behavior visual-only for this slice: nearby weather, shore, forest, and
+  high-sky cues choose a few animated GLB anchors, while point flocks carry the wider
+  group. `npm run proof:k11-sky-life` proves all four bird GLBs load from committed
+  `assets/kiln/models/`, with zero generated requests and zero fallback.
 - Hex terrain material variety now stays in the procedural/material lane. `src/render/palette.ts`
   uses deterministic per-material swatch ramps for grass, dirt, rock, sand, snow, bedrock,
   built blocks, seabed, and wood while preserving the single shared vertex-color material.
@@ -312,10 +314,10 @@ Prepared request packs:
   instanced/points/boids runtime behavior, not GLB-authored clusters. The first
   `fish-school-*` / cluster prompt attempt is rejected as improper prompting and should not
   be promoted.
-- Sky life: generate singleton bodies only: `bird-sky-kite`, `bird-shore-gull`,
-  `bird-forest-flutter`, and `bird-storm-finch` with idle/flap/glide/turn clips. Flocks are
-  runtime boids, points, impostors, or migration signals, never authored multi-bird GLB
-  scenes.
+- Sky life: the first singleton bodies are promoted and wired: `bird-sky-kite`,
+  `bird-shore-gull`, `bird-forest-flutter`, and `bird-storm-finch` with
+  idle/flap/glide/turn clips. Flocks are runtime points, impostors, boids, or migration
+  signals, never authored multi-bird GLB scenes.
 - Pickup skins: `drop-dirt-clod`, `drop-sand-pile`, `drop-snow-clump`,
   `drop-glow-crystal`, `drop-raw-fish`, `drop-kelp-reeds`, `drop-compost-pellet`, and
   `drop-cave-mushroom`.
@@ -338,7 +340,7 @@ shader, or instanced runtime systems keyed to the palette.
 
 ## Next Critical Slice
 
-K1, K2, K5, K6, K6T, K6R, and K9 now prove the repeated static-family, first
-animated-family, native targetability, sparse creature-roaming, and aquatic singleton
-paths. Continue with K3W/K3 functional home shells and props, then K4 waterline utilities,
-then K11 sky life, richer G5/K6R creature behavior, and K7 wonders.
+K1, K2, K5, K6, K6T, K6R, K9, and K11 now prove the repeated static-family, first
+animated-family, native targetability, sparse creature-roaming, aquatic singleton, and
+sky-life singleton paths. Continue with K3W/K3 functional home shells and props, then K4
+waterline utilities, richer G5/K6R creature behavior, and K7 wonders.

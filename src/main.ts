@@ -25,6 +25,7 @@ import { ResourceDropRenderer } from './render/resourceDrops';
 import { TreeAssetRenderer } from './render/treeAssets';
 import { NativeLifeRenderer } from './render/nativeLife';
 import { FishSchoolRenderer, type FishSchoolVisualSite } from './render/fishSchools';
+import { SkyLifeRenderer } from './render/skyLife';
 import { Player } from './player/player';
 import { Input } from './player/input';
 import { TouchControls } from './player/touch';
@@ -83,6 +84,7 @@ import { buildInventoryLedger, packBurdenForInventory, packCapacityBonusForInven
 import { cavePressureAt } from './sim/cavePressure';
 import { applyFishingCatch, fishSchoolAt, type FishSchoolReport } from './sim/fishing';
 import { applyForage, forageAt } from './sim/forage';
+import { skyLifeSitesAround, type SkyLifeCandidate, type SkyLifeSite } from './sim/skyLife';
 import { caveResourceAt } from './sim/caveResources';
 import {
   caveResonanceNotebook,
@@ -595,6 +597,7 @@ async function boot(): Promise<void> {
   const treeAssetRenderer = new TreeAssetRenderer(scene, kilnAssets);
   const nativeLifeRenderer = new NativeLifeRenderer(scene, kilnAssets);
   const fishSchoolRenderer = new FishSchoolRenderer(scene, kilnAssets);
+  const skyLifeRenderer = new SkyLifeRenderer(scene, kilnAssets);
   resourceDropRenderer.setDrops(resourceDrops);
   let treeAssetSyncNeeded = true;
 
@@ -3352,6 +3355,34 @@ async function boot(): Promise<void> {
     weatherProtection: currentWeatherProtection(),
   });
 
+  const currentSkyLifeSites = (): SkyLifeSite[] => {
+    const weather = currentWeather();
+    const domain = currentPentagonDomain();
+    const candidates: SkyLifeCandidate[] = tileEntriesAroundTile(player.tile, 4).map((entry) => {
+      const tile = Math.max(0, Math.min(geo.count - 1, Math.trunc(entry.tile)));
+      const local = tilesAroundTile(tile, 1);
+      return {
+        tile,
+        ring: entry.ring,
+        height: columns.heightOf(tile),
+        nearWater: waterNearTile(tile, 1),
+        nearTrees: local.some((nearby) => trees.hasTree(nearby)),
+      };
+    });
+    return skyLifeSitesAround({
+      centerTile: player.tile,
+      day: timeState.day,
+      minute: timeState.minute,
+      weatherKind: weather.kind,
+      weatherLabel: weather.label,
+      weatherIntensity: weather.intensity,
+      domainEffect: domain?.effect ?? null,
+      domainIntensity: domain?.intensity ?? 0,
+      candidates,
+      maxSites: 4,
+    });
+  };
+
   const currentFishSchool = () => fishSchoolAt({
     tile: player.tile,
     day: timeState.day,
@@ -4619,6 +4650,35 @@ async function boot(): Promise<void> {
     refreshUseButton();
   };
 
+  const skyLifeKinds: readonly SkyLifeSite['kind'][] = ['sky', 'shore', 'forest', 'storm'];
+
+  const normalizeSkyLifeKind = (kind: unknown): SkyLifeSite['kind'] | null =>
+    skyLifeKinds.includes(kind as SkyLifeSite['kind']) ? kind as SkyLifeSite['kind'] : null;
+
+  const findSkyLifeTile = (kind: SkyLifeSite['kind'], startTile = player.tile): number | null => {
+    const start = Math.max(0, Math.min(geo.count - 1, Math.trunc(Number.isFinite(startTile) ? startTile : player.tile)));
+    for (const entry of tileEntriesAroundTile(start, 64)) {
+      const tile = entry.tile;
+      const height = columns.heightOf(tile);
+      const nearWater = waterNearTile(tile, 1);
+      const nearTrees = tilesAroundTile(tile, 1).some((nearby) => trees.hasTree(nearby));
+      if (kind === 'shore' && nearWater && height > SEA_LEVEL_HEIGHT + 0.6) return tile;
+      if (kind === 'forest' && nearTrees && height > SEA_LEVEL_HEIGHT + 0.6) return tile;
+      if (kind === 'storm' && !nearTrees && height > SEA_LEVEL_HEIGHT + 1.6) return tile;
+      if (kind === 'sky' && !nearWater && !nearTrees && height > SEA_LEVEL_HEIGHT + 2.5) return tile;
+    }
+    return null;
+  };
+
+  const debugSpawnAtSkyLifeKind = (kind: unknown = 'sky', startTile?: number) => {
+    const targetKind = normalizeSkyLifeKind(kind);
+    if (!targetKind) return { ok: false, reason: 'unknown sky-life kind', kind, allowed: [...skyLifeKinds] };
+    const tile = findSkyLifeTile(targetKind, Number.isFinite(startTile) ? Math.trunc(startTile!) : player.tile);
+    if (tile === null) return { ok: false, reason: 'no sky-life tile found', kind: targetKind, sites: currentSkyLifeSites() };
+    relocatePlayerToTile(tile);
+    return { ok: true, kind: targetKind, tile, sites: currentSkyLifeSites() };
+  };
+
   const triggerCollapseRecovery = (reason = 'exposure', force = false) => {
     if (!force && (creativeActive || !shouldCollapse(survivalState))) return null;
     const bedroll = homeBedrollStructure();
@@ -5037,6 +5097,7 @@ async function boot(): Promise<void> {
       inventory: packLedger(),
       tools: { ...toolSummary(craftedItems, toolWear), wear: { ...toolWear }, lastAction: lastToolAction, reach: playerReach() },
       food: { ...foodCounts(), lastAction: lastFoodAction, nearWater: nearFishingWater(), nearDock: nearDock(), school: currentFishSchool(), fishVisuals: fishSchoolRenderer.stats(), forage: currentForage(), crops: cropDiagnostics(), fishTraps: fishTrapDiagnostics(), shoreNets: shoreNetDiagnostics() },
+      skyLife: { sites: currentSkyLifeSites(), renderer: skyLifeRenderer.stats() },
       audio: audio.state(),
       controls: { ux: uxManager.snapshot(), gamepad: gamepad.snapshot(), touch: touch.enabled, inputActive: input.active(), aimActive: input.active() || gamepad.active(), panels: currentPanelOwnership() },
       relocation: relocationDiagnostics(),
@@ -5217,6 +5278,8 @@ async function boot(): Promise<void> {
     fish: (force = false) => tryFish(force),
     fishSchool: () => currentFishSchool(),
     fishVisuals: () => ({ site: currentFishVisualSite(), renderer: fishSchoolRenderer.stats() }),
+    skyLife: () => ({ sites: currentSkyLifeSites(), renderer: skyLifeRenderer.stats() }),
+    debugSpawnAtSkyLifeKind,
     forage: () => currentForage(),
     gatherForage: () => tryForage(),
     caves: () => ({ current: currentNaturalVoid(), signal: nearbyCaveSignal(), resonance: caveResonanceDiagnostics(), mouths: caveMouthDiagnostics(), pressure: currentCavePressure(), lastAction: lastCaveAction, glowCrystal: itemCount(counts, craftedItems, 'glowCrystal'), lantern: itemCount(counts, craftedItems, 'lantern'), echoLantern: itemCount(counts, craftedItems, 'echoLantern') }),
@@ -5715,6 +5778,7 @@ async function boot(): Promise<void> {
         mineProgress: mineProgressDiagnostics(),
         treeAssets: treeAssetDiagnostics(),
         fishVisuals: fishSchoolRenderer.stats(),
+        skyLife: { sites: currentSkyLifeSites(), renderer: skyLifeRenderer.stats() },
         survival: { ...survivalSnapshot(), time: { ...timeState }, pack: packBurden() },
         structures: { relocation: relocationDiagnostics(), snapPreview: currentStructureSnapPreview(), commands: buildCommandDiagnostics() },
       };
@@ -5750,6 +5814,7 @@ async function boot(): Promise<void> {
       controls: { ux: uxManager.snapshot(), gamepad: gamepad.snapshot(), touch: touch.enabled, panels: currentPanelOwnership() },
       caves: { current: currentNaturalVoid(), signal: nearbyCaveSignal(), resonance: caveResonanceDiagnostics(), mouths: caveMouthDiagnostics(), pressure: currentCavePressure(), lastAction: lastCaveAction },
     },
+    skyLife: { sites: currentSkyLifeSites(), renderer: skyLifeRenderer.stats() },
     navigation: {
       horizonChart: horizonChartCount(),
       signal: visibleHorizonChartSignal(),
@@ -6278,6 +6343,8 @@ async function boot(): Promise<void> {
     nativeLifeRenderer.update(nativeSitesNow, geo, layers, columns, camWorld, now / 1000);
     const fishVisualSiteNow = currentFishVisualSite();
     fishSchoolRenderer.update(fishVisualSiteNow, geo, layers, columns, camWorld, now / 1000);
+    const skyLifeSitesNow = currentSkyLifeSites();
+    skyLifeRenderer.update(skyLifeSitesNow, geo, layers, columns, camWorld, now / 1000);
     const caveMouths = currentCaveMouths();
     caveMouthRenderer.setMouths(caveMouths);
     caveMouthRenderer.update(caveMouths, geo, layers, columns, camWorld, now / 1000);
@@ -6408,6 +6475,7 @@ async function boot(): Promise<void> {
         const afterglowStats = seasonAfterglowRenderer.stats();
         const nativeStats = nativeLifeRenderer.stats();
         const fishVisualStats = fishSchoolRenderer.stats();
+        const skyLifeStats = skyLifeRenderer.stats();
         const nativeHazard = nearbyNativeHazard();
         const mouthStats = caveMouthRenderer.stats();
         const routeStats = routeRenderer.stats();
@@ -6436,6 +6504,7 @@ async function boot(): Promise<void> {
           `structures ${structures.length} · prop meshes ${propStats.meshes} · route marker roles ${propStats.routeReadabilityRoles}/${propStats.routeSilhouettes} · ${home.label}${cisternWater > 0 ? ` · cistern water ${cisternWater}` : ''}${cellarProvisions > 0 ? ` · cellar provisions ${cellarProvisions}` : ''}`,
           `food bait ${food.bait} · seeds ${food.seeds} · compost ${food.compost} · berries ${food.berries} · mushroom/herb/kelp/reeds ${food.caveMushroom}/${food.snowHerb}/${food.kelp}/${food.reeds} · raw/cooked fish ${food.rawFish}/${food.cookedFish} · traps ${trapReady}/${trapStats.length} ready · nets ${netReady}/${netStats.length} ready · meals/rations/stews ${food.campMeal}/${food.trailRation}/${food.expeditionStew} · cellar ${food.cellarProvisions}`,
           `fish ${currentFishSchool().label} · strength ${currentFishSchool().strength.toFixed(2)} · catch ${currentFishSchool().catchCount} · visual ${fishVisualStats.slug ?? 'none'} anchors ${fishVisualStats.glbAnchorsVisible}/${fishVisualStats.glbAnchors} pts ${fishVisualStats.pointSchoolSprites}`,
+          `sky life ${skyLifeStats.kinds.join(',') || 'none'} · birds ${skyLifeStats.glbBirdsVisible}/${skyLifeStats.glbBirds} pts ${skyLifeStats.pointFlockSprites} · loaded ${skyLifeStats.kilnBirdSkinsLoaded} fallback ${skyLifeStats.fallbackVisible}`,
           `forage ${currentForage().label} · strength ${currentForage().strength.toFixed(2)}`,
           `cave pressure ${currentCavePressure().label} · light ${currentCavePressure().light} · exposure ${currentCavePressure().exposureRate.toFixed(2)}${currentCavePressure().focus?.active ? ` · focus ${currentCavePressure().focus?.minutes}m` : ''}`,
           caveResonance ? `cave resonance ${caveResonance.label} · ${caveResonance.observed ? 'noted' : `unread · +${caveResonance.reward.count} ${caveResonance.reward.label}`}` : '',

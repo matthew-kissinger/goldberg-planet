@@ -19,15 +19,15 @@ craftable plane.
 The Drop 1 promoted pack is accepted as curated source material:
 
 - `public/assets/kiln/ASSET_MANIFEST.json` is the authoritative manifest.
-- `public/assets/kiln/models/` contains 66 committed GLBs, 5.64 MiB total.
-- The manifest has 69 records: 66 `ready`, 3 `unused`, 0 `missing`.
+- `public/assets/kiln/models/` contains 70 committed GLBs, 5.92 MiB total.
+- The manifest has 73 records: 70 `ready`, 3 `unused`, 0 `missing`.
 - The 3 unused records are `cave-mouth-arch`, `cave-mouth-dry`, and
   `cave-mouth-sea`. Do not wire them; real carved cave voids read better than a small arch
   prop inside a larger terrain opening.
 - Raw generated drops remain quarantine/provenance material under
   `public/assets/kiln/generated/` when present. They must stay ignored and out of commits.
 
-The current target is to adopt the 66 ready assets across runtime families, not to leave
+The current target is to adopt the 70 ready assets across runtime families, not to leave
 them as a passive library. Each ready asset should become runtime wired, runtime dressing,
 or an explicit regeneration/supersession decision. Repeated families must be implemented
 through palette/material reuse, instanced or batched geometry, and distance-gated animation
@@ -41,11 +41,11 @@ npm run proof:kiln-assets
 
 Current proof result, 2026-07-07:
 
-- 66 curated assets accepted into the committed pack.
-- 25 runtime pilot candidates.
+- 70 curated assets accepted into the committed pack.
+- 29 runtime pilot candidates.
 - 41 runtime-deferred assets.
 - 3 runtime-rejected assets.
-- 31 warnings, 0 failures.
+- 27 warnings, 0 failures.
 - The proof also checks GLB headers/lengths, manifest/file parity, palette ids, animation
   metadata, secret/presigned URL leakage, and tracked raw-drop hygiene.
 
@@ -70,9 +70,9 @@ npm run proof:kiln-asset-viewer
 
 Current proof result, 2026-07-07:
 
-- Loads all 66 ready GLBs from committed `assets/kiln/models/` paths.
+- Loads all 70 ready GLBs from committed `assets/kiln/models/` paths.
 - Captures overview screenshots for `structures`, `drops`, `nodes`, `trees`, `creatures`,
-  `fish`, `adopted`, and the full `ready` pack.
+  `fish`, `birds`, `adopted`, and the full `ready` pack.
 - Captures one single-asset alignment screenshot for every ready slug under
   `output/playwright/kiln-asset-viewer/assets/<slug>.png`.
 - Emits `output/playwright/kiln-asset-viewer/proof.json` with socket role, socket grid,
