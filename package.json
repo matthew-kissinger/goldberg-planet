@@ -12,6 +12,7 @@
     "proof:kiln-assets": "node scripts/proof-kiln-asset-pack.mjs",
     "proof:route-markers": "node scripts/proof-route-marker-readability.mjs",
     "proof:panel-ownership": "node scripts/proof-panel-ownership.mjs",
+    "proof:hearth-contract": "node scripts/proof-hearth-contract.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

@@ -3,6 +3,22 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-07
 
+- Closed the B3/C5 Hearth Contract slice recommended by the frontier-review lane. The new
+  `npm run proof:hearth-contract` browser gate seeds the real First Hearth site, proves
+  concrete missing requirements, builds the functional home, completes site work, opens the
+  hearth threshold, stocks and spends a root-cellar provision, grants trail focus, and
+  captures desktop, laptop, tablet touch, phone touch, and gamepad-active screenshots.
+- Moved ready expedition site work up in the Hearth Journal priority order so the five-slot
+  next-action list cannot crowd out "Finish site work" behind ambient hazards, helpers,
+  skyfall, or murmurs. Added a crowded-world regression in `test/journal.test.ts`.
+- Tightened the `__world.completeSiteWork()` proof hook so it returns the structured
+  threshold terrain carve result alongside the site-work completion. The hearth-contract
+  proof now verifies the first hearth arch opens 12 terrain cells across 3 underpass tiles
+  instead of trusting a status string.
+- Added `scripts/proof-hearth-contract.mjs` and package script
+  `proof:hearth-contract` as the authoritative B3/C5 browser proof. The proof checks Route
+  Slate and Hearth Journal transitions, threshold state, visible home structures, survival
+  supper/trail-focus effects, screenshot pixels, and page/console cleanliness.
 - Reconciled the parallel Kiln Drop 1 branch into the H4 DAG node instead of treating it
   as a competing source of truth. Local `main` now carries the promoted pack with
   `public/assets/kiln/ASSET_MANIFEST.json`, 61 committed GLBs under

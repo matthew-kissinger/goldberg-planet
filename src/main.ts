@@ -4507,7 +4507,7 @@ async function boot(): Promise<void> {
         hud.setRouteSlate(currentRouteSlate(), 8);
         if (journalOpen) hud.setJournal(currentHearthJournal(), true);
       }
-      return result;
+      return { ...result, terrain };
     },
     spawnAtPentagon,
     landmarks: () => ({

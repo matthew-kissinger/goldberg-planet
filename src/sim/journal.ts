@@ -190,6 +190,11 @@ export function buildHearthJournal(input: HearthJournalInput): HearthJournal {
   if (input.route.routePlanLabel && input.route.routePlanDetail) {
     addNext(next, 'Follow planned path', `${input.route.routePlanLabel} · ${input.route.routePlanDetail}`, 'ready');
   }
+  if (input.discoveries.siteReady && !input.discoveries.siteCompleted && input.discoveries.siteLabel) {
+    addNext(next, 'Finish site work', `${input.discoveries.siteLabel} is ready; read the landmark again`, 'ready');
+  } else if (input.discoveries.siteDiscovered && !input.discoveries.siteCompleted && input.discoveries.siteMissing?.length && input.discoveries.siteLabel) {
+    addNext(next, 'Prepare site work', `${input.discoveries.siteLabel} needs ${input.discoveries.siteMissing.slice(0, 3).join(', ')}`, 'quiet');
+  }
   if (input.discoveries.thresholdChamberLabel && input.discoveries.thresholdChamberDetail) {
     addNext(next, 'Read the threshold', `${input.discoveries.thresholdChamberLabel} · ${input.discoveries.thresholdChamberDetail}`, 'wonder');
   }
@@ -239,11 +244,6 @@ export function buildHearthJournal(input: HearthJournalInput): HearthJournal {
   }
   if (input.world.caveSignal && input.route.caveAnchors <= 0) {
     addNext(next, 'Mark a cave', input.world.caveDetail ?? input.world.caveSignal, 'quiet');
-  }
-  if (input.discoveries.siteReady && !input.discoveries.siteCompleted && input.discoveries.siteLabel) {
-    addNext(next, 'Finish site work', `${input.discoveries.siteLabel} is ready; read the landmark again`, 'ready');
-  } else if (input.discoveries.siteDiscovered && !input.discoveries.siteCompleted && input.discoveries.siteMissing?.length && input.discoveries.siteLabel) {
-    addNext(next, 'Prepare site work', `${input.discoveries.siteLabel} needs ${input.discoveries.siteMissing.slice(0, 3).join(', ')}`, 'quiet');
   }
   if (next.length === 0) {
     addNext(next, 'Follow the horizon', input.route.slateSummary || 'walk until the next signal changes', 'ready');

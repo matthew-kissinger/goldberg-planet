@@ -513,6 +513,48 @@ describe('Hearth Journal', () => {
     expect(completedEntry?.detail).toContain('hearth arch');
   });
 
+  it('keeps ready site work in next actions when ambient world hooks are crowded', () => {
+    const journal = buildHearthJournal(baseInput({
+      home: { functional: true, protected: true, missing: [], label: 'shelter alive', storedItems: 4, cellarProvisions: 1, structures: 8 },
+      discoveries: {
+        pentagonsKnown: 1,
+        pentagonsTotal: 12,
+        insightLabel: 'Hearth Memory',
+        siteLabel: 'First Hearth hearth niche',
+        siteDetail: 'hearth niche ready · reward +1 expedition stew',
+        siteDiscovered: true,
+        siteCompleted: false,
+        siteReady: true,
+        siteMissing: [],
+        resourcesDiscovered: 0,
+        resourcesHarvested: 0,
+        resourcesTotal: 36,
+      },
+      world: {
+        skyfallActive: 1,
+        skyfallHarvested: 0,
+        skyfallRoute: 'emberfall crater 300 m right',
+        murmursActive: 1,
+        murmursObserved: 0,
+        murmurRoute: 'root-whisper knot 200 m left',
+        nativeLifeVisible: 2,
+        nativeLifeTended: 0,
+        nativeLifeWarded: 0,
+        nativeHazardLabel: 'storm burr',
+        nativeHazardDetail: '9 m right · brace with storm cloak',
+        nativeHelperLabel: 'reedback grazer',
+        nativeHelperDetail: 'near garden · scratch for compost',
+        recentMurmurs: [],
+        fishLabel: 'shore nibble',
+        fishStrength: 0.2,
+        forageLabel: 'shore kelp',
+        forageStrength: 0.42,
+      },
+    }));
+
+    expect(journal.next.map((entry) => entry.label)).toContain('Finish site work');
+  });
+
   it('reconstructs observed murmur notes from saved ids', () => {
     const observed = new Set<number>();
     const first = murmurSites('journal-murmur-seed', 1, 12, 1000, observed)[0];
