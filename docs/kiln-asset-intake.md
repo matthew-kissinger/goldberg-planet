@@ -252,10 +252,11 @@ Deferred until scale, snap, budget, readability, or animation proof exists:
   supports and joins. The second C6 slice now adds code-owned `floorFoundation`,
   `wallPanel`, `wallDoorPanel`, `wallWindowPanel`, `wallCorner`, `wallHalfRail`, and
   `roofJoin` sockets and proves integrated walls seal while rails/foundations do not fake
-  enclosure. Before more craftable house pieces ship, finish true edge-addressed sockets,
-  multi-piece-per-tile snapping, collision, and broader room-shape proof. New Kiln wall
-  pieces should be generated as one shared-scale house-shell pack and then treated as
-  decorative skins over measured sockets.
+  enclosure. The edge-socket slice adds true edge-addressed occupancy: center foundations and
+  multiple wall edges can share a hex only when sockets do not overlap. Before more
+  craftable house pieces ship, finish edge-based shelter coverage, collision, and broader
+  room-shape proof. New Kiln wall pieces should be generated as one shared-scale house-shell
+  pack and then treated as decorative skins over measured sockets.
 - Functional props with warnings or watery placement needs: `workbench`, `rain-cistern`,
   `fish-trap`, `shore-net`, `lantern-post`.
 - Shrines and craters: defer for blind screenshot readability, world-placement scale,

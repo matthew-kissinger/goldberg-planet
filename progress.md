@@ -3,6 +3,15 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-07
 
+- Closed the first true C6 edge-addressed socket slice. Wall-like pieces now derive
+  `tile:edge` occupancy from yaw, so a center foundation and multiple wall edges can share
+  one hex when their sockets do not overlap. Duplicate edge placement, relocation, and
+  rotation now block with explicit edge-socket reasons; `__world.structures()` and
+  `StructureRenderer.stats()` expose socket keys plus same-tile edge-stack diagnostics.
+  `npm run proof:c6-wall-shells` now proves a foundation with two wall edges on the same
+  hex, rejects a duplicate wall-door edge, and still verifies shelter weakening when a wall
+  piece moves out. Remaining C6 work is edge-based shelter coverage/collision polish,
+  broader room shapes, and shared-scale decorative skins over the code-owned wall shell.
 - Closed the second C6 wall/shell socket slice. `wallDoorPanel`, `wallWindowPanel`,
   `wallCorner`, and `roofJoin` are now craftable/placeable code-owned building pieces with
   socket specs, snap-preview silhouettes, renderer diagnostics, save coverage, build
@@ -12,9 +21,7 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   `npm run proof:c6-wall-shells` now proves the expanded seven-piece wall-shell catalog,
   places a weather-safe but not fully functional room, verifies foundation/rail/panel/join
   renderer diagnostics, then moves a corner out so shelter drops back to `room boundary`
-  missing. Remaining C6 work is true edge-addressed sockets, multi-piece-per-tile snapping
-  and collision, broader room shapes, shared-scale decorative skins, and runtime GLB wiring
-  for any future house-shell pack.
+  missing.
 - Closed the first C6 wall/shell socket slice. `floorFoundation`, `wallPanel`, and
   `wallHalfRail` are now craftable/placeable code-owned building pieces with separate
   wall-shell socket specs, renderer silhouettes, avatar prop colors, and diagnostics.

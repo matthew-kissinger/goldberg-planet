@@ -10,6 +10,9 @@ import {
   spendPlacedItem,
   STRUCTURE_YAW_STEP,
   structureDismantleBlockers,
+  structurePlacementBlocker,
+  structureSocketPlacement,
+  structureSocketPlacementFor,
   structureSocketSpec,
   structureYawTurn,
   type CaveAnchorContext,
@@ -204,6 +207,7 @@ export function rotatePlacedStructureCommand(
     yaw: result.yaw,
     message: result.message,
     action: `${target.item}:rotate:${result.message}`,
+    blockers: result.blockers,
   };
 }
 
@@ -230,8 +234,15 @@ export function previewPlaceStructureCommand(input: StructurePlacePreviewInput):
   if (input.blocker) {
     return { ...base, ok: false, message: input.blocker, blocker: input.blocker, blockers: [input.blocker] };
   }
-  if (input.structures.some((entry) => entry.tile === Math.trunc(input.tile))) {
-    return { ...base, ok: false, message: 'that hex already has a prop', blocker: 'occupied snap target', blockers: ['occupied snap target'] };
+  const occupancyBlocker = structurePlacementBlocker(input.structures, { item: input.item, tile: input.tile, yaw: input.yaw });
+  if (occupancyBlocker) {
+    return {
+      ...base,
+      ok: false,
+      message: occupancyBlocker === 'occupied edge socket' ? 'that edge already has a prop' : 'that hex already has a prop',
+      blocker: occupancyBlocker,
+      blockers: [occupancyBlocker],
+    };
   }
   return {
     ...base,
@@ -283,6 +294,18 @@ export function placeStructureCommand(input: StructurePlaceCommandInput): Struct
       action: `${item}:place:blocked:${input.blocker}`,
       selected: item,
       blockers: [input.blocker],
+    };
+  }
+  const occupancyBlocker = structurePlacementBlocker(structures, { item, tile, yaw });
+  if (occupancyBlocker) {
+    return {
+      ok: false,
+      command: 'place',
+      item,
+      message: occupancyBlocker === 'occupied edge socket' ? 'that edge already has a prop' : 'that hex already has a prop',
+      action: `${item}:place:blocked:${occupancyBlocker}`,
+      selected: item,
+      blockers: [occupancyBlocker],
     };
   }
   const placed = addStructure(structures, { item, tile, layer, yaw });
@@ -405,11 +428,24 @@ export function previewRelocateStructureCommand(input: StructureRelocatePreviewI
   if (input.blocker) {
     return { ...base, ok: false, message: input.blocker, blocker: input.blocker, blockers: [input.blocker] };
   }
-  if (target.tile === toTile) {
+  const currentSocket = structureSocketPlacement(target);
+  const nextSocket = structureSocketPlacementFor(target.item, yaw);
+  const sameSocket = target.tile === toTile
+    && target.layer === toLayer
+    && currentSocket.occupies.length === nextSocket.occupies.length
+    && currentSocket.occupies.every((slot, index) => slot === nextSocket.occupies[index]);
+  if (sameSocket) {
     return { ...base, ok: false, message: `${placeableName(target.item).toLowerCase()} already on that snap hex`, blocker: 'same snap target', blockers: ['same snap target'] };
   }
-  if (input.structures.some((entry) => entry.id !== target.id && entry.tile === toTile)) {
-    return { ...base, ok: false, message: 'that hex already has a prop', blocker: 'occupied snap target', blockers: ['occupied snap target'] };
+  const occupancyBlocker = structurePlacementBlocker(input.structures, { item: target.item, tile: toTile, yaw }, target.id);
+  if (occupancyBlocker) {
+    return {
+      ...base,
+      ok: false,
+      message: occupancyBlocker === 'occupied edge socket' ? `${placeableName(target.item)} edge is occupied` : 'that hex already has a prop',
+      blocker: occupancyBlocker,
+      blockers: [occupancyBlocker],
+    };
   }
   return {
     ...base,

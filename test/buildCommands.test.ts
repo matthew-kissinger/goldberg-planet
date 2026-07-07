@@ -94,8 +94,8 @@ describe('Hearth and Horizon build commands', () => {
       item: 'doorKit',
       tile: 6,
       layer: 2,
-      yaw: 0,
-      placementTurn: 0,
+      yaw: placementTurn.yaw!,
+      placementTurn: placementTurn.turn!,
       materialCounts: materials,
       craftedItems: crafted,
       creative: false,
@@ -103,8 +103,8 @@ describe('Hearth and Horizon build commands', () => {
     })).toMatchObject({
       ok: false,
       command: 'place',
-      action: 'doorKit:place:blocked:occupied',
-      message: 'that hex already has a prop',
+      action: 'doorKit:place:blocked:occupied edge socket',
+      message: 'that edge already has a prop',
     });
 
     expect(rotatePlacedStructureCommand(structures, null, 1)).toMatchObject({
@@ -189,6 +189,7 @@ describe('Hearth and Horizon build commands', () => {
       target: placed.placed!,
       tile: 9,
       layer: 2,
+      yaw: 0,
       playerTile: 4,
     })).toMatchObject({
       ok: false,
@@ -197,8 +198,8 @@ describe('Hearth and Horizon build commands', () => {
       id: placed.placed!.id,
       fromTile: 6,
       toTile: 9,
-      action: 'doorKit:relocate:that hex already has a prop',
-      blockers: ['occupied snap target'],
+      action: 'doorKit:relocate:door kit edge is occupied',
+      blockers: ['occupied edge socket'],
     });
     expect(relocateStructureCommand({
       structures,
@@ -336,9 +337,9 @@ describe('Hearth and Horizon build commands', () => {
       playerTile: 4,
     })).toMatchObject({
       ok: false,
-      message: 'that hex already has a prop',
-      blocker: 'occupied snap target',
-      blockers: ['occupied snap target'],
+      message: 'that edge already has a prop',
+      blocker: 'occupied edge socket',
+      blockers: ['occupied edge socket'],
     });
     expect(previewPlaceStructureCommand({
       structures,
@@ -399,9 +400,9 @@ describe('Hearth and Horizon build commands', () => {
       playerTile: 4,
     })).toMatchObject({
       ok: false,
-      message: 'that hex already has a prop',
-      blocker: 'occupied snap target',
-      blockers: ['occupied snap target'],
+      message: 'Door Kit edge is occupied',
+      blocker: 'occupied edge socket',
+      blockers: ['occupied edge socket'],
     });
     expect(previewRelocateStructureCommand({
       structures,
@@ -578,5 +579,97 @@ describe('Hearth and Horizon build commands', () => {
       });
       expect(crafted[testCase.item]).toBe(1);
     }
+  });
+
+  it('places and blocks wall-shell pieces by edge socket instead of whole tile', () => {
+    const materials = [0, 0, 0, 0, 0];
+    const crafted: InventoryItems = { floorFoundation: 1, wallPanel: 1, wallWindowPanel: 1, wallDoorPanel: 1 };
+    const structures: StructureSave[] = [];
+
+    const foundation = placeStructureCommand({
+      structures,
+      item: 'floorFoundation',
+      tile: 30,
+      layer: 2,
+      yaw: 0,
+      placementTurn: 0,
+      materialCounts: materials,
+      craftedItems: crafted,
+      creative: false,
+      playerTile: 4,
+    });
+    expect(foundation).toMatchObject({ ok: true, item: 'floorFoundation' });
+
+    const wall = placeStructureCommand({
+      structures,
+      item: 'wallPanel',
+      tile: 30,
+      layer: 2,
+      yaw: 0,
+      placementTurn: 0,
+      materialCounts: materials,
+      craftedItems: crafted,
+      creative: false,
+      playerTile: 4,
+    });
+    expect(wall).toMatchObject({ ok: true, item: 'wallPanel' });
+
+    expect(previewPlaceStructureCommand({
+      structures,
+      item: 'wallWindowPanel',
+      tile: 30,
+      layer: 2,
+      yaw: Math.PI / 3,
+      placementTurn: 1,
+      materialCounts: materials,
+      craftedItems: crafted,
+      creative: false,
+      playerTile: 4,
+    })).toMatchObject({
+      ok: true,
+      item: 'wallWindowPanel',
+      tile: 30,
+      turn: 1,
+    });
+
+    const window = placeStructureCommand({
+      structures,
+      item: 'wallWindowPanel',
+      tile: 30,
+      layer: 2,
+      yaw: Math.PI / 3,
+      placementTurn: 1,
+      materialCounts: materials,
+      craftedItems: crafted,
+      creative: false,
+      playerTile: 4,
+    });
+    expect(window).toMatchObject({ ok: true, item: 'wallWindowPanel' });
+    expect(structures.filter((entry) => entry.tile === 30)).toHaveLength(3);
+
+    expect(previewPlaceStructureCommand({
+      structures,
+      item: 'wallDoorPanel',
+      tile: 30,
+      layer: 2,
+      yaw: 0,
+      placementTurn: 0,
+      materialCounts: materials,
+      craftedItems: crafted,
+      creative: false,
+      playerTile: 4,
+    })).toMatchObject({
+      ok: false,
+      blocker: 'occupied edge socket',
+      blockers: ['occupied edge socket'],
+      message: 'that edge already has a prop',
+    });
+
+    expect(rotatePlacedStructureCommand(structures, window.placed!, -1)).toMatchObject({
+      ok: false,
+      command: 'rotatePlaced',
+      item: 'wallWindowPanel',
+      blockers: ['occupied edge socket'],
+    });
   });
 });

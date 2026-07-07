@@ -266,7 +266,7 @@ async function main() {
       }),
     };
 
-    const setup = await page.evaluate(() => {
+    let setup = await page.evaluate(() => {
       const world = window.__world;
       for (const item of ['bedroll', 'roofBundle', 'roofJoin', 'wallDoorPanel', 'wallWindowPanel', 'wallCorner', 'wallPanel', 'wallHalfRail', 'floorFoundation', 'campfire']) world.giveItem(item, 8);
       const baseline = world.save.export();
@@ -306,6 +306,21 @@ async function main() {
         }
         return null;
       };
+      const relocate = (entry, tile, yaw, expectOk = true) => {
+        if (!entry) return { ok: false, reason: 'missing source', tile, yaw };
+        const ok = world.relocateStructure(entry.id, tile, undefined, yaw);
+        const after = world.structures().items.find((candidate) => candidate.id === entry.id) ?? null;
+        const result = {
+          ok,
+          tile,
+          yaw,
+          after,
+          lastAction: world.structures().lastAction,
+          commands: world.buildCommands?.(),
+        };
+        if (ok !== expectOk) failures.push({ item: entry.item, expectedRelocateOk: expectOk, result });
+        return result;
+      };
       const centers = world.nearbyTiles(3).filter((tile) => tile !== world.player.tile);
       for (const center of centers) {
         if (occupied().has(center)) continue;
@@ -341,7 +356,17 @@ async function main() {
         if (fire) world.useStructure(fire.id);
         const halfRail = placeFirst('wallHalfRail', 5);
         const foundation = placeFirst('floorFoundation', 7, halfRail ? [halfRail.tile] : []);
+        const looseWall = placeFirst('wallPanel', 7, [halfRail?.tile, foundation?.tile].filter((tile) => tile !== undefined));
+        const looseWindow = placeFirst('wallWindowPanel', 7, [halfRail?.tile, foundation?.tile, looseWall?.tile].filter((tile) => tile !== undefined));
+        const looseDoor = placeFirst('wallDoorPanel', 7, [halfRail?.tile, foundation?.tile, looseWall?.tile, looseWindow?.tile].filter((tile) => tile !== undefined));
         if (!halfRail || !foundation) {
+          world.save.import(baseline);
+          continue;
+        }
+        const stackedWall = relocate(looseWall, foundation.tile, 0, true);
+        const stackedWindow = relocate(looseWindow, foundation.tile, Math.PI / 3, true);
+        const duplicateDoor = relocate(looseDoor, foundation.tile, 0, false);
+        if (!looseWall || !looseWindow || !looseDoor || !stackedWall.ok || !stackedWindow.ok || duplicateDoor.ok) {
           world.save.import(baseline);
           continue;
         }
@@ -353,6 +378,12 @@ async function main() {
           placed,
           halfRail,
           foundation,
+          stacked: {
+            wall: stackedWall,
+            window: stackedWindow,
+            duplicateDoor,
+            tile: foundation.tile,
+          },
           structures: world.structures(),
           text: JSON.parse(window.render_game_to_text()),
         };
@@ -360,6 +391,13 @@ async function main() {
       return { ok: false, reason: 'no valid center', playerTile: world.player.tile, nearby: centers, failures };
     });
     if (!setup.ok) throw new Error(`C6 setup failed: ${JSON.stringify(setup)}`);
+    await page.waitForFunction((tile) => {
+      const wallShell = window.__world?.structures?.().renderer?.wallShell;
+      return wallShell?.sameTileEdgeStacks >= 1
+        && wallShell.edgeSockets?.includes(`${tile}:edge:0`)
+        && wallShell.edgeSockets?.includes(`${tile}:edge:1`);
+    }, setup.stacked.tile, { timeout: 10000 });
+    setup = { ...setup, structures: await page.evaluate(() => window.__world.structures()) };
     if (setup.structures.sockets.houseKit.map((entry) => entry.item).join(',') !== 'doorKit,windowFrame,roofBundle') {
       throw new Error(`houseKit catalog changed unexpectedly: ${JSON.stringify(setup.structures.sockets.houseKit)}`);
     }
@@ -383,6 +421,25 @@ async function main() {
       || (setup.structures.renderer.wallShell?.foundations ?? 0) < 1
     ) {
       throw new Error(`renderer wall shell diagnostics missing: ${JSON.stringify(setup.structures.renderer.wallShell)}`);
+    }
+    const stackedKeys = setup.structures.items
+      .filter((entry) => entry.tile === setup.stacked.tile)
+      .flatMap((entry) => entry.socket?.occupancyKeys ?? []);
+    for (const key of [`${setup.stacked.tile}:center`, `${setup.stacked.tile}:edge:0`, `${setup.stacked.tile}:edge:1`]) {
+      if (!stackedKeys.includes(key)) {
+        throw new Error(`same-tile edge stack missing ${key}: ${JSON.stringify({ stacked: setup.stacked, stackedKeys, items: setup.structures.items.filter((entry) => entry.tile === setup.stacked.tile) })}`);
+      }
+    }
+    if (setup.stacked.duplicateDoor.ok || setup.stacked.duplicateDoor?.commands?.last?.blockers?.[0] !== 'occupied edge socket') {
+      throw new Error(`duplicate wall edge was not blocked: ${JSON.stringify(setup.stacked.duplicateDoor)}`);
+    }
+    if ((setup.structures.renderer.wallShell?.sameTileEdgeStacks ?? 0) < 1) {
+      throw new Error(`renderer did not report same-tile edge stack: ${JSON.stringify(setup.structures.renderer.wallShell)}`);
+    }
+    for (const key of [`${setup.stacked.tile}:edge:0`, `${setup.stacked.tile}:edge:1`]) {
+      if (!setup.structures.renderer.wallShell?.edgeSockets?.includes(key)) {
+        throw new Error(`renderer edge socket missing ${key}: ${JSON.stringify(setup.structures.renderer.wallShell)}`);
+      }
     }
 
     await page.waitForTimeout(300);

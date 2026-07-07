@@ -121,6 +121,7 @@ import {
   rootCellarProvisionCount,
   spendRootCellarProvision,
   structureDismantleBlockers,
+  structureSocketOccupancy,
   structureYawTurn,
   structureStationInventory,
   transferChestMaterial,
@@ -5444,7 +5445,7 @@ async function boot(): Promise<void> {
     }),
     craft: (recipeId: string) => craftSelected(recipeId),
     crafting: () => ({ open: craftingOpen, crafted: { ...craftedItems }, recipes: craftingRows(), ledger: packLedger() }),
-    structures: () => ({ items: structures.map((s) => ({ ...s, state: s.state ? { ...s.state } : undefined, turn: structureYawTurn(s.yaw) })), placement: placementDiagnostics(), relocation: relocationDiagnostics(), snapPreview: currentStructureSnapPreview(), commands: buildCommandDiagnostics(), sockets: { houseKit: houseKitSocketCatalog(), wallShell: wallShellSocketCatalog() }, crops: cropDiagnostics(), compostBins: compostBinDiagnostics(), rainCisterns: rainCisternDiagnostics(), rootCellars: rootCellarDiagnostics(), caveAnchors: caveAnchorDiagnostics(), waystones: waystoneDiagnostics(), weatherVanes: weatherVaneDiagnostics(), fishTraps: fishTrapDiagnostics(), shoreNets: shoreNetDiagnostics(), storage: { open: openChestId !== null, chestId: openChestId, state: currentChestStorage() }, home: homeScore(structures, geo), renderer: structureRenderer.stats(), lastAction: lastStructureAction }),
+    structures: () => ({ items: structures.map((s) => ({ ...s, state: s.state ? { ...s.state } : undefined, turn: structureYawTurn(s.yaw), socket: structureSocketOccupancy(s) })), placement: placementDiagnostics(), relocation: relocationDiagnostics(), snapPreview: currentStructureSnapPreview(), commands: buildCommandDiagnostics(), sockets: { houseKit: houseKitSocketCatalog(), wallShell: wallShellSocketCatalog() }, crops: cropDiagnostics(), compostBins: compostBinDiagnostics(), rainCisterns: rainCisternDiagnostics(), rootCellars: rootCellarDiagnostics(), caveAnchors: caveAnchorDiagnostics(), waystones: waystoneDiagnostics(), weatherVanes: weatherVaneDiagnostics(), fishTraps: fishTrapDiagnostics(), shoreNets: shoreNetDiagnostics(), storage: { open: openChestId !== null, chestId: openChestId, state: currentChestStorage() }, home: homeScore(structures, geo), renderer: structureRenderer.stats(), lastAction: lastStructureAction }),
     buildCommands: () => buildCommandDiagnostics(),
     selectStructure: (item: string) => selectStructureForPlacement(item),
     placeStructure: (item: string, tile?: number) => {

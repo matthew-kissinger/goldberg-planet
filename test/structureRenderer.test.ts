@@ -398,6 +398,31 @@ describe('structure renderer asset readability', () => {
     ]));
   });
 
+  it('reports same-tile wall-shell edge sockets for stacked building pieces', () => {
+    const scene = new THREE.Scene();
+    const geo = new Goldberg(8);
+    const layers = buildLayers();
+    const renderer = new StructureRenderer(scene);
+    const structures: StructureSave[] = [
+      { id: 1, item: 'floorFoundation', tile: 1, layer: 100, yaw: 0 },
+      { id: 2, item: 'wallPanel', tile: 1, layer: 100, yaw: 0 },
+      { id: 3, item: 'wallWindowPanel', tile: 1, layer: 100, yaw: Math.PI / 3 },
+      { id: 4, item: 'wallCorner', tile: 1, layer: 100, yaw: Math.PI * 2 / 3 },
+    ];
+
+    renderer.setStructures(structures);
+    renderer.update(structures, geo, layers, { x: 0, y: 0, z: 0 }, 1.5);
+    const stats = renderer.stats();
+
+    expect(stats.wallShell.sameTileEdgeStacks).toBe(1);
+    expect(stats.wallShell.edgeSockets).toEqual(expect.arrayContaining([
+      '1:edge:0',
+      '1:edge:1',
+      '1:edge:2',
+      '1:edge:3',
+    ]));
+  });
+
   it('renders valid and blocked snap previews without adding saved structure groups', () => {
     const scene = new THREE.Scene();
     const geo = new Goldberg(8);

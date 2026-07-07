@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import type { Goldberg } from '../geo/goldberg';
 import type { Layers } from '../world/layers';
-import { homeScore, type ShelterReport, type StructureSave, type StructureSocketSpec } from '../sim/structures';
+import { homeScore, structureSocketOccupancy, type ShelterReport, type StructureSave, type StructureSocketSpec } from '../sim/structures';
 import type { KilnAssetSnapshot, KilnSkinFitSnapshot, KilnStructureSkinSlug, StructureSkinProvider } from './kilnAssets';
 
 type PropFactory = () => THREE.Group;
@@ -887,6 +887,8 @@ export class StructureRenderer {
       const obj = FACTORIES[s.item]();
       obj.userData.structureId = s.id;
       obj.userData.structureItem = s.item;
+      obj.userData.structureTile = s.tile;
+      obj.userData.structureSocket = structureSocketOccupancy(s);
       this.objects.set(s.id, obj);
       this.group.add(obj);
       this.attachKilnSkin(s, obj);
@@ -903,6 +905,8 @@ export class StructureRenderer {
     for (const s of structures) {
       const obj = this.objects.get(s.id);
       if (!obj) continue;
+      obj.userData.structureTile = s.tile;
+      obj.userData.structureSocket = structureSocketOccupancy(s);
       const frame = geo.frameOf(s.tile);
       const ca = Math.cos(s.yaw), sa = Math.sin(s.yaw);
       vX.set(
@@ -1272,6 +1276,8 @@ export class StructureRenderer {
       windowPanels: number;
       corners: number;
       roofJoins: number;
+      edgeSockets: string[];
+      sameTileEdgeStacks: number;
       visibleRoles: string[];
     };
     homeComfortSignals: number;
@@ -1312,6 +1318,9 @@ export class StructureRenderer {
     const shelterReadabilityRoles = new Set<string>();
     const wallShellReadabilityRoles = new Set<string>();
     const wallShellVisibleRoles = new Set<string>();
+    const edgeSockets = new Set<string>();
+    const edgeSocketsByTile = new Map<number, Set<string>>();
+    const edgeStructureCountByTile = new Map<number, number>();
     let wallShellSignals = 0;
     const wallShell = {
       foundations: 0,
@@ -1321,6 +1330,8 @@ export class StructureRenderer {
       windowPanels: 0,
       corners: 0,
       roofJoins: 0,
+      edgeSockets: [] as string[],
+      sameTileEdgeStacks: 0,
       visibleRoles: [] as string[],
     };
     let homeComfortSignals = 0;
@@ -1350,6 +1361,17 @@ export class StructureRenderer {
       if (obj.userData.structureItem === 'wallWindowPanel') wallShell.windowPanels++;
       if (obj.userData.structureItem === 'wallCorner') wallShell.corners++;
       if (obj.userData.structureItem === 'roofJoin') wallShell.roofJoins++;
+      const socket = obj.userData.structureSocket as ReturnType<typeof structureSocketOccupancy> | undefined;
+      if (socket?.kind === 'edge') {
+        const byTile = edgeSocketsByTile.get(socket.tile) ?? new Set<string>();
+        edgeStructureCountByTile.set(socket.tile, (edgeStructureCountByTile.get(socket.tile) ?? 0) + 1);
+        for (const slot of socket.occupies) {
+          const key = `${socket.tile}:${slot}`;
+          edgeSockets.add(key);
+          byTile.add(slot);
+        }
+        edgeSocketsByTile.set(socket.tile, byTile);
+      }
       const skinStatus = obj.userData.kilnSkinStatus as KilnSkinStatus | undefined;
       const skinSlug = obj.userData.kilnAssetSlug as KilnStructureSkinSlug | undefined;
       if (skinStatus === 'loaded') kilnSkinsLoaded++;
@@ -1410,6 +1432,8 @@ export class StructureRenderer {
       wallShellSignals,
       wallShell: {
         ...wallShell,
+        edgeSockets: [...edgeSockets].sort(),
+        sameTileEdgeStacks: [...edgeStructureCountByTile.values()].filter((count) => count > 1).length,
         visibleRoles: [...wallShellVisibleRoles].sort(),
       },
       homeComfortSignals,

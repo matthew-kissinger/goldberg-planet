@@ -170,6 +170,16 @@ export interface PlaceStructureInput {
   yaw: number;
 }
 
+export type StructureSocketPlacementKind = 'center' | 'edge';
+
+export interface StructureSocketPlacement {
+  kind: StructureSocketPlacementKind;
+  edge?: number;
+  key: string;
+  occupies: string[];
+  label: string;
+}
+
 export interface HomeScore {
   score: number;
   max: number;
@@ -260,6 +270,7 @@ export interface StructureRotationResult {
   id?: number;
   yaw?: number;
   turn?: number;
+  blockers?: string[];
 }
 
 export interface StructureRelocationInput {
@@ -545,6 +556,71 @@ export function structureYawTurn(yaw: number): number {
   return ((step % 6) + 6) % 6;
 }
 
+function edgeSlot(edge: number): string {
+  return `edge:${((Math.trunc(edge) % 6) + 6) % 6}`;
+}
+
+function isEdgeAddressedSocket(item: PlaceableItemId): boolean {
+  const spec = structureSocketSpec(item);
+  return spec.pivot === 'wall-center' || spec.collider === 'edge-strip' || spec.role === 'roof-join';
+}
+
+export function structureSocketPlacementFor(item: PlaceableItemId, yaw: number): StructureSocketPlacement {
+  if (!isEdgeAddressedSocket(item)) {
+    return {
+      kind: 'center',
+      key: 'center',
+      occupies: ['center'],
+      label: 'center hex',
+    };
+  }
+  const edge = structureYawTurn(yaw);
+  const occupies = item === 'wallCorner'
+    ? [edgeSlot(edge), edgeSlot(edge + 1)]
+    : [edgeSlot(edge)];
+  return {
+    kind: 'edge',
+    edge,
+    key: occupies.join('+'),
+    occupies,
+    label: item === 'wallCorner' ? `hex edges ${edge + 1}/${((edge + 1) % 6) + 1}` : `hex edge ${edge + 1}`,
+  };
+}
+
+export function structureSocketPlacement(structure: Pick<StructureSave, 'item' | 'yaw'>): StructureSocketPlacement {
+  return structureSocketPlacementFor(structure.item, structure.yaw);
+}
+
+export function structureSocketOccupancy(structure: Pick<StructureSave, 'item' | 'tile' | 'yaw'>): StructureSocketPlacement & { tile: number; occupancyKeys: string[] } {
+  const tile = Math.trunc(structure.tile);
+  const placement = structureSocketPlacement(structure);
+  return {
+    ...placement,
+    tile,
+    occupancyKeys: placement.occupies.map((slot) => `${tile}:${slot}`),
+  };
+}
+
+export function structurePlacementBlocker(
+  structures: readonly StructureSave[],
+  input: Pick<PlaceStructureInput, 'item' | 'tile' | 'yaw'>,
+  ignoreId?: number,
+): string | null {
+  const tile = Math.trunc(input.tile);
+  const placement = structureSocketPlacementFor(input.item, input.yaw);
+  const wanted = new Set(placement.occupies);
+  const ignored = Number.isFinite(ignoreId) ? Math.trunc(ignoreId!) : null;
+  for (const entry of structures) {
+    if (ignored !== null && entry.id === ignored) continue;
+    if (entry.tile !== tile) continue;
+    const occupied = structureSocketPlacement(entry);
+    if (occupied.occupies.some((slot) => wanted.has(slot))) {
+      return placement.kind === 'edge' ? 'occupied edge socket' : 'occupied snap target';
+    }
+  }
+  return null;
+}
+
 export function isWaystoneMark(value: unknown): value is WaystoneMark {
   return value === 'survey' || value === 'home' || value === 'cave' || value === 'shore' || value === 'forage';
 }
@@ -712,7 +788,6 @@ export function normalizeStructureSaves(raw: unknown, tileCount: number, layerCo
   if (!Array.isArray(raw)) return [];
   const out: StructureSave[] = [];
   const usedIds = new Set<number>();
-  const usedTiles = new Set<number>();
   for (const value of raw) {
     if (!value || typeof value !== 'object') continue;
     const entry = value as Partial<StructureSave>;
@@ -723,17 +798,17 @@ export function normalizeStructureSaves(raw: unknown, tileCount: number, layerCo
     const tile = Math.trunc(tileValue as number);
     const layer = Math.trunc(layerValue as number);
     if (tile < 0 || tile >= tileCount || layer < 0 || layer >= layerCount) continue;
-    if (usedTiles.has(tile)) continue;
+    const yaw = normalizeStructureYaw(Number.isFinite(entry.yaw) ? entry.yaw! : 0);
+    if (structurePlacementBlocker(out, { item: entry.item, tile, yaw })) continue;
     let id = Number.isFinite(entry.id) ? Math.max(1, Math.trunc(entry.id as number)) : 1;
     while (usedIds.has(id)) id++;
     usedIds.add(id);
-    usedTiles.add(tile);
     out.push({
       id,
       item: entry.item,
       tile,
       layer,
-      yaw: normalizeStructureYaw(Number.isFinite(entry.yaw) ? entry.yaw! : 0),
+      yaw,
       state: normalizeState(entry.item, entry.state),
     });
   }
@@ -746,21 +821,23 @@ export function nextStructureId(structures: readonly StructureSave[]): number {
   return id;
 }
 
-export function canPlaceStructure(structures: readonly StructureSave[], tile: number): boolean {
-  return !structures.some((s) => s.tile === tile);
+export function canPlaceStructure(structures: readonly StructureSave[], tile: number, item?: PlaceableItemId, yaw = 0): boolean {
+  if (item) return structurePlacementBlocker(structures, { item, tile, yaw }) === null;
+  return !structures.some((s) => s.tile === tile && structureSocketPlacement(s).kind === 'center');
 }
 
 export function addStructure(structures: StructureSave[], input: PlaceStructureInput): StructureSave | null {
   const tile = Math.trunc(input.tile);
   const layer = Math.trunc(input.layer);
   if (!isPlaceableItemId(input.item) || tile < 0 || layer < 0) return null;
-  if (!canPlaceStructure(structures, tile)) return null;
+  const yaw = normalizeStructureYaw(Number.isFinite(input.yaw) ? input.yaw : 0);
+  if (structurePlacementBlocker(structures, { item: input.item, tile, yaw })) return null;
   const structure = {
     id: nextStructureId(structures),
     item: input.item,
     tile,
     layer,
-    yaw: normalizeStructureYaw(Number.isFinite(input.yaw) ? input.yaw : 0),
+    yaw,
     state: undefined,
   };
   structures.push(structure);
@@ -782,7 +859,20 @@ export function rotateStructure(structures: StructureSave[], id: number, turns =
       message: `${placeableName(structure.item).toLowerCase()} already aligned`,
     };
   }
-  structure.yaw = normalizeStructureYaw(structure.yaw + turnDelta * STRUCTURE_YAW_STEP);
+  const nextYaw = normalizeStructureYaw(structure.yaw + turnDelta * STRUCTURE_YAW_STEP);
+  const blocker = structurePlacementBlocker(structures, { item: structure.item, tile: structure.tile, yaw: nextYaw }, structure.id);
+  if (blocker) {
+    return {
+      ok: false,
+      id: structure.id,
+      item: structure.item,
+      yaw: structure.yaw,
+      turn: structureYawTurn(structure.yaw),
+      message: blocker === 'occupied edge socket' ? `${placeableName(structure.item).toLowerCase()} edge is occupied` : 'that hex already has a prop',
+      blockers: [blocker],
+    };
+  }
+  structure.yaw = nextYaw;
   const turn = structureYawTurn(structure.yaw);
   return {
     ok: true,
@@ -825,7 +915,14 @@ export function relocateStructure(
       message: `${placeableName(structure.item).toLowerCase()} cannot be moved · ${blockers[0]}`,
     };
   }
-  if (structure.tile === toTile) {
+  const nextYaw = Number.isFinite(input.yaw) ? normalizeStructureYaw(input.yaw!) : structure.yaw;
+  const currentSocket = structureSocketPlacement(structure);
+  const nextSocket = structureSocketPlacementFor(structure.item, nextYaw);
+  const sameSocket = structure.tile === toTile
+    && structure.layer === toLayer
+    && currentSocket.occupies.length === nextSocket.occupies.length
+    && currentSocket.occupies.every((slot, index) => slot === nextSocket.occupies[index]);
+  if (sameSocket) {
     return {
       ok: false,
       id: structure.id,
@@ -838,8 +935,8 @@ export function relocateStructure(
       blockers: ['same snap target'],
     };
   }
-  const occupied = structures.find((entry) => entry.id !== structure.id && entry.tile === toTile);
-  if (occupied) {
+  const blocker = structurePlacementBlocker(structures, { item: structure.item, tile: toTile, yaw: nextYaw }, structure.id);
+  if (blocker) {
     return {
       ok: false,
       id: structure.id,
@@ -848,13 +945,12 @@ export function relocateStructure(
       fromLayer: structure.layer,
       toTile,
       toLayer,
-      message: 'that hex already has a prop',
-      blockers: ['occupied snap target'],
+      message: blocker === 'occupied edge socket' ? `${placeableName(structure.item).toLowerCase()} edge is occupied` : 'that hex already has a prop',
+      blockers: [blocker],
     };
   }
   const fromTile = structure.tile;
   const fromLayer = structure.layer;
-  const nextYaw = Number.isFinite(input.yaw) ? normalizeStructureYaw(input.yaw!) : structure.yaw;
   structure.tile = toTile;
   structure.layer = toLayer;
   structure.yaw = nextYaw;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addStructure,
+  canPlaceStructure,
   caveAnchorKindLabel,
   chestStorageView,
   consumeWaterlineRouteResupply,
@@ -18,6 +19,8 @@ import {
   spendRootCellarProvision,
   spendPlacedItem,
   STRUCTURE_YAW_STEP,
+  structureSocketOccupancy,
+  structureSocketPlacement,
   structureSocketSpec,
   structureYawTurn,
   structureStationInventory,
@@ -47,6 +50,9 @@ describe('Hearth and Horizon structures', () => {
       { id: 16, item: 'wallWindowPanel', tile: 16, layer: 4, yaw: 1, state: { storage: { wood: 1 } } },
       { id: 17, item: 'wallCorner', tile: 17, layer: 4, yaw: 1.2, state: { home: true } },
       { id: 18, item: 'roofJoin', tile: 18, layer: 4, yaw: 1.4, state: { water: 3 } },
+      { id: 19, item: 'wallPanel', tile: 20, layer: 4, yaw: 0 },
+      { id: 20, item: 'wallWindowPanel', tile: 20, layer: 4, yaw: STRUCTURE_YAW_STEP },
+      { id: 21, item: 'wallDoorPanel', tile: 20, layer: 4, yaw: 0 },
       { id: 7, item: 'missingThing', tile: 12, layer: 4, yaw: 1 },
       { id: 8, item: 'bedroll', tile: 10, layer: 4, yaw: 1 },
       { id: 9, item: 'lantern', tile: 999, layer: 4, yaw: 1 },
@@ -63,10 +69,22 @@ describe('Hearth and Horizon structures', () => {
       { id: 16, item: 'wallWindowPanel', tile: 16, layer: 4, yaw: 1 },
       { id: 17, item: 'wallCorner', tile: 17, layer: 4, yaw: 1.2 },
       { id: 18, item: 'roofJoin', tile: 18, layer: 4, yaw: 1.4 },
+      { id: 19, item: 'wallPanel', tile: 20, layer: 4, yaw: 0 },
+      { id: 20, item: 'wallWindowPanel', tile: 20, layer: 4, yaw: STRUCTURE_YAW_STEP },
     ]);
+    expect(structureSocketOccupancy(structures.find((entry) => entry.id === 19)!)).toMatchObject({
+      kind: 'edge',
+      tile: 20,
+      occupancyKeys: ['20:edge:0'],
+    });
+    expect(structureSocketOccupancy(structures.find((entry) => entry.id === 20)!)).toMatchObject({
+      kind: 'edge',
+      tile: 20,
+      occupancyKeys: ['20:edge:1'],
+    });
   });
 
-  it('places one prop per tile, exposes stations, spends inventory, and scores a hearth', () => {
+  it('places center props one per tile, exposes stations, spends inventory, and scores a hearth', () => {
     const structures: StructureSave[] = [];
     expect(addStructure(structures, { item: 'workbench', tile: 1, layer: 2, yaw: 0 })?.id).toBe(1);
     expect(addStructure(structures, { item: 'campfire', tile: 1, layer: 2, yaw: 0 })).toBeNull();
@@ -96,6 +114,26 @@ describe('Hearth and Horizon structures', () => {
     expect(spendPlacedItem(items, 'campfire')).toBe(false);
   });
 
+  it('allows same-tile building edges when sockets do not overlap', () => {
+    const structures: StructureSave[] = [];
+    const foundation = addStructure(structures, { item: 'floorFoundation', tile: 30, layer: 2, yaw: 0 })!;
+    const wall = addStructure(structures, { item: 'wallPanel', tile: 30, layer: 2, yaw: 0 })!;
+    const window = addStructure(structures, { item: 'wallWindowPanel', tile: 30, layer: 2, yaw: STRUCTURE_YAW_STEP })!;
+
+    expect(foundation).toMatchObject({ item: 'floorFoundation', tile: 30 });
+    expect(structureSocketPlacement(foundation)).toMatchObject({ kind: 'center', occupies: ['center'] });
+    expect(structureSocketPlacement(wall)).toMatchObject({ kind: 'edge', edge: 0, occupies: ['edge:0'] });
+    expect(structureSocketPlacement(window)).toMatchObject({ kind: 'edge', edge: 1, occupies: ['edge:1'] });
+    expect(addStructure(structures, { item: 'campfire', tile: 30, layer: 2, yaw: 0 })).toBeNull();
+    expect(addStructure(structures, { item: 'wallDoorPanel', tile: 30, layer: 2, yaw: 0 })).toBeNull();
+    expect(addStructure(structures, { item: 'wallCorner', tile: 30, layer: 2, yaw: STRUCTURE_YAW_STEP })).toBeNull();
+
+    const corner = addStructure(structures, { item: 'wallCorner', tile: 30, layer: 2, yaw: STRUCTURE_YAW_STEP * 2 })!;
+    expect(structureSocketPlacement(corner)).toMatchObject({ kind: 'edge', edge: 2, occupies: ['edge:2', 'edge:3'] });
+    expect(canPlaceStructure(structures, 30, 'wallHalfRail', STRUCTURE_YAW_STEP * 4)).toBe(true);
+    expect(canPlaceStructure(structures, 30, 'wallHalfRail', STRUCTURE_YAW_STEP * 2)).toBe(false);
+  });
+
   it('normalizes and rotates placed props in hex-facing steps', () => {
     const structures: StructureSave[] = [];
     const door = addStructure(structures, { item: 'doorKit', tile: 6, layer: 2, yaw: -STRUCTURE_YAW_STEP })!;
@@ -122,17 +160,18 @@ describe('Hearth and Horizon structures', () => {
   it('relocates only inactive props across the snap grid while preserving identity and state', () => {
     const structures: StructureSave[] = [];
     const door = addStructure(structures, { item: 'doorKit', tile: 6, layer: 2, yaw: STRUCTURE_YAW_STEP })!;
+    const window = addStructure(structures, { item: 'windowFrame', tile: 6, layer: 2, yaw: 0 })!;
     const chest = addStructure(structures, { item: 'chest', tile: 8, layer: 2, yaw: 0 })!;
     chest.state = { storage: { wood: 2 } };
 
-    expect(relocateStructure(structures, door.id, { tile: 8, layer: 2 })).toMatchObject({
+    expect(relocateStructure(structures, door.id, { tile: 6, layer: 2, yaw: 0 })).toMatchObject({
       ok: false,
       id: door.id,
       item: 'doorKit',
       fromTile: 6,
-      toTile: 8,
-      message: 'that hex already has a prop',
-      blockers: ['occupied snap target'],
+      toTile: 6,
+      message: 'door kit edge is occupied',
+      blockers: ['occupied edge socket'],
     });
     expect(relocateStructure(structures, door.id, { tile: 6, layer: 2 })).toMatchObject({
       ok: false,
@@ -158,6 +197,7 @@ describe('Hearth and Horizon structures', () => {
     });
     expect(door).toMatchObject({ id: 1, item: 'doorKit', tile: 10, layer: 3 });
     expect(door.yaw).toBeCloseTo(STRUCTURE_YAW_STEP);
+    expect(window).toMatchObject({ id: 2, item: 'windowFrame', tile: 6 });
 
     expect(relocateStructure(structures, chest.id, { tile: 12, layer: 2 })).toMatchObject({
       ok: false,
