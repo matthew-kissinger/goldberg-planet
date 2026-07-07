@@ -185,6 +185,7 @@ import {
   nextHorizonChartSignal,
   normalizeRoutePlan,
   planExpedition,
+  routeEcologyForExpedition,
   routeGuide,
   routeGuideCandidates,
   routePlanSignal,
@@ -2705,6 +2706,16 @@ async function boot(): Promise<void> {
     const school = currentFishSchool();
     const traps = fishTrapDiagnostics();
     const nets = shoreNetDiagnostics();
+    const ecology = routeEcologyForExpedition({
+      centers: geo.centers,
+      fromTile: player.tile,
+      targetTile: signal?.target.tile ?? null,
+      radius: PLANET_RADIUS,
+      fishLabel: school.label,
+      fishStrength: school.strength,
+      traps: traps.map((trap) => ({ tile: trap.tile, ready: trap.ready })),
+      nets: nets.map((net) => ({ tile: net.tile, ready: net.ready })),
+    });
     return planExpedition({
       signal,
       items: craftedItems,
@@ -2716,12 +2727,7 @@ async function boot(): Promise<void> {
         forecastLabel: forecast.label || (currentPentagonSiteThresholdEffect()?.routePrep === 'weather' ? currentPentagonSiteThresholdEffect()?.label : undefined),
         cellarProvisions: rootCellarProvisionCount(structures, geo),
       },
-      ecology: {
-        fishLabel: school.label,
-        fishStrength: school.strength,
-        fishTrapReady: traps.filter((trap) => trap.ready).length,
-        shoreNetReady: nets.filter((net) => net.ready).length,
-      },
+      ecology,
       planeCrafted,
       insights: pentagonInsights(),
       seasonChain: chain,

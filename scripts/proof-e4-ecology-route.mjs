@@ -21,6 +21,7 @@ function loadPlaywright() {
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.join(root, 'output', 'playwright', 'e4-ecology-route');
 const requestedPort = Number(process.env.PROOF_PORT || 0);
+const profileFilter = process.env.PROOF_PROFILE || '';
 
 async function getFreePort() {
   if (requestedPort > 0) return requestedPort;
@@ -262,7 +263,12 @@ async function seedEcologyRoute(page) {
       { id: 7, item: 'chest', tile: pickTile(5), layer: 4, yaw: 0 },
     ];
 
-    const saveFor = (ready) => {
+    const readyTrapState = { trapSetDay: 6, trapSetMinute: 560, trapBaited: true, trapChecks: 0 };
+    const readyNetState = { netSetDay: 6, netSetMinute: 560, netChecks: 0 };
+    const soakingTrapState = { trapSetDay: 6, trapSetMinute: 790, trapBaited: true, trapChecks: 0 };
+    const soakingNetState = { netSetDay: 6, netSetMinute: 790, netChecks: 0 };
+
+    const saveFor = ({ ready, offRouteTile = null, routeGear = true }) => {
       const save = JSON.parse(JSON.stringify(spawned));
       save.player = JSON.parse(world.save.export()).player;
       save.progression = {
@@ -275,17 +281,16 @@ async function seedEcologyRoute(page) {
       save.survival = { stamina: 92, exposure: 4, mealsEaten: 0, collapseCount: 0, trailFocus: 0 };
       save.time = { day: 6, minute: 800 };
       save.weather = { phase: 0.2, storm: 0 };
-      save.structures = [
-        ...baseStructures,
+      save.structures = [...baseStructures];
+      if (routeGear) {
+        save.structures.push(
         {
           id: 8,
           item: 'fishTrap',
           tile: pickTile(6),
           layer: 4,
           yaw: 0.2,
-          state: ready
-            ? { trapSetDay: 6, trapSetMinute: 560, trapBaited: true, trapChecks: 0 }
-            : { trapSetDay: 6, trapSetMinute: 790, trapBaited: true, trapChecks: 0 },
+          state: ready ? readyTrapState : soakingTrapState,
         },
         {
           id: 9,
@@ -293,11 +298,16 @@ async function seedEcologyRoute(page) {
           tile: pickTile(7),
           layer: 4,
           yaw: 0.4,
-          state: ready
-            ? { netSetDay: 6, netSetMinute: 560, netChecks: 0 }
-            : { netSetDay: 6, netSetMinute: 790, netChecks: 0 },
+          state: ready ? readyNetState : soakingNetState,
         },
-      ];
+        );
+      }
+      if (Number.isFinite(offRouteTile)) {
+        save.structures.push(
+          { id: 10, item: 'fishTrap', tile: Math.trunc(offRouteTile), layer: 4, yaw: 0.6, state: readyTrapState },
+          { id: 11, item: 'shoreNet', tile: Math.trunc(offRouteTile), layer: 4, yaw: 0.9, state: readyNetState },
+        );
+      }
       return save;
     };
 
@@ -318,27 +328,60 @@ async function seedEcologyRoute(page) {
       };
     };
 
-    const unreadySave = saveFor(false);
+    const findOffRouteTile = () => {
+      const totalTiles = Math.max(0, Math.trunc(world.geo?.count ?? 0));
+      const stride = Math.max(1, Math.floor(totalTiles / 180));
+      const candidates = [
+        ...pentagons,
+        ...Array.from({ length: Math.min(220, totalTiles) }, (_, index) => (index * stride) % Math.max(1, totalTiles)),
+      ];
+      const seen = new Set();
+      for (const tile of candidates) {
+        const t = Math.max(0, Math.min(Math.max(0, totalTiles - 1), Math.trunc(tile)));
+        if (seen.has(t) || t === homeTile || t === targetSignal.target.tile) continue;
+        seen.add(t);
+        const offRouteSave = saveFor({ ready: true, routeGear: false, offRouteTile: t });
+        if (!world.save.import(JSON.stringify(offRouteSave))) continue;
+        const nav = world.navigation();
+        const food = nav.plan?.checks?.find((check) => check.id === 'food')?.detail ?? '';
+        if (nav.plan?.missing?.includes('packed food') && food.includes('off-route')) return t;
+      }
+      return null;
+    };
+
+    const offRouteTile = findOffRouteTile();
+    if (!Number.isFinite(offRouteTile)) throw new Error('could not find an off-route waterline staging tile');
+
+    const offRouteSave = saveFor({ ready: true, routeGear: false, offRouteTile });
+    if (!world.save.import(JSON.stringify(offRouteSave))) throw new Error('failed to import off-route waterline save');
+    const offRoute = sample('off-route');
+
+    const unreadySave = saveFor({ ready: false });
     if (!world.save.import(JSON.stringify(unreadySave))) throw new Error('failed to import unready waterline save');
     const unready = sample('unready');
-    const readySave = saveFor(true);
+    const readySave = saveFor({ ready: true, offRouteTile });
     if (!world.save.import(JSON.stringify(readySave))) throw new Error('failed to import ready waterline save');
     const ready = sample('ready');
 
-    return { targetIndex, targetName: targetSignal.target.name, unready, ready };
+    return { targetIndex, targetName: targetSignal.target.name, offRouteTile, offRoute, unready, ready };
   });
 }
 
 function assertEcologyRoute(result, name) {
   if (result.unready.plan.range === 'near') throw new Error(`${name}: unready route is too near for expedition prep`);
   if (result.ready.plan.range === 'near') throw new Error(`${name}: ready route is too near for expedition prep`);
+  const offRouteFood = foodCheck(result.offRoute.plan);
   const unreadyFood = foodCheck(result.unready.plan);
   const readyFood = foodCheck(result.ready.plan);
+  if (offRouteFood.ready) throw new Error(`${name}: off-route food check unexpectedly ready: ${offRouteFood.detail}`);
+  if (!result.offRoute.plan.missing.includes('packed food')) throw new Error(`${name}: off-route plan does not miss packed food`);
+  if (!offRouteFood.detail.includes('off-route')) throw new Error(`${name}: off-route food detail lacks ignored gear: ${offRouteFood.detail}`);
   if (unreadyFood.ready) throw new Error(`${name}: unready food check unexpectedly ready: ${unreadyFood.detail}`);
   if (!result.unready.plan.missing.includes('packed food')) throw new Error(`${name}: unready plan does not miss packed food`);
   if (!readyFood.ready) throw new Error(`${name}: ready food check did not become ready: ${readyFood.detail}`);
   if (result.ready.plan.missing.includes('packed food')) throw new Error(`${name}: ready plan still misses packed food`);
   if (!readyFood.detail.includes('waterline')) throw new Error(`${name}: ready food detail lacks waterline resupply: ${readyFood.detail}`);
+  if (!readyFood.detail.includes('off-route')) throw new Error(`${name}: ready food detail does not preserve ignored off-route gear: ${readyFood.detail}`);
   const trapsReady = result.ready.structures.fishTraps.filter((trap) => trap.ready).length;
   const netsReady = result.ready.structures.shoreNets.filter((net) => net.ready).length;
   if (trapsReady < 1 || netsReady < 1) throw new Error(`${name}: ready structure diagnostics missing trap/net readiness`);
@@ -347,6 +390,10 @@ function assertEcologyRoute(result, name) {
 
 async function openVisibleRouteSlate(page, name, options = {}) {
   if (options.touch) await page.tap('#btn-route');
+  else if (options.gamepad) {
+    await page.evaluate(() => window.__world?.injectGamepad?.({ active: true, chart: true }, 3));
+    await page.waitForTimeout(250);
+  }
   else {
     await page.evaluate(() => window.focus());
     await page.keyboard.press('m');
@@ -392,6 +439,31 @@ async function runViewport(browser, url, name, viewport, options = {}) {
   const routeText = await openVisibleRouteSlate(page, name, options);
   await page.waitForTimeout(600);
   const canvasProbe = await canvasPixelProbe(page);
+  const ui = await page.evaluate(() => {
+    const rectFor = (id) => {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        left: Math.round(r.left),
+        top: Math.round(r.top),
+        right: Math.round(r.right),
+        bottom: Math.round(r.bottom),
+        width: Math.round(r.width),
+        height: Math.round(r.height),
+      };
+    };
+    return {
+      ux: window.__world?.controls?.()?.ux ?? null,
+      panels: window.__world?.controls?.()?.panels ?? null,
+      routeRect: rectFor('route'),
+      touchButtons: {
+        route: rectFor('btn-route'),
+        craft: rectFor('btn-craft'),
+        use: rectFor('btn-use'),
+      },
+    };
+  });
   const screenshot = path.join(outDir, `${name}.png`);
   const screenshotBuffer = await page.screenshot({ path: screenshot, fullPage: true });
   const screenshotProbe = pngPixelProbe(screenshotBuffer);
@@ -405,11 +477,14 @@ async function runViewport(browser, url, name, viewport, options = {}) {
     touch: !!options.touch,
     screenshot,
     targetName: result.targetName,
+    offRouteTile: result.offRouteTile,
     targetDistance: result.ready.signal.distanceLabel,
+    offRouteFood: result.offRoute.foodCheck.detail,
     unreadyFood: result.unready.foodCheck.detail,
     readyFood: result.ready.foodCheck.detail,
     readyPrepLabel: result.ready.plan.prepLabel,
     routeText,
+    ui,
     trapReady: result.ready.structures.fishTraps.filter((trap) => trap.ready).length,
     netReady: result.ready.structures.shoreNets.filter((net) => net.ready).length,
     pixelProbe: { canvas: canvasProbe, screenshot: screenshotProbe },
@@ -429,8 +504,17 @@ try {
   const browser = await chromium.launch({ headless: process.env.HEADED !== '1' });
   const results = [];
   try {
-    results.push(await runViewport(browser, targetUrl, 'desktop', { width: 1440, height: 900 }));
-    results.push(await runViewport(browser, touchUrl, 'phone-touch', { width: 390, height: 844 }, { touch: true }));
+    const profiles = [
+      { name: 'desktop', url: targetUrl, viewport: { width: 1440, height: 900 }, options: {} },
+      { name: 'laptop', url: targetUrl, viewport: { width: 1366, height: 720 }, options: {} },
+      { name: 'tablet-touch', url: touchUrl, viewport: { width: 820, height: 1180 }, options: { touch: true } },
+      { name: 'phone-touch', url: touchUrl, viewport: { width: 390, height: 844 }, options: { touch: true } },
+      { name: 'gamepad', url: targetUrl, viewport: { width: 1440, height: 900 }, options: { gamepad: true } },
+    ].filter((profile) => !profileFilter || profile.name === profileFilter);
+    if (profiles.length === 0) throw new Error(`No E4 ecology route profile matched PROOF_PROFILE=${profileFilter}`);
+    for (const profile of profiles) {
+      results.push(await runViewport(browser, profile.url, profile.name, profile.viewport, profile.options));
+    }
   } finally {
     await browser.close();
   }
@@ -453,6 +537,7 @@ try {
       name: result.name,
       screenshot: result.screenshot,
       target: `${result.targetName} ${result.targetDistance}`,
+      offRouteFood: result.offRouteFood,
       unreadyFood: result.unreadyFood,
       readyFood: result.readyFood,
       readyPrepLabel: result.readyPrepLabel,

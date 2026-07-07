@@ -394,6 +394,26 @@ export interface ExpeditionEcologyState {
   fishStrength?: number;
   fishTrapReady?: number;
   shoreNetReady?: number;
+  fishTrapOffRouteReady?: number;
+  shoreNetOffRouteReady?: number;
+}
+
+export interface ExpeditionEcologySite {
+  tile: number;
+  ready?: boolean;
+}
+
+export interface RouteEcologyStagingInput {
+  centers: ArrayLike<number>;
+  fromTile: number;
+  targetTile: number | null | undefined;
+  radius: number;
+  fishLabel?: string;
+  fishStrength?: number;
+  traps?: readonly ExpeditionEcologySite[];
+  nets?: readonly ExpeditionEcologySite[];
+  endpointMeters?: number;
+  detourMeters?: number;
 }
 
 export interface ExpeditionPlanInput {
@@ -732,6 +752,72 @@ export function greatCircleDistanceMeters(
   const b = unitAt(centers, toTile);
   const dot = clamp(a[0] * b[0] + a[1] * b[1] + a[2] * b[2], -1, 1);
   return Math.acos(dot) * Math.max(0, radius);
+}
+
+export function routeAdjacentTile(
+  centers: ArrayLike<number>,
+  fromTile: number,
+  targetTile: number | null | undefined,
+  siteTile: number,
+  radius: number,
+  endpointMeters = 180,
+  detourMeters = 220,
+): boolean {
+  if (!Number.isFinite(targetTile) || !Number.isFinite(siteTile)) return false;
+  const target = Math.trunc(targetTile!);
+  const site = Math.trunc(siteTile);
+  const sphereRadius = Math.max(0, radius);
+  const routeDistance = greatCircleDistanceMeters(centers, fromTile, target, sphereRadius);
+  const fromDistance = greatCircleDistanceMeters(centers, fromTile, site, sphereRadius);
+  const targetDistance = greatCircleDistanceMeters(centers, target, site, sphereRadius);
+  if (routeDistance <= 1e-3 || sphereRadius <= 1e-3) return fromDistance <= endpointMeters;
+  if (fromDistance <= endpointMeters || targetDistance <= endpointMeters) return true;
+  const from = unitAt(centers, fromTile);
+  const to = unitAt(centers, target);
+  const point = unitAt(centers, site);
+  const nx = from[1] * to[2] - from[2] * to[1];
+  const ny = from[2] * to[0] - from[0] * to[2];
+  const nz = from[0] * to[1] - from[1] * to[0];
+  const nl = Math.hypot(nx, ny, nz);
+  if (nl <= 1e-6) return fromDistance + targetDistance - routeDistance <= detourMeters;
+  const crossTrack = Math.asin(clamp(Math.abs((point[0] * nx + point[1] * ny + point[2] * nz) / nl), 0, 1)) * sphereRadius;
+  if (crossTrack > detourMeters) return false;
+  return fromDistance + targetDistance - routeDistance <= Math.max(detourMeters * 1.5, endpointMeters);
+}
+
+function routeEcologyCount(
+  sites: readonly ExpeditionEcologySite[] | undefined,
+  input: RouteEcologyStagingInput,
+): { ready: number; offRouteReady: number } {
+  let ready = 0;
+  let offRouteReady = 0;
+  for (const site of sites ?? []) {
+    if (site.ready !== true) continue;
+    if (routeAdjacentTile(
+      input.centers,
+      input.fromTile,
+      input.targetTile,
+      site.tile,
+      input.radius,
+      input.endpointMeters,
+      input.detourMeters,
+    )) ready += 1;
+    else offRouteReady += 1;
+  }
+  return { ready, offRouteReady };
+}
+
+export function routeEcologyForExpedition(input: RouteEcologyStagingInput): ExpeditionEcologyState {
+  const traps = routeEcologyCount(input.traps, input);
+  const nets = routeEcologyCount(input.nets, input);
+  return {
+    fishLabel: input.fishLabel,
+    fishStrength: input.fishStrength,
+    fishTrapReady: traps.ready,
+    shoreNetReady: nets.ready,
+    fishTrapOffRouteReady: traps.offRouteReady,
+    shoreNetOffRouteReady: nets.offRouteReady,
+  };
 }
 
 export function chartTurnLabel(bearingDeg: number): HorizonChartSignal['turn'] {
@@ -1325,11 +1411,13 @@ function foodUnits(items: InventoryItems): number {
     + count(items, 'rawFish') * 0.35;
 }
 
-function ecologyRouteResupply(input: ExpeditionEcologyState | undefined, range: ExpeditionPlan['range']): { units: number; detail: string } {
-  if (!input || range === 'near') return { units: 0, detail: '' };
+function ecologyRouteResupply(input: ExpeditionEcologyState | undefined, range: ExpeditionPlan['range']): { units: number; detail: string; ignored: number } {
+  if (!input || range === 'near') return { units: 0, detail: '', ignored: 0 };
   const trapReady = Math.max(0, Math.trunc(input.fishTrapReady ?? 0));
   const netReady = Math.max(0, Math.trunc(input.shoreNetReady ?? 0));
-  if (trapReady + netReady <= 0) return { units: 0, detail: '' };
+  const ignored = Math.max(0, Math.trunc(input.fishTrapOffRouteReady ?? 0))
+    + Math.max(0, Math.trunc(input.shoreNetOffRouteReady ?? 0));
+  if (trapReady + netReady <= 0) return { units: 0, detail: '', ignored };
   const trapUnits = Math.min(trapReady, 2) * 0.7;
   const netUnits = Math.min(netReady, 2) * 0.5;
   const fishStrength = Math.max(0, Math.min(1, input.fishStrength ?? 0));
@@ -1340,7 +1428,8 @@ function ecologyRouteResupply(input: ExpeditionEcologyState | undefined, range: 
   if (trapReady > 0) parts.push(`${trapReady} trap${trapReady === 1 ? '' : 's'}`);
   if (netReady > 0) parts.push(`${netReady} net${netReady === 1 ? '' : 's'}`);
   if (runBonus > 0) parts.push(input.fishLabel ?? 'fish run');
-  return { units, detail: parts.join(' + ') };
+  if (ignored > 0) parts.push(`off-route ${ignored} ignored`);
+  return { units, detail: parts.join(' + '), ignored };
 }
 
 export function planExpedition(input: ExpeditionPlanInput): ExpeditionPlan {
@@ -1408,7 +1497,7 @@ export function planExpedition(input: ExpeditionPlanInput): ExpeditionPlan {
       id: 'food',
       label: 'packed food',
       ready: units >= requiredFood,
-      detail: `${units.toFixed(units % 1 === 0 ? 0 : 1)}/${requiredFood} meal units${cellarProvisions > 0 ? ` · cellar ${cellarProvisions}` : ''}${ecologyResupply.units > 0 ? ` · waterline ${ecologyResupply.units.toFixed(ecologyResupply.units % 1 === 0 ? 0 : 1)} (${ecologyResupply.detail})` : ''}${foodDiscount > 0 ? ' · insight -1' : ''}${seasonFoodDiscount > 0 ? ' · full season chord -1' : ''}`,
+      detail: `${units.toFixed(units % 1 === 0 ? 0 : 1)}/${requiredFood} meal units${cellarProvisions > 0 ? ` · cellar ${cellarProvisions}` : ''}${ecologyResupply.units > 0 ? ` · waterline ${ecologyResupply.units.toFixed(ecologyResupply.units % 1 === 0 ? 0 : 1)} (${ecologyResupply.detail})` : ecologyResupply.ignored > 0 ? ` · waterline off-route ${ecologyResupply.ignored} ignored` : ''}${foodDiscount > 0 ? ' · insight -1' : ''}${seasonFoodDiscount > 0 ? ' · full season chord -1' : ''}`,
     },
     {
       id: 'rest',

@@ -3,6 +3,22 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-07
 
+- Advanced E4 from global capped resupply to route-adjacent waterline staging. The
+  expedition plan now counts ready fish traps and shore nets only when their tile sits at
+  the route origin, destination, or along the active great-circle route corridor; ready
+  off-route waterline gear remains visible as ignored prep instead of silently becoming
+  free food.
+- Tightened the route-corridor math to use cross-track distance on the sphere rather than
+  detour alone, because near-antipodal routes can make detour too permissive. Added focused
+  navigation tests for on-route versus off-route staging and the visible off-route food
+  detail.
+- Expanded `proof:e4-ecology-route` to a five-profile route-logistics matrix: desktop,
+  1366x720 laptop, tablet touch, phone touch, and synthetic gamepad. The proof now seeds
+  off-route ready gear, unready route gear, and ready route-adjacent gear; asserts the
+  off-route state still misses packed food; asserts route-adjacent waterline staging flips
+  the Route Slate to `expedition ready`; captures five screenshots under
+  `output/playwright/e4-ecology-route/`; records UX/panel rectangles; and reports no
+  page/console errors in `proof.json`.
 - Closed the first E4 ecology-to-route balance slice under the DAG/subagent workflow. Ready
   fish traps and shore nets now contribute capped staged waterline resupply to far or
   planetary expedition food prep, with active fish runs adding a small confidence bonus.

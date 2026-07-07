@@ -12,6 +12,8 @@ import {
   nextHorizonChartSignal,
   normalizeRoutePlan,
   planExpedition,
+  routeAdjacentTile,
+  routeEcologyForExpedition,
   routeAtlasVisible,
   routeGuide,
   routeGuideCandidates,
@@ -324,6 +326,56 @@ describe('Hearth and Horizon horizon chart navigation', () => {
     expect(plan.ready).toBe(false);
     expect(plan.missing).toContain('packed food');
     expect(plan.checks.find((check) => check.id === 'food')?.detail).toBe('2/3 meal units');
+  });
+
+  it('only counts route-adjacent waterline gear toward expedition resupply', () => {
+    const routeCenters = Float64Array.from([
+      0, 0, 1,
+      1, 0, 0,
+      Math.SQRT1_2, 0, Math.SQRT1_2,
+      0, 1, 0,
+    ]);
+    expect(routeAdjacentTile(routeCenters, 0, 1, 2, 1000, 120, 120)).toBe(true);
+    expect(routeAdjacentTile(routeCenters, 0, 1, 3, 1000, 120, 120)).toBe(false);
+
+    const ecology = routeEcologyForExpedition({
+      centers: routeCenters,
+      fromTile: 0,
+      targetTile: 1,
+      radius: 1000,
+      fishLabel: 'storm fish run',
+      fishStrength: 0.72,
+      traps: [
+        { tile: 2, ready: true },
+        { tile: 3, ready: true },
+      ],
+      nets: [
+        { tile: 0, ready: true },
+      ],
+      endpointMeters: 120,
+      detourMeters: 120,
+    });
+    expect(ecology).toMatchObject({
+      fishTrapReady: 1,
+      shoreNetReady: 1,
+      fishTrapOffRouteReady: 1,
+      shoreNetOffRouteReady: 0,
+    });
+
+    const signal = nextHorizonChartSignal(landmarks, new Set([1]), centers, frame, 0, [1, 0, 0], 100)!;
+    const longRoute = { ...signal, distanceM: 1800, distanceLabel: '1.8 km' };
+    const plan = planExpedition({
+      signal: longRoute,
+      items: { campMeal: 1, stonePick: 1, stoneAxe: 1, echoLantern: 1 },
+      survival: { stamina: 92, exposure: 4, mealsEaten: 0 },
+      weather: { kind: 'clear', label: 'clear', intensity: 0, exposureRate: -0.2, staminaRegen: 1 },
+      home: { label: 'shelter alive', protected: true, functional: true },
+      ecology,
+      planeCrafted: true,
+    });
+
+    expect(plan.ready).toBe(true);
+    expect(plan.checks.find((check) => check.id === 'food')?.detail).toBe('3.4/3 meal units · waterline 1.4 (1 trap + 1 net + storm fish run + off-route 1 ignored)');
   });
 
   it('lets a read weather vane time storms for expedition prep', () => {
