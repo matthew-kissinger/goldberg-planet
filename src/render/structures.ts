@@ -4,6 +4,7 @@ import type { Layers } from '../world/layers';
 import type { StructureSave } from '../sim/structures';
 
 type PropFactory = () => THREE.Group;
+type StructureSilhouette = 'cave-anchor-belay-marker' | 'waystone-attuned-marker';
 
 function mat(color: number, roughness = 0.85, metalness = 0.02, emissive = 0x000000): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness, emissive, emissiveIntensity: emissive === 0 ? 0 : 0.7 });
@@ -59,6 +60,16 @@ function mesh(geom: THREE.BufferGeometry, material: THREE.Material, pos: [number
   m.castShadow = false;
   m.receiveShadow = true;
   return m;
+}
+
+function role<T extends THREE.Object3D>(obj: T, roleName: string): T {
+  obj.userData.structureReadabilityRole = roleName;
+  return obj;
+}
+
+function silhouette<T extends THREE.Object3D>(obj: T, silhouetteName: StructureSilhouette): T {
+  obj.userData.structureSilhouette = silhouetteName;
+  return obj;
 }
 
 function post(name: string, x: number, z: number, height = 0.8): THREE.Mesh {
@@ -230,35 +241,46 @@ function makeRootCellar(): THREE.Group {
 function makeCaveAnchor(): THREE.Group {
   const g = new THREE.Group();
   g.name = 'structure-cave-anchor';
+  silhouette(g, 'cave-anchor-belay-marker');
   g.add(mesh(cyl8, materials.stone, [0, 0.1, 0], [0.42, 0.18, 0.42], 'caveAnchorStoneBase'));
   for (let i = 0; i < 5; i++) {
     const a = (i / 5) * Math.PI * 2;
-    const stone = mesh(cyl8, materials.stone, [Math.cos(a) * 0.28, 0.22, Math.sin(a) * 0.22], [0.12, 0.18 + (i % 2) * 0.05, 0.1], 'caveAnchorCairnStone');
+    const stone = role(mesh(cyl8, materials.stone, [Math.cos(a) * 0.28, 0.22, Math.sin(a) * 0.22], [0.12, 0.18 + (i % 2) * 0.05, 0.1], 'caveAnchorCairnStone'), 'stacked cave-route cairn');
     stone.rotation.y = a;
     g.add(stone);
   }
-  const postA = mesh(box, materials.darkWood, [-0.18, 0.52, 0], [0.08, 0.8, 0.08], 'caveAnchorPost');
+  const postA = role(mesh(box, materials.darkWood, [-0.18, 0.52, 0], [0.08, 0.8, 0.08], 'caveAnchorPost'), 'belay post');
   postA.rotation.z = -0.18;
-  const postB = mesh(box, materials.darkWood, [0.2, 0.5, 0], [0.08, 0.72, 0.08], 'caveAnchorPost');
+  const postB = role(mesh(box, materials.darkWood, [0.2, 0.5, 0], [0.08, 0.72, 0.08], 'caveAnchorPost'), 'belay post');
   postB.rotation.z = 0.24;
   g.add(postA, postB);
-  const ropeRail = mesh(cyl8, materials.rope, [0, 0.78, 0], [0.035, 0.62, 0.035], 'caveAnchorRopeRail');
+  const ropeRail = role(mesh(cyl8, materials.rope, [0, 0.78, 0], [0.035, 0.62, 0.035], 'caveAnchorRopeRail'), 'route rope rail');
   ropeRail.rotation.z = Math.PI / 2;
   g.add(ropeRail);
   for (let i = 0; i < 3; i++) {
-    const coil = mesh(cyl12, materials.rope, [0, 0.26 + i * 0.018, -0.3], [0.3 - i * 0.055, 0.018, 0.3 - i * 0.055], `caveAnchorRopePulse${i}`);
+    const coil = role(mesh(cyl12, materials.rope, [0, 0.26 + i * 0.018, -0.3], [0.3 - i * 0.055, 0.018, 0.3 - i * 0.055], `caveAnchorRopePulse${i}`), 'coiled return rope');
     g.add(coil);
   }
-  const crystal = mesh(cone8, materials.anchorGlow, [0, 0.98, 0], [0.14, 0.36, 0.14], 'caveAnchorGlow');
+  const crystal = role(mesh(cone8, materials.anchorGlow, [0, 0.98, 0], [0.14, 0.36, 0.14], 'caveAnchorGlow'), 'set-anchor glow spike');
   crystal.rotation.z = 0.18;
   g.add(crystal);
-  const archA = mesh(box, materials.anchorArch, [-0.13, 1.04, 0.11], [0.07, 0.34, 0.06], 'caveAnchorGlyph-arch');
-  const archB = mesh(box, materials.anchorArch, [0.13, 1.04, 0.11], [0.07, 0.34, 0.06], 'caveAnchorGlyph-arch');
-  const archTop = mesh(box, materials.anchorArch, [0, 1.21, 0.11], [0.33, 0.06, 0.06], 'caveAnchorGlyph-arch');
+  const archA = role(mesh(box, materials.anchorArch, [-0.16, 1.04, 0.11], [0.075, 0.38, 0.06], 'caveAnchorGlyph-arch'), 'walk-under arch glyph');
+  const archB = role(mesh(box, materials.anchorArch, [0.16, 1.04, 0.11], [0.075, 0.38, 0.06], 'caveAnchorGlyph-arch'), 'walk-under arch glyph');
+  const archTop = role(mesh(box, materials.anchorArch, [0, 1.23, 0.11], [0.38, 0.065, 0.06], 'caveAnchorGlyph-arch'), 'walk-under arch glyph');
   g.add(archA, archB, archTop);
-  g.add(mesh(cone8, materials.cave, [0, 1.12, 0.1], [0.1, 0.22, 0.1], 'caveAnchorGlyph-dryCave'));
-  g.add(mesh(box, materials.anchorFlood, [0, 1.08, 0.11], [0.34, 0.055, 0.09], 'caveAnchorGlyph-seaCave'));
-  g.add(mesh(box, materials.anchorFlood, [0, 0.44, -0.36], [0.54, 0.04, 0.1], 'caveAnchorFloodMark'));
+  const dryMouth = role(mesh(sphere8, materials.cave, [0, 1.1, 0.12], [0.18, 0.12, 0.09], 'caveAnchorGlyph-dryCave'), 'dark dry-cave mouth glyph');
+  dryMouth.scale.y = 0.08;
+  const dryLip = role(mesh(box, materials.stone, [0, 1.0, 0.12], [0.42, 0.055, 0.08], 'caveAnchorGlyph-dryCave'), 'dry-cave stone lip glyph');
+  const dryGlow = role(mesh(sphere8, materials.anchorGlow, [0, 1.13, 0.19], [0.045, 0.045, 0.035], 'caveAnchorGlyph-dryCave'), 'cave-depth glow bead');
+  g.add(dryMouth, dryLip, dryGlow);
+  const waveA = role(mesh(box, materials.anchorFlood, [0, 1.02, 0.11], [0.42, 0.045, 0.09], 'caveAnchorGlyph-seaCave'), 'sea-cave waterline glyph');
+  const waveB = role(mesh(box, materials.anchorFlood, [-0.04, 1.12, 0.12], [0.34, 0.04, 0.075], 'caveAnchorGlyph-seaCave'), 'sea-cave second wave glyph');
+  waveB.rotation.z = -0.2;
+  const tideMouth = role(mesh(sphere8, materials.cave, [0.14, 1.07, 0.1], [0.12, 0.07, 0.055], 'caveAnchorGlyph-seaCave'), 'flooded cave mouth glyph');
+  tideMouth.scale.y = 0.06;
+  g.add(waveA, waveB, tideMouth);
+  g.add(role(mesh(box, materials.anchorFlood, [0, 0.44, -0.36], [0.54, 0.04, 0.1], 'caveAnchorFloodMark'), 'set-anchor flood marker'));
+  g.add(role(mesh(sphere8, materials.water, [0.24, 1.0, 0.21], [0.055, 0.055, 0.045], 'caveAnchorSpringMark'), 'freshwater spring bead'));
   return g;
 }
 
@@ -484,15 +506,33 @@ function makeLantern(): THREE.Group {
 function makeWaystone(): THREE.Group {
   const g = new THREE.Group();
   g.name = 'structure-waystone';
+  silhouette(g, 'waystone-attuned-marker');
   g.add(mesh(cyl8, materials.stone, [0, 0.18, 0], [0.34, 0.34, 0.34], 'waystoneBase'));
   g.add(mesh(box, materials.stone, [0, 0.52, 0], [0.34, 0.58, 0.22], 'waystoneCore'));
-  g.add(mesh(cone8, materials.route, [0, 0.96, 0], [0.18, 0.34, 0.18], 'waystoneGlyph-survey'));
-  g.add(mesh(sphere8, materials.home, [0, 0.97, 0], [0.17, 0.17, 0.17], 'waystoneGlyph-home'));
-  g.add(mesh(cone8, materials.cave, [0, 0.97, 0], [0.15, 0.28, 0.15], 'waystoneGlyph-cave'));
-  g.add(mesh(box, materials.shore, [0, 0.95, 0], [0.3, 0.08, 0.18], 'waystoneGlyph-shore'));
-  const leaf = mesh(cone8, materials.forage, [0, 0.98, 0], [0.12, 0.24, 0.12], 'waystoneGlyph-forage');
+  const surveyNeedle = role(mesh(cone8, materials.route, [0, 1.04, 0], [0.17, 0.38, 0.17], 'waystoneGlyph-survey'), 'survey bearing needle');
+  surveyNeedle.rotation.z = -0.32;
+  const surveyBar = role(mesh(box, materials.route, [0, 0.86, 0.03], [0.42, 0.055, 0.055], 'waystoneGlyph-survey'), 'survey route tick');
+  surveyBar.rotation.z = 0.2;
+  g.add(surveyNeedle, surveyBar);
+  g.add(role(mesh(sphere8, materials.home, [0, 0.98, 0], [0.17, 0.17, 0.17], 'waystoneGlyph-home'), 'hearth home sun'));
+  const homeRoofA = role(mesh(box, materials.home, [-0.08, 1.12, 0], [0.22, 0.055, 0.055], 'waystoneGlyph-home'), 'home roof chevron');
+  homeRoofA.rotation.z = 0.55;
+  const homeRoofB = role(mesh(box, materials.home, [0.08, 1.12, 0], [0.22, 0.055, 0.055], 'waystoneGlyph-home'), 'home roof chevron');
+  homeRoofB.rotation.z = -0.55;
+  g.add(homeRoofA, homeRoofB);
+  const caveArchA = role(mesh(box, materials.cave, [-0.13, 0.96, 0], [0.06, 0.26, 0.055], 'waystoneGlyph-cave'), 'cave arch side');
+  const caveArchB = role(mesh(box, materials.cave, [0.13, 0.96, 0], [0.06, 0.26, 0.055], 'waystoneGlyph-cave'), 'cave arch side');
+  const caveArchTop = role(mesh(box, materials.cave, [0, 1.1, 0], [0.34, 0.055, 0.055], 'waystoneGlyph-cave'), 'cave arch lintel');
+  g.add(caveArchA, caveArchB, caveArchTop);
+  const shoreA = role(mesh(box, materials.shore, [0, 0.92, 0], [0.36, 0.055, 0.18], 'waystoneGlyph-shore'), 'shore wave bar');
+  const shoreB = role(mesh(box, materials.shore, [0.03, 1.02, 0], [0.28, 0.045, 0.14], 'waystoneGlyph-shore'), 'shore second wave bar');
+  shoreB.rotation.z = 0.22;
+  g.add(shoreA, shoreB);
+  const leaf = role(mesh(cone8, materials.forage, [0, 1.0, 0], [0.12, 0.28, 0.12], 'waystoneGlyph-forage'), 'forage leaf sprout');
   leaf.rotation.z = 0.55;
-  g.add(leaf);
+  const stem = role(mesh(box, materials.forage, [-0.08, 0.86, 0], [0.045, 0.28, 0.04], 'waystoneGlyph-forage'), 'forage stem');
+  stem.rotation.z = -0.3;
+  g.add(leaf, stem);
   g.add(mesh(box, materials.darkWood, [0, 0.58, -0.13], [0.42, 0.06, 0.04], 'waystoneBand'));
   return g;
 }
@@ -595,6 +635,7 @@ export class StructureRenderer {
     const forecastKind = structure.state?.forecastKind;
     const anchorUses = Math.max(0, Math.trunc(structure.state?.anchorUses ?? 0));
     const anchorKind = structure.state?.anchorKind;
+    const anchorSpring = structure.state?.anchorSpring === true;
     const trapSet = structure.state?.trapSetDay !== undefined;
     const trapBaited = structure.state?.trapBaited === true;
     const trapChecks = Math.max(0, Math.trunc(structure.state?.trapChecks ?? 0));
@@ -684,6 +725,11 @@ export class StructureRenderer {
         child.scale.set(base * pulse, 0.018, base * pulse);
       }
       if (child.name === 'caveAnchorFloodMark') child.visible = anchorUses > 0 && structure.state?.anchorFlooded === true;
+      if (child.name === 'caveAnchorSpringMark') {
+        child.visible = anchorUses > 0 && anchorSpring;
+        const pulse = 1 + Math.sin(timeSec * 2.2 + structure.id) * 0.12;
+        child.scale.set(0.055 * pulse, 0.055 * pulse, 0.045 * pulse);
+      }
       if (child.name === 'fishTrapBait') child.visible = trapSet && trapBaited;
       if (child.name === 'fishTrapFish') child.visible = trapChecks > 0 && !trapSet;
       if (child.name === 'fishTrapFloat' || child.name === 'fishTrapTether') child.visible = trapSet;
@@ -727,9 +773,17 @@ export class StructureRenderer {
     });
   }
 
-  stats(): { groups: number; meshes: number } {
+  stats(): { groups: number; meshes: number; routeSilhouettes: number; routeReadabilityRoles: number } {
     let meshes = 0;
-    for (const obj of this.objects.values()) obj.traverse((child) => { if ((child as THREE.Mesh).isMesh) meshes++; });
-    return { groups: this.objects.size, meshes };
+    const routeSilhouettes = new Set<string>();
+    const routeReadabilityRoles = new Set<string>();
+    for (const obj of this.objects.values()) {
+      if (typeof obj.userData.structureSilhouette === 'string') routeSilhouettes.add(obj.userData.structureSilhouette);
+      obj.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) meshes++;
+        if (typeof child.userData.structureReadabilityRole === 'string') routeReadabilityRoles.add(child.userData.structureReadabilityRole);
+      });
+    }
+    return { groups: this.objects.size, meshes, routeSilhouettes: routeSilhouettes.size, routeReadabilityRoles: routeReadabilityRoles.size };
   }
 }

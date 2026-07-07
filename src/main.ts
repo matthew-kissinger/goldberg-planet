@@ -4260,6 +4260,7 @@ async function boot(): Promise<void> {
       return true;
     },
     tools: () => ({ ...toolSummary(craftedItems, toolWear), wear: { ...toolWear }, lastAction: lastToolAction, reach: playerReach() }),
+    nearbyTiles: (rings = 1) => [...tileSetAround(player.tile, Math.max(0, Math.trunc(Number.isFinite(rings) ? Number(rings) : 1)))],
     resourceDrops: () => resourceDropDiagnostics(),
     mineProgress: () => mineProgressDiagnostics(),
     debugStrikeMineTile: (tile?: number, layer?: number) => {
@@ -4880,6 +4881,7 @@ async function boot(): Promise<void> {
       weatherVanes: weatherVaneDiagnostics(),
       fishTraps: fishTrapDiagnostics(),
       shoreNets: shoreNetDiagnostics(),
+      renderer: structureRenderer.stats(),
       storage: { open: openChestId !== null, chestId: openChestId, state: currentChestStorage() },
       home: homeScore(structures, geo),
       lastAction: lastStructureAction,
@@ -5421,7 +5423,7 @@ async function boot(): Promise<void> {
           `tools ${tools.owned.map((tool) => tool.label).join(' · ') || 'hands'}${tools.repairKits > 0 ? ` · repair kits ${tools.repairKits}` : ''} · reach ${playerReach().toFixed(1)}`,
           `character ${characterState.action} · held ${characterState.held} · back ${characterState.backProps.join(',') || 'none'}`,
           `audio ${audioState.muted ? 'muted' : audioState.unlocked ? 'on' : 'locked'} · loaded ${audioState.loaded.length} · music ${audioState.musicStarted ? audioState.musicPlaying ? 'playing' : audioState.musicQueued ? 'waiting' : 'paused' : 'idle'}${audioState.musicTrack ? ` ${audioState.musicTrack}` : ''} · last ${audioState.lastEvent ?? 'none'}${audioState.errors.length ? ` · errors ${audioState.errors.length}` : ''}`,
-          `structures ${structures.length} · prop meshes ${propStats.meshes} · ${home.label}${cisternWater > 0 ? ` · cistern water ${cisternWater}` : ''}${cellarProvisions > 0 ? ` · cellar provisions ${cellarProvisions}` : ''}`,
+          `structures ${structures.length} · prop meshes ${propStats.meshes} · route marker roles ${propStats.routeReadabilityRoles}/${propStats.routeSilhouettes} · ${home.label}${cisternWater > 0 ? ` · cistern water ${cisternWater}` : ''}${cellarProvisions > 0 ? ` · cellar provisions ${cellarProvisions}` : ''}`,
           `food bait ${food.bait} · seeds ${food.seeds} · compost ${food.compost} · berries ${food.berries} · mushroom/herb/kelp/reeds ${food.caveMushroom}/${food.snowHerb}/${food.kelp}/${food.reeds} · raw/cooked fish ${food.rawFish}/${food.cookedFish} · traps ${trapReady}/${trapStats.length} ready · nets ${netReady}/${netStats.length} ready · meals/rations/stews ${food.campMeal}/${food.trailRation}/${food.expeditionStew} · cellar ${food.cellarProvisions}`,
           `fish ${currentFishSchool().label} · strength ${currentFishSchool().strength.toFixed(2)} · catch ${currentFishSchool().catchCount}`,
           `forage ${currentForage().label} · strength ${currentForage().strength.toFixed(2)}`,

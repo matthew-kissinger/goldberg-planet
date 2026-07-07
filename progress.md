@@ -1,12 +1,31 @@
 Original prompt: complete courier frontier plan
+Current operating goal: Hearth and Horizon full crafting-survival cycle under the DAG/subagent workflow.
 
 ## 2026-07-07
 
 - Current frontier snapshot: goal outcome is measurable Hearth and Horizon progress under
-  the DAG operating model; active critical-path node is F1 Route Slate candidate choice
-  with I2 cross-device parity and J1 browser proof; subagent lanes accepted the docs
-  correction and ranked Route Slate selection over asset or music churn; current reviewer
-  gates are R0, R2, R3, and R5; no human-owned decision is blocking this slice.
+  the DAG operating model; F1/I2/J1 route choice is closed, and the current moved node is
+  H3/R4 route-marker glyph readability with committed browser proof. Three current subagent
+  lanes audited the graph/frontier, asset readability, and gameplay/UX: graph and asset lanes
+  selected route-marker readability for this slice, while the UX lane accepted P1 shared
+  panel ownership as the next follow-up. Current gates are R0, R3, R4, and R5; no
+  human-owned decision is blocking the marker slice.
+- Closed the H3/R4 Route Marker Glyph Dialect slice: cave anchors now carry belay/cairn/rope,
+  dry-cave, sea-cave, spring, flood, and arch readability roles; waystones now use distinct
+  survey bearing, hearth/home, cave arch, shore wave, and forage sprout glyph components; and
+  `StructureRenderer.stats()` plus `render_game_to_text` expose route-marker silhouettes and
+  readability-role counts instead of leaving the proof in screenshots only.
+- Added committed browser proof for this asset slice at
+  `scripts/proof-route-marker-readability.mjs` and `npm run proof:route-markers`. The proof
+  seeds attuned waystones and cave anchors around the player, captures desktop and phone
+  screenshots, validates screenshot pixels, asserts `routeSilhouettes: 2`,
+  `routeReadabilityRoles: 24`, `waystones: 3`, `caveAnchors: 3`, and records no page or
+  console errors in `output/playwright/route-marker-readability/proof.json`.
+- Verified the marker slice with `npm test -- structureRenderer structures navigation`,
+  `npm run typecheck`, `npm run proof:route-markers`, and the develop-web-game client at
+  `output/web-game/route-marker-readability-client/`. The generic client screenshot is
+  nonblank but still uses the normal diagnostic overlay; the committed route-marker proof is
+  the authoritative readability artifact.
 - Corrected the Hearth and Horizon orchestration process after the user called out that
   subagents and directed acyclic graphs were no longer visibly driving progress. The cycle
   docs now promote the static DAG into an active run ledger with node owners, statuses,
