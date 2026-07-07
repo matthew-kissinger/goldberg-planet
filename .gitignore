@@ -4,3 +4,11 @@ dist/
 output/
 *.local
 .DS_Store
+
+# Local Kiln source/generated asset quarantine. Move curated runtime assets to a
+# committed manifest path after proof instead of staging raw generated drops.
+public/assets/kiln/generated/
+tools/kiln/.env.local
+tools/kiln/generated/
+tools/kiln/dogfood-output/
+tools/kiln/*.tgz

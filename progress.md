@@ -3,6 +3,29 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-07
 
+- Corrected the current continuation back onto the explicit DAG after the user called out
+  that subagents and graph execution were not visible enough. Opened H4 as the local
+  critical-path node and deployed three parallel explorer lanes for generated-asset
+  safety/tooling, art readability, and UX/control-loop fit while the main lane added the
+  proof gate.
+- Added `docs/kiln-asset-intake.md` and `npm run proof:kiln-assets`. The new proof validates
+  the local `public/assets/kiln/generated` pack as quarantined source material: 64 GLBs,
+  5.76 MiB total, valid GLB 2.0 headers and lengths, `sphere-planet` palette metadata, no
+  detected secrets or presigned URLs, and 28 runtime-readiness warnings captured before any
+  generated model can become a shipped dependency.
+- Hardened asset intake hygiene by keeping raw generated Kiln drops, `.env.local`, generated
+  packages, and dogfood outputs out of normal staging. The next H4 edge is not "load all
+  GLBs"; it is a runtime manifest and blind screenshot proof for a small shortlist:
+  waystones/cave anchors/cave mouths, functional home props, food/shore props, drops, and
+  planet-native creatures.
+- Integrated the three subagent lanes into the ledger. Safety found one ignored live-shaped
+  Kiln secret and an earlier orphan UUID camp-lantern asset outside the catalog. The current
+  proofed pack is back to catalog parity, but the generated pack remains quarantined and
+  `tools/kiln/scripts/batch.mjs` was verified to contain regen deletes inside
+  `KILN_OUT_DIR`. Art review accepted a one-family pilot only, preferably `waystone`
+  or `cave-mouth-dry`, with the avatar remaining code-authored. UX review confirmed
+  keyboard, touch, and gamepad systems are implemented but the next proof edge is landscape
+  tablet/phone plus full survival/build verb coverage.
 - Closed the J3 music/audio verification slice under the DAG/subagent workflow. Three
   parallel lanes audited runtime music wiring, asset optimization, and proof coverage while
   the main path added the enforceable gates. The Twelve Bells album was already correctly
