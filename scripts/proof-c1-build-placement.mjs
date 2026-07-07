@@ -178,9 +178,20 @@ async function screenshot(page, name) {
 async function waitForWorld(page) {
   await page.waitForFunction(() => {
     const world = window.__world;
-    return !!world?.placeStructure && !!world?.rotatePlacement && !!world?.rotateStructure && !!world?.dismantleStructure;
+    return !!world?.placeStructure && !!world?.rotatePlacement && !!world?.rotateStructure && !!world?.dismantleStructure && !!world?.buildCommands;
   }, null, { timeout: 45000 });
   await page.waitForTimeout(350);
+}
+
+function assertCommand(record, expected, label) {
+  if (!record || typeof record !== 'object') throw new Error(`${label}: missing build command record`);
+  for (const [key, value] of Object.entries(expected)) {
+    if (value instanceof RegExp) {
+      if (!value.test(String(record[key] ?? ''))) throw new Error(`${label}: command ${key} mismatch ${JSON.stringify(record)} expected ${value}`);
+    } else if (record[key] !== value) {
+      throw new Error(`${label}: command ${key} mismatch ${JSON.stringify(record)} expected ${JSON.stringify(value)}`);
+    }
+  }
 }
 
 async function runPlacementContract(page, name, options = {}) {
@@ -201,6 +212,7 @@ async function runPlacementContract(page, name, options = {}) {
       after: world.structures().placement.turn,
       selected: world.structures().placement.selected,
       controls: world.controls(),
+      command: world.buildCommands().last,
     };
   }, options.gamepad ? 'gamepad' : 'debug');
 
@@ -211,14 +223,24 @@ async function runPlacementContract(page, name, options = {}) {
     await page.evaluate(() => window.__world.rotatePlacement(1));
   }
 
-  const afterInput = await page.evaluate(() => window.__world.structures().placement);
+  const afterInput = await page.evaluate(() => ({
+    placement: window.__world.structures().placement,
+    command: window.__world.buildCommands().last,
+  }));
   const expectedTurn = (inputProof.before + 1) % 6;
   if (options.gamepad && inputProof.after !== expectedTurn) {
     throw new Error(`${name}: gamepad build rotation did not advance placement ${JSON.stringify(inputProof)}`);
   }
-  if (!options.gamepad && afterInput.turn !== expectedTurn) {
+  if (!options.gamepad && afterInput.placement.turn !== expectedTurn) {
     throw new Error(`${name}: build rotation did not advance placement ${JSON.stringify({ inputProof, afterInput })}`);
   }
+  assertCommand(afterInput.command, {
+    source: options.gamepad ? 'gamepad' : options.keyboard ? 'keyboard' : 'debug',
+    verb: 'rotate',
+    target: 'placement',
+    ok: true,
+    turn: expectedTurn,
+  }, `${name}: selected-placement rotation command`);
 
   const result = await page.evaluate(() => {
     const world = window.__world;
@@ -230,30 +252,41 @@ async function runPlacementContract(page, name, options = {}) {
         if (world.placeStructure(item, tile)) {
           used.add(tile);
           const items = world.structures().items;
-          return items[items.length - 1];
+          return { structure: items[items.length - 1], command: world.buildCommands().last };
         }
       }
       throw new Error(`could not place ${item}`);
     }
 
-    const door = place('doorKit');
+    const doorPlacement = place('doorKit');
+    const door = doorPlacement.structure;
     world.selectStructure('roofBundle');
+    const roofSelectCommand = world.buildCommands().last;
     world.rotatePlacement(1);
-    const roof = place('roofBundle');
-    const windowFrame = place('windowFrame');
-    const workbench = place('workbench');
-    const campfire = place('campfire');
+    const roofRotateCommand = world.buildCommands().last;
+    const roofPlacement = place('roofBundle');
+    const roof = roofPlacement.structure;
+    const windowPlacement = place('windowFrame');
+    const windowFrame = windowPlacement.structure;
+    const workbenchPlacement = place('workbench');
+    const workbench = workbenchPlacement.structure;
+    const campfirePlacement = place('campfire');
+    const campfire = campfirePlacement.structure;
 
     const beforeRotate = world.structures().items.find((entry) => entry.id === door.id);
     world.rotateStructure(door.id, 1);
     const afterRotate = world.structures().items.find((entry) => entry.id === door.id);
+    const rotateCommand = world.buildCommands().last;
 
     const packBefore = world.crafting().crafted.workbench ?? 0;
     const packed = world.dismantleStructure(workbench.id);
     const packAfter = world.crafting().crafted.workbench ?? 0;
+    const packCommand = world.buildCommands().last;
 
     world.useStructure(campfire.id);
+    const useCommand = world.buildCommands().last;
     const unsafePack = world.dismantleStructure(campfire.id);
+    const unsafePackCommand = world.buildCommands().last;
     const final = world.structures();
     return {
       door,
@@ -266,6 +299,20 @@ async function runPlacementContract(page, name, options = {}) {
       packed,
       packBefore,
       packAfter,
+      commands: {
+        doorPlace: doorPlacement.command,
+        roofSelect: roofSelectCommand,
+        roofRotate: roofRotateCommand,
+        roofPlace: roofPlacement.command,
+        windowPlace: windowPlacement.command,
+        workbenchPlace: workbenchPlacement.command,
+        campfirePlace: campfirePlacement.command,
+        rotate: rotateCommand,
+        pack: packCommand,
+        use: useCommand,
+        unsafePack: unsafePackCommand,
+        log: world.buildCommands().log,
+      },
       unsafePack,
       final,
       text: JSON.parse(window.render_game_to_text()),
@@ -279,6 +326,19 @@ async function runPlacementContract(page, name, options = {}) {
   if (result.unsafePack !== false || !/douse light first/.test(result.final.lastAction ?? '')) throw new Error(`${name}: lit campfire packing was not blocked ${JSON.stringify(result.final.lastAction)}`);
   if (result.final.items.length < 4) throw new Error(`${name}: expected visible house-kit cluster after pack flow`);
   if (result.text.structures.placement.selected === undefined) throw new Error(`${name}: render_game_to_text missing placement diagnostics`);
+  if (!result.text.structures.commands?.last) throw new Error(`${name}: render_game_to_text missing build command diagnostics`);
+  assertCommand(result.commands.doorPlace, { source: 'debug', verb: 'place', target: 'placement', ok: true, item: 'doorKit', tile: result.door.tile, turn: result.door.turn }, `${name}: door place command`);
+  assertCommand(result.commands.roofSelect, { source: 'debug', verb: 'select', target: 'placement', ok: true, item: 'roofBundle' }, `${name}: roof select command`);
+  assertCommand(result.commands.roofRotate, { source: 'debug', verb: 'rotate', target: 'placement', ok: true, item: 'roofBundle' }, `${name}: roof selected-rotate command`);
+  assertCommand(result.commands.workbenchPlace, { source: 'debug', verb: 'place', target: 'placement', ok: true, item: 'workbench', tile: result.workbench.tile }, `${name}: workbench place command`);
+  assertCommand(result.commands.rotate, { source: 'debug', verb: 'rotate', target: 'structure', ok: true, item: 'doorKit', id: result.door.id, turn: result.afterRotate.turn }, `${name}: placed rotate command`);
+  assertCommand(result.commands.pack, { source: 'debug', verb: 'pack', target: 'structure', ok: true, item: 'workbench', id: result.workbench.id }, `${name}: safe pack command`);
+  if (result.commands.pack.inventoryAfter < result.commands.pack.inventoryBefore + 1) throw new Error(`${name}: pack command did not record inventory return ${JSON.stringify(result.commands.pack)}`);
+  assertCommand(result.commands.use, { source: 'debug', verb: 'use', target: 'structure', ok: true, item: 'campfire', id: result.campfire.id, mode: 'lit' }, `${name}: campfire use command`);
+  assertCommand(result.commands.unsafePack, { source: 'debug', verb: 'pack', target: 'structure', ok: false, item: 'campfire', id: result.campfire.id, message: /douse light first/ }, `${name}: unsafe pack command`);
+  if (!Array.isArray(result.commands.unsafePack.blockers) || !result.commands.unsafePack.blockers.includes('douse light first')) {
+    throw new Error(`${name}: unsafe pack command missing blocker ${JSON.stringify(result.commands.unsafePack)}`);
+  }
 
   const shot = await screenshot(page, `${name}-build-placement`);
   return {
@@ -291,6 +351,7 @@ async function runPlacementContract(page, name, options = {}) {
       windowFrame: result.windowFrame,
       packedReturned: result.packAfter,
       unsafeLastAction: result.final.lastAction,
+      lastBuildCommand: result.commands.unsafePack,
       structures: result.final.items.length,
       renderer: result.final.renderer,
     },

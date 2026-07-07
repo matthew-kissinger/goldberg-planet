@@ -485,7 +485,7 @@ water, or a cliff stows it; E brings it back mid-fall.
 - GitHub Pages deploys from the `main` branch workflow in `.github/workflows/deploy.yml`.
   The app is static: no server secrets, runtime API keys, or backend configuration are expected.
 
-Test suite: 268 tests — icosahedron invariants; 10m²+2 counts with exactly 12 pentagons;
+Test suite: 269 tests — icosahedron invariants; 10m²+2 counts with exactly 12 pentagons;
 neighbor symmetry; CCW winding and bit-identical shared corners; id round-trips; seam
 agreement; `tileOf` vs brute force; layer-grid inverses; terrain determinism and
 ocean/land/mountain balance; column edit semantics incl. tunnels and immutable bedrock;
@@ -495,7 +495,7 @@ regeneration**; edit persistence through regeneration; **Hearth and Horizon save
 serialization** for edits, trees, inventory, crafted items, plane unlock, and player state;
 **Hearth and Horizon crafting rules** for recipe readiness, station gating, material
 spending, bait crafting, stone-blade crafting, pack-frame crafting, storm-cloak crafting, waystone crafting, dock crafting, drying-rack crafting, rain-cistern crafting, root-cellar crafting, cave-anchor crafting, weather-vane crafting, and the echo lantern recipe; **Hearth and Horizon tool rules** for target matching, defensive tool readiness, reach/cooldown effects,
-wear normalization, and breakage; **Hearth and Horizon structure rules** for placed-prop normalization, hex-facing rotation, station
+wear normalization, and breakage; **Hearth and Horizon build command rules** for selected-prop command results, placement rotation, placed-prop rotation, safe pack returns, blocked pack readbacks, and use-command diagnostics; **Hearth and Horizon structure rules** for placed-prop normalization, hex-facing rotation, station
 availability, duplicate-tile prevention, inventory spending, hearth scoring, local shelter
 recognition around the home bedroll, prop utility state for campfires, bedrolls, chests, docks, compost bins, rain cisterns, root cellars, cave anchors, drying racks, weather vanes, and waystones,
 crop condition gating, compost fertility, rain-cistern irrigation, root-cellar provision caching, protected-yield bonuses, growth/harvest, campfire cooking, and drying-rack preserving.

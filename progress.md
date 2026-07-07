@@ -3,6 +3,18 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-07
 
+- Closed the first B1 build-command boundary slice under the DAG/subagent workflow. The new
+  `src/sim/buildCommands.ts` facade owns structured command results for selecting build
+  props, rotating selected placement, rotating placed props, placing, using, and packing
+  placed props, while `main.ts` stays responsible for HUD, audio, renderer refresh, save
+  dirtying, storage panels, and world-use fallbacks.
+- Added `test/buildCommands.test.ts` plus runtime command diagnostics through
+  `__world.buildCommands()`, `__world.structures().commands`, and `render_game_to_text`.
+  `npm run proof:c1-build-placement` now asserts command source tags, verbs, targets,
+  messages, blockers, turns, ids, tiles, modes, and inventory deltas for the affected build
+  verbs. The proof still avoids overclaiming touch rotation: portrait touch profiles prove
+  layout/readback, while exact placement/use/pack paths remain debug-controlled and keyboard
+  plus synthetic gamepad prove selected-placement rotation.
 - Closed a first C1 build-placement contract slice. Placed structures now normalize yaw,
   selected crafted props rotate in six hex-facing steps before placement, nearby placed
   props can rotate afterward, and placement diagnostics expose selected build face plus
