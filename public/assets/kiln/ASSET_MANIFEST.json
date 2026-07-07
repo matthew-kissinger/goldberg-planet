@@ -187,7 +187,9 @@
       "paletteId": "sphere-planet",
       "kilnTris": 1340,
       "instanceability": "B",
-      "source": "generated/door-kit/model.glb (gitignored raw drop)"
+      "source": "generated/door-kit/model.glb (gitignored raw drop)",
+      "modularKit": true,
+      "wiringRisk": "proportion/snapping: no shared dimensional contract with the rest of the house kit — normalize to grid before assembly"
     },
     {
       "slug": "window-frame",
@@ -229,7 +231,9 @@
       "paletteId": "sphere-planet",
       "kilnTris": 1454,
       "instanceability": "C",
-      "source": "generated/window-frame/model.glb (gitignored raw drop)"
+      "source": "generated/window-frame/model.glb (gitignored raw drop)",
+      "modularKit": true,
+      "wiringRisk": "proportion/snapping: no shared dimensional contract with the rest of the house kit — normalize to grid before assembly"
     },
     {
       "slug": "dock-segment",
@@ -271,7 +275,9 @@
       "paletteId": "sphere-planet",
       "kilnTris": 3076,
       "instanceability": "A",
-      "source": "generated/dock-segment/model.glb (gitignored raw drop)"
+      "source": "generated/dock-segment/model.glb (gitignored raw drop)",
+      "modularKit": true,
+      "wiringRisk": "proportion/snapping: no shared dimensional contract with the rest of the house kit — normalize to grid before assembly"
     },
     {
       "slug": "roof-bundle",
@@ -314,7 +320,9 @@
       "paletteId": "sphere-planet",
       "kilnTris": 1056,
       "instanceability": "B",
-      "source": "generated/roof-bundle/model.glb (gitignored raw drop)"
+      "source": "generated/roof-bundle/model.glb (gitignored raw drop)",
+      "modularKit": true,
+      "wiringRisk": "proportion/snapping: no shared dimensional contract with the rest of the house kit — normalize to grid before assembly"
     },
     {
       "slug": "bedroll",
@@ -440,7 +448,9 @@
       "paletteId": "sphere-planet",
       "kilnTris": 2028,
       "instanceability": "B",
-      "source": "generated/compost-bin/model.glb (gitignored raw drop)"
+      "source": "generated/compost-bin/model.glb (gitignored raw drop)",
+      "modularKit": true,
+      "wiringRisk": "proportion/snapping: no shared dimensional contract with the rest of the house kit — normalize to grid before assembly"
     },
     {
       "slug": "rain-cistern",
@@ -524,7 +534,9 @@
       "paletteId": "sphere-planet",
       "kilnTris": 2370,
       "instanceability": "B",
-      "source": "generated/root-cellar/model.glb (gitignored raw drop)"
+      "source": "generated/root-cellar/model.glb (gitignored raw drop)",
+      "modularKit": true,
+      "wiringRisk": "proportion/snapping: no shared dimensional contract with the rest of the house kit — normalize to grid before assembly"
     },
     {
       "slug": "cave-anchor",
@@ -2818,5 +2830,6 @@
       "source": "generated/drop-ore-chunk/model.glb (gitignored raw drop)"
     }
   ],
-  "runtimePath": "public/assets/kiln/models/<slug>.glb (committed). Raw drops stay in generated/ (gitignored)."
+  "runtimePath": "public/assets/kiln/models/<slug>.glb (committed). Raw drops stay in generated/ (gitignored).",
+  "modularKitRisk": "These assets assemble into structures but were generated independently with NO shared dimensional contract (wall height, opening size, wall thickness, grid unit all differ). Do not snap them together at raw scale — normalize each to the build grid, or use each GLB as decoration inside a code-authored correctly-proportioned socket. See HANDOFF.md section 1b."
 }
