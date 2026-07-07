@@ -74,7 +74,7 @@ describe('Hearth and Horizon save boundary', () => {
       trees: a.trees,
       mining,
       inventory: [2, 4, 6, 8, 10],
-      craftedItems: { sticks: 4, workbench: 1, stoneHatchet: 1, stoneBlade: 1, reedBow: 1, whistlingArrow: 5, stoneAxe: 1, packFrame: 1, stormCloak: 1, compost: 2, berries: 3, reeds: 4, rawFish: 1, campMeal: 1, expeditionStew: 1, rainCistern: 1, rootCellar: 1, caveAnchor: 1, fishTrap: 1, shoreNet: 1 },
+      craftedItems: { sticks: 4, workbench: 1, stoneHatchet: 1, stoneBlade: 1, reedBow: 1, whistlingArrow: 5, stoneAxe: 1, packFrame: 1, stormCloak: 1, compost: 2, berries: 3, reeds: 4, rawFish: 1, campMeal: 1, expeditionStew: 1, rainCistern: 1, rootCellar: 1, caveAnchor: 1, wallDoorPanel: 1, wallWindowPanel: 1, wallCorner: 1, roofJoin: 1, fishTrap: 1, shoreNet: 1 },
       drops: [{ id: 7, item: 'wood', count: 2, tile: partialTreeTile, offsetA: 0.1, offsetB: -0.2, age: 0.5, source: 'tree' }],
       structures: [
         { id: 1, item: 'campfire', tile: editTile, layer: top - 1, yaw: 0.25, state: { lit: true } },
@@ -87,6 +87,10 @@ describe('Hearth and Horizon save boundary', () => {
         { id: 8, item: 'fishTrap', tile: editTile + 7, layer: top - 1, yaw: 0.3, state: { trapSetDay: 3, trapSetMinute: 720, trapBaited: true, trapChecks: 2 } },
         { id: 9, item: 'cropPlot', tile: editTile + 8, layer: top - 1, yaw: 0.15, state: { crop: 'reeds', growth: 2, fertility: 1, harvests: 3 } },
         { id: 10, item: 'shoreNet', tile: editTile + 9, layer: top - 1, yaw: 0.22, state: { netSetDay: 3, netSetMinute: 700, netChecks: 1 } },
+        { id: 11, item: 'wallDoorPanel', tile: editTile + 10, layer: top - 1, yaw: 0.4 },
+        { id: 12, item: 'wallWindowPanel', tile: editTile + 11, layer: top - 1, yaw: 0.45 },
+        { id: 13, item: 'wallCorner', tile: editTile + 12, layer: top - 1, yaw: 0.5 },
+        { id: 14, item: 'roofJoin', tile: editTile + 13, layer: top - 1, yaw: 0.55 },
       ],
       progression: {
         pentagons: [5, 2, 5, 0],
@@ -129,7 +133,7 @@ describe('Hearth and Horizon save boundary', () => {
     expect(parsed!.mineProgress).toEqual([{ tile: crackedTile, layer: crackedLayer, progress: 1.25, needed: 4 }]);
     expect(parsed!.drops).toEqual([{ id: 7, item: 'wood', count: 2, tile: partialTreeTile, offsetA: 0.1, offsetB: -0.2, age: 0.5, source: 'tree' }]);
     expect(parsed!.inventory).toEqual([2, 4, 6, 8, 10]);
-    expect(parsed!.craftedItems).toEqual({ sticks: 4, workbench: 1, stoneHatchet: 1, stoneBlade: 1, reedBow: 1, whistlingArrow: 5, stoneAxe: 1, packFrame: 1, stormCloak: 1, compost: 2, berries: 3, reeds: 4, rawFish: 1, campMeal: 1, expeditionStew: 1, rainCistern: 1, rootCellar: 1, caveAnchor: 1, fishTrap: 1, shoreNet: 1 });
+    expect(parsed!.craftedItems).toEqual({ sticks: 4, workbench: 1, stoneHatchet: 1, stoneBlade: 1, reedBow: 1, whistlingArrow: 5, stoneAxe: 1, packFrame: 1, stormCloak: 1, compost: 2, berries: 3, reeds: 4, rawFish: 1, campMeal: 1, expeditionStew: 1, rainCistern: 1, rootCellar: 1, caveAnchor: 1, wallDoorPanel: 1, wallWindowPanel: 1, wallCorner: 1, roofJoin: 1, fishTrap: 1, shoreNet: 1 });
     expect(parsed!.structures).toEqual([
       { id: 1, item: 'campfire', tile: editTile, layer: top - 1, yaw: 0.25, state: { lit: true } },
       { id: 2, item: 'chest', tile: editTile + 1, layer: top - 1, yaw: 0, state: { storage: { wood: 5, rock: 2 } } },
@@ -141,6 +145,10 @@ describe('Hearth and Horizon save boundary', () => {
       { id: 8, item: 'fishTrap', tile: editTile + 7, layer: top - 1, yaw: 0.3, state: { trapSetDay: 3, trapSetMinute: 720, trapBaited: true, trapChecks: 2 } },
       { id: 9, item: 'cropPlot', tile: editTile + 8, layer: top - 1, yaw: 0.15, state: { crop: 'reeds', growth: 2, fertility: 1, harvests: 3 } },
       { id: 10, item: 'shoreNet', tile: editTile + 9, layer: top - 1, yaw: 0.22, state: { netSetDay: 3, netSetMinute: 700, netChecks: 1 } },
+      { id: 11, item: 'wallDoorPanel', tile: editTile + 10, layer: top - 1, yaw: 0.4 },
+      { id: 12, item: 'wallWindowPanel', tile: editTile + 11, layer: top - 1, yaw: 0.45 },
+      { id: 13, item: 'wallCorner', tile: editTile + 12, layer: top - 1, yaw: 0.5 },
+      { id: 14, item: 'roofJoin', tile: editTile + 13, layer: top - 1, yaw: 0.55 },
     ]);
     expect(parsed!.progression.pentagons).toEqual([0, 2, 5]);
     expect(parsed!.progression.siteCompletions).toEqual([0, 2, 5]);

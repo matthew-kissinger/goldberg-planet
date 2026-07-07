@@ -43,6 +43,10 @@ describe('Hearth and Horizon structures', () => {
       { id: 12, item: 'floorFoundation', tile: 12, layer: 4, yaw: 0.2, state: { lit: true } },
       { id: 13, item: 'wallPanel', tile: 13, layer: 4, yaw: 0.4, state: { storage: { wood: 5 } } },
       { id: 14, item: 'wallHalfRail', tile: 14, layer: 4, yaw: 0.6 },
+      { id: 15, item: 'wallDoorPanel', tile: 15, layer: 4, yaw: 0.8, state: { lit: true } },
+      { id: 16, item: 'wallWindowPanel', tile: 16, layer: 4, yaw: 1, state: { storage: { wood: 1 } } },
+      { id: 17, item: 'wallCorner', tile: 17, layer: 4, yaw: 1.2, state: { home: true } },
+      { id: 18, item: 'roofJoin', tile: 18, layer: 4, yaw: 1.4, state: { water: 3 } },
       { id: 7, item: 'missingThing', tile: 12, layer: 4, yaw: 1 },
       { id: 8, item: 'bedroll', tile: 10, layer: 4, yaw: 1 },
       { id: 9, item: 'lantern', tile: 999, layer: 4, yaw: 1 },
@@ -55,6 +59,10 @@ describe('Hearth and Horizon structures', () => {
       { id: 12, item: 'floorFoundation', tile: 12, layer: 4, yaw: 0.2 },
       { id: 13, item: 'wallPanel', tile: 13, layer: 4, yaw: 0.4 },
       { id: 14, item: 'wallHalfRail', tile: 14, layer: 4, yaw: 0.6 },
+      { id: 15, item: 'wallDoorPanel', tile: 15, layer: 4, yaw: 0.8 },
+      { id: 16, item: 'wallWindowPanel', tile: 16, layer: 4, yaw: 1 },
+      { id: 17, item: 'wallCorner', tile: 17, layer: 4, yaw: 1.2 },
+      { id: 18, item: 'roofJoin', tile: 18, layer: 4, yaw: 1.4 },
     ]);
   });
 
@@ -187,7 +195,7 @@ describe('Hearth and Horizon structures', () => {
 
   it('defines code-owned wall-shell sockets separately from decorative house-kit inserts', () => {
     const catalog = wallShellSocketCatalog();
-    expect(catalog.map((entry) => entry.item)).toEqual(['floorFoundation', 'wallPanel', 'wallHalfRail']);
+    expect(catalog.map((entry) => entry.item)).toEqual(['floorFoundation', 'wallPanel', 'wallDoorPanel', 'wallWindowPanel', 'wallCorner', 'wallHalfRail', 'roofJoin']);
     expect(structureSocketSpec('floorFoundation')).toMatchObject({
       role: 'foundation',
       modularKit: true,
@@ -203,11 +211,37 @@ describe('Hearth and Horizon structures', () => {
       collider: 'thin-wall',
       loadBearing: 'code-socket',
     });
+    expect(structureSocketSpec('wallDoorPanel')).toMatchObject({
+      role: 'wall-opening',
+      modularKit: true,
+      openingHeight: 1.55,
+      pivot: 'wall-center',
+      collider: 'thin-wall',
+      glbPolicy: 'procedural-only',
+    });
+    expect(structureSocketSpec('wallWindowPanel')).toMatchObject({
+      role: 'wall-light',
+      modularKit: true,
+      openingWidth: 0.58,
+      collider: 'thin-wall',
+    });
+    expect(structureSocketSpec('wallCorner')).toMatchObject({
+      role: 'wall-corner',
+      modularKit: true,
+      gridDepth: 0.72,
+      collider: 'thin-wall',
+    });
     expect(structureSocketSpec('wallHalfRail')).toMatchObject({
       role: 'half-rail',
       pivot: 'wall-center',
       collider: 'thin-wall',
       visualScale: 'procedural rail stays visibly lower than full walls',
+    });
+    expect(structureSocketSpec('roofJoin')).toMatchObject({
+      role: 'roof-join',
+      modularKit: true,
+      collider: 'roof-shell',
+      loadBearing: 'code-socket',
     });
   });
 
@@ -1065,6 +1099,76 @@ describe('Hearth and Horizon structures', () => {
       },
     });
     expect(shelter.missing).toEqual(['workbench', 'chest']);
+  });
+
+  it('counts integrated wall door/window panels, corners, and roof joins without double-counting tiles', () => {
+    const structures: StructureSave[] = [
+      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
+      { id: 2, item: 'roofJoin', tile: 101, layer: 2, yaw: 0 },
+      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
+      { id: 4, item: 'wallDoorPanel', tile: 103, layer: 2, yaw: 0 },
+      { id: 5, item: 'wallWindowPanel', tile: 104, layer: 2, yaw: 0 },
+      { id: 6, item: 'wallCorner', tile: 105, layer: 2, yaw: 0 },
+      { id: 7, item: 'campfire', tile: 106, layer: 2, yaw: 0, state: { lit: true } },
+    ];
+
+    const shelter = shelterReport(structures, hubTopology);
+    expect(shelter).toMatchObject({
+      roofPieces: 2,
+      hasDoor: true,
+      hasWindow: true,
+      hasWarmth: true,
+      protected: true,
+      functional: false,
+      comfort: 4,
+      enclosure: {
+        wallTiles: [103, 104, 105],
+        cornerTiles: [105],
+        roofTiles: [101, 102],
+        roofJoinTiles: [101],
+        openingTiles: [103, 104],
+        boundaryCoverage: 0.75,
+        doorOnBoundary: true,
+        enclosed: true,
+        comfortTier: 'weather-safe',
+      },
+    });
+    expect(shelter.missing).toEqual(['workbench', 'chest']);
+  });
+
+  it('does not double-count an integrated door panel as two boundary tiles', () => {
+    const structures: StructureSave[] = [
+      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
+      { id: 2, item: 'roofJoin', tile: 101, layer: 2, yaw: 0 },
+      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
+      { id: 4, item: 'wallDoorPanel', tile: 103, layer: 2, yaw: 0 },
+      { id: 5, item: 'campfire', tile: 104, layer: 2, yaw: 0, state: { lit: true } },
+    ];
+
+    const shelter = shelterReport(structures, hubTopology);
+    expect(shelter.hasDoor).toBe(true);
+    expect(shelter.enclosure.boundaryCoverage).toBeCloseTo(0.25);
+    expect(shelter.protected).toBe(false);
+    expect(shelter.missing).toContain('room boundary');
+  });
+
+  it('does not let an integrated window panel satisfy the required door', () => {
+    const structures: StructureSave[] = [
+      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
+      { id: 2, item: 'roofJoin', tile: 101, layer: 2, yaw: 0 },
+      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
+      { id: 4, item: 'wallWindowPanel', tile: 103, layer: 2, yaw: 0 },
+      { id: 5, item: 'wallPanel', tile: 104, layer: 2, yaw: 0 },
+      { id: 6, item: 'wallCorner', tile: 105, layer: 2, yaw: 0 },
+      { id: 7, item: 'campfire', tile: 106, layer: 2, yaw: 0, state: { lit: true } },
+    ];
+
+    const shelter = shelterReport(structures, hubTopology);
+    expect(shelter.hasWindow).toBe(true);
+    expect(shelter.hasDoor).toBe(false);
+    expect(shelter.protected).toBe(false);
+    expect(shelter.enclosure.boundaryCoverage).toBeCloseTo(0.75);
+    expect(shelter.missing).toContain('door');
   });
 
   it('keeps foundations and half rails from pretending to be sealed walls', () => {

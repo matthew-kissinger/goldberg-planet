@@ -524,4 +524,59 @@ describe('Hearth and Horizon build commands', () => {
     });
     expect(crafted.wallPanel).toBe(1);
   });
+
+  it('uses integrated wall-shell sockets in generic build commands', () => {
+    const materials = [0, 0, 0, 0, 0];
+    const crafted: InventoryItems = { wallDoorPanel: 1, wallWindowPanel: 1, wallCorner: 1, roofJoin: 1 };
+    const structures: StructureSave[] = [];
+    const cases: Array<{ item: 'wallDoorPanel' | 'wallWindowPanel' | 'wallCorner' | 'roofJoin'; role: string; tile: number }> = [
+      { item: 'wallDoorPanel', role: 'wall-opening', tile: 20 },
+      { item: 'wallWindowPanel', role: 'wall-light', tile: 21 },
+      { item: 'wallCorner', role: 'wall-corner', tile: 22 },
+      { item: 'roofJoin', role: 'roof-join', tile: 23 },
+    ];
+
+    for (const [index, testCase] of cases.entries()) {
+      expect(selectStructurePlacementCommand(materials, crafted, testCase.item)).toMatchObject({
+        ok: true,
+        selected: testCase.item,
+      });
+      expect(previewPlaceStructureCommand({
+        structures,
+        item: testCase.item,
+        tile: testCase.tile,
+        layer: 2,
+        yaw: index * Math.PI / 3,
+        placementTurn: index,
+        materialCounts: materials,
+        craftedItems: crafted,
+        creative: false,
+        playerTile: 4,
+      })).toMatchObject({
+        active: true,
+        ok: true,
+        item: testCase.item,
+        socket: { role: testCase.role, modularKit: true },
+      });
+      const placed = placeStructureCommand({
+        structures,
+        item: testCase.item,
+        tile: testCase.tile,
+        layer: 2,
+        yaw: index * Math.PI / 3,
+        placementTurn: index,
+        materialCounts: materials,
+        craftedItems: crafted,
+        creative: false,
+        playerTile: 4,
+      });
+      expect(placed).toMatchObject({ ok: true, item: testCase.item, selected: null });
+      expect(packStructureCommand(structures, placed.placed!, crafted, false)).toMatchObject({
+        ok: true,
+        item: testCase.item,
+        selected: testCase.item,
+      });
+      expect(crafted[testCase.item]).toBe(1);
+    }
+  });
 });

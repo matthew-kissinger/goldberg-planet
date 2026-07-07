@@ -3,6 +3,18 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-07
 
+- Closed the second C6 wall/shell socket slice. `wallDoorPanel`, `wallWindowPanel`,
+  `wallCorner`, and `roofJoin` are now craftable/placeable code-owned building pieces with
+  socket specs, snap-preview silhouettes, renderer diagnostics, save coverage, build
+  command coverage, and avatar prop colors. Shelter reporting now treats integrated
+  door/window panels as both openings and wall boundary contributors without double-counting
+  the same tile, counts `wallCorner` as boundary, and counts `roofJoin` as roof coverage.
+  `npm run proof:c6-wall-shells` now proves the expanded seven-piece wall-shell catalog,
+  places a weather-safe but not fully functional room, verifies foundation/rail/panel/join
+  renderer diagnostics, then moves a corner out so shelter drops back to `room boundary`
+  missing. Remaining C6 work is true edge-addressed sockets, multi-piece-per-tile snapping
+  and collision, broader room shapes, shared-scale decorative skins, and runtime GLB wiring
+  for any future house-shell pack.
 - Closed the first C6 wall/shell socket slice. `floorFoundation`, `wallPanel`, and
   `wallHalfRail` are now craftable/placeable code-owned building pieces with separate
   wall-shell socket specs, renderer silhouettes, avatar prop colors, and diagnostics.

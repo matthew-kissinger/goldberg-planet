@@ -44,6 +44,10 @@ export type CraftedItemId =
   | 'floorFoundation'
   | 'wallPanel'
   | 'wallHalfRail'
+  | 'wallDoorPanel'
+  | 'wallWindowPanel'
+  | 'wallCorner'
+  | 'roofJoin'
   | 'doorKit'
   | 'windowFrame'
   | 'roofBundle'
@@ -151,6 +155,10 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
   floorFoundation: { id: 'floorFoundation', name: 'Floor Foundation', kind: 'placeable', css: '#8c806e', description: 'A leveled house-floor socket that supports snug wall placement without acting like a wall.' },
   wallPanel: { id: 'wallPanel', name: 'Wall Panel', kind: 'placeable', css: '#9b7448', description: 'A code-owned full wall segment for real shelter boundaries and future decorative skins.' },
   wallHalfRail: { id: 'wallHalfRail', name: 'Half Rail', kind: 'placeable', css: '#b58b52', description: 'A low rail for porches, lofts, and decks; useful but not enough to seal a shelter.' },
+  wallDoorPanel: { id: 'wallDoorPanel', name: 'Wall Door Panel', kind: 'placeable', css: '#a36a3a', description: 'A full wall segment with an integrated doorway that counts as shelter boundary and access.' },
+  wallWindowPanel: { id: 'wallWindowPanel', name: 'Wall Window Panel', kind: 'placeable', css: '#a7c8d2', description: 'A full wall segment with an integrated window opening for shelter light and readability.' },
+  wallCorner: { id: 'wallCorner', name: 'Wall Corner', kind: 'placeable', css: '#8f6b43', description: 'A sturdy corner join placeholder for two future edge-addressed wall faces.' },
+  roofJoin: { id: 'roofJoin', name: 'Roof Join', kind: 'placeable', css: '#6f4d2f', description: 'A compact roof ridge or eave join that contributes to shelter roof coverage.' },
   doorKit: { id: 'doorKit', name: 'Door Kit', kind: 'placeable', css: '#9a6335', description: 'The first shelter boundary prop.' },
   windowFrame: { id: 'windowFrame', name: 'Window Frame', kind: 'placeable', css: '#b8d4df', description: 'A future sand-to-glass shelter prop.' },
   roofBundle: { id: 'roofBundle', name: 'Roof Bundle', kind: 'placeable', css: '#7f5a35', description: 'A functional roof part for shelter detection.' },
@@ -414,6 +422,42 @@ export const BASIC_RECIPES: RecipeDef[] = [
     station: 'workbench',
     requires: { wood: 3, sticks: 3 },
     description: 'Builds low porch and loft rails that guide space without sealing the weather out.',
+  },
+  {
+    id: 'wall_door_panel',
+    name: 'Wall Door Panel',
+    result: 'wallDoorPanel',
+    count: 1,
+    station: 'workbench',
+    requires: { wallPanel: 1, doorKit: 1, sticks: 1 },
+    description: 'Combines a full wall and doorway into one shelter-boundary socket.',
+  },
+  {
+    id: 'wall_window_panel',
+    name: 'Wall Window Panel',
+    result: 'wallWindowPanel',
+    count: 1,
+    station: 'workbench',
+    requires: { wallPanel: 1, windowFrame: 1, sand: 2 },
+    description: 'Combines a full wall and window into one shelter-boundary socket.',
+  },
+  {
+    id: 'wall_corner',
+    name: 'Wall Corner',
+    result: 'wallCorner',
+    count: 2,
+    station: 'workbench',
+    requires: { wood: 4, sticks: 2, rock: 1 },
+    description: 'Builds sturdy corner posts for readable house shells before true edge sockets land.',
+  },
+  {
+    id: 'roof_join',
+    name: 'Roof Join',
+    result: 'roofJoin',
+    count: 2,
+    station: 'workbench',
+    requires: { roofBundle: 1, wood: 2, sticks: 2 },
+    description: 'Builds compact roof join pieces that count toward shelter roof coverage.',
   },
   {
     id: 'door_kit',

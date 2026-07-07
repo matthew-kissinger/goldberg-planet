@@ -211,8 +211,9 @@ First wired pilot:
   fit metadata, clip metadata, and active/low-rate/frozen/hidden mixer bands by slug.
   `npm run proof:k6-creatures` proves all nine committed model requests, zero generated
   requests, zero fallback, distance-gated animation, desktop/phone screenshots, and
-  harmless/hazard gameplay responses. The follow-on K6T proof now closes creature-first
-  targetability and occupied-tile placement blockers; full roaming remains future K6R work.
+  harmless/hazard gameplay responses. Follow-on proofs now close creature-first
+  targetability, occupied-tile placement blockers, and first sparse roaming over approved
+  GLB skins; richer behavior states remain future K6R work.
 
 Runtime pilot candidates from the proof:
 
@@ -248,23 +249,24 @@ Deferred until scale, snap, budget, readability, or animation proof exists:
   screenshot proof before shipping as craftable art.
 - House walls are not solved by the current pack. A `window-frame` is an insert, not a
   wall; a `door-kit` is an opening/threshold, not a full enclosure; a `roof-bundle` needs
-  supports and joins. The first C6 slice now adds code-owned `floorFoundation`,
-  `wallPanel`, and `wallHalfRail` sockets and proves full walls seal while rails/foundations
-  do not. Before more craftable house pieces ship, finish the code-owned wall and shell
-  contract for edge-addressed wall-with-window openings, wall-with-door openings, corners,
-  roof joins, collision, and multi-piece snapping. New Kiln wall pieces should be generated
-  as one shared-scale house-shell pack and then treated as decorative skins over measured
-  sockets.
+  supports and joins. The second C6 slice now adds code-owned `floorFoundation`,
+  `wallPanel`, `wallDoorPanel`, `wallWindowPanel`, `wallCorner`, `wallHalfRail`, and
+  `roofJoin` sockets and proves integrated walls seal while rails/foundations do not fake
+  enclosure. Before more craftable house pieces ship, finish true edge-addressed sockets,
+  multi-piece-per-tile snapping, collision, and broader room-shape proof. New Kiln wall
+  pieces should be generated as one shared-scale house-shell pack and then treated as
+  decorative skins over measured sockets.
 - Functional props with warnings or watery placement needs: `workbench`, `rain-cistern`,
   `fish-trap`, `shore-net`, `lantern-post`.
 - Shrines and craters: defer for blind screenshot readability, world-placement scale,
   repetition/LOD policy, and collision proof. Trees are no longer deferred for the first
   vegetation slice; broader forest art direction can still revise placement, density, and
   regeneration prompts after K5 proof.
-- Native-life roaming: creature GLB skinning and first targeting ownership are wired, but
-  the sim is still site-based. Future K6R work should add sparse `NativeCreatureActor`
-  state over deterministic native sites so harmless creatures graze/wander/flee and
-  territorial creatures warn/pressure/recover/retreat across valid neighbor hexes.
+- Native-life roaming: creature GLB skinning, first targeting ownership, and a first
+  sparse-roaming actor layer are wired. Future K6R work should deepen `NativeCreatureActor`
+  state over deterministic native sites so harmless creatures graze/wander/flee with more
+  intent and territorial creatures warn/pressure/recover/retreat across valid neighbor
+  hexes with anti-farming cooldowns.
 - Native-life polish still needs named HUD pressure-source feedback and suppression of any
   remaining procedural body fragments that compete with the approved GLB skins.
 

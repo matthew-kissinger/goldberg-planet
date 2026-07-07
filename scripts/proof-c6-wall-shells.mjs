@@ -229,6 +229,27 @@ async function main() {
         meshNames: ['snapPreviewWallPanelFace', 'snapPreviewWallPanelTopCap'],
         roles: ['snap preview full wall boundary', 'snap preview wall top cap'],
       }),
+      wallDoorPanel: await assertSnapPreview(page, 'wallDoorPanel', {
+        socketRole: 'wall-opening',
+        socketCollider: 'thin-wall',
+        silhouette: 'wall-door-panel-preview',
+        meshNames: ['snapPreviewWallDoorLeftWall', 'snapPreviewWallDoorLeftJamb', 'snapPreviewWallDoorLintel'],
+        roles: ['snap preview wall door shelter boundary', 'snap preview integrated door opening', 'snap preview wall door lintel'],
+      }),
+      wallWindowPanel: await assertSnapPreview(page, 'wallWindowPanel', {
+        socketRole: 'wall-light',
+        socketCollider: 'thin-wall',
+        silhouette: 'wall-window-panel-preview',
+        meshNames: ['snapPreviewWallWindowFace', 'snapPreviewWallWindowPane', 'snapPreviewWallWindowMullion'],
+        roles: ['snap preview wall window shelter boundary', 'snap preview wall window light opening', 'snap preview wall window centered opening'],
+      }),
+      wallCorner: await assertSnapPreview(page, 'wallCorner', {
+        socketRole: 'wall-corner',
+        socketCollider: 'thin-wall',
+        silhouette: 'wall-corner-preview',
+        meshNames: ['snapPreviewWallCornerPost', 'snapPreviewWallCornerLeftWing', 'snapPreviewWallCornerCap'],
+        roles: ['snap preview wall corner shelter boundary', 'snap preview wall corner wing', 'snap preview wall shell corner cap'],
+      }),
       wallHalfRail: await assertSnapPreview(page, 'wallHalfRail', {
         socketRole: 'half-rail',
         socketCollider: 'thin-wall',
@@ -236,17 +257,54 @@ async function main() {
         meshNames: ['snapPreviewHalfRailRun', 'snapPreviewHalfRailOpenGap'],
         roles: ['snap preview porch rail', 'snap preview open weather gap'],
       }),
+      roofJoin: await assertSnapPreview(page, 'roofJoin', {
+        socketRole: 'roof-join',
+        socketCollider: 'roof-shell',
+        silhouette: 'roof-join-preview',
+        meshNames: ['snapPreviewRoofJoinRidge', 'snapPreviewRoofJoinLeftBracket', 'snapPreviewRoofJoinCoverage'],
+        roles: ['snap preview roof join ridge', 'snap preview roof join bracket', 'snap preview roof join coverage'],
+      }),
     };
 
     const setup = await page.evaluate(() => {
       const world = window.__world;
-      for (const item of ['bedroll', 'roofBundle', 'doorKit', 'wallPanel', 'wallHalfRail', 'floorFoundation', 'campfire']) world.giveItem(item, 8);
+      for (const item of ['bedroll', 'roofBundle', 'roofJoin', 'wallDoorPanel', 'wallWindowPanel', 'wallCorner', 'wallPanel', 'wallHalfRail', 'floorFoundation', 'campfire']) world.giveItem(item, 8);
       const baseline = world.save.export();
       const occupied = () => new Set(world.structures().items.map((entry) => entry.tile));
+      const failures = [];
       const place = (item, tile) => {
         const before = new Set(world.structures().items.map((entry) => entry.id));
-        if (!world.placeStructure(item, tile)) return null;
-        return world.structures().items.find((entry) => !before.has(entry.id)) ?? null;
+        if (!world.placeStructure(item, tile)) {
+          failures.push({
+            item,
+            tile,
+            lastAction: world.structures().lastAction,
+            commands: world.buildCommands?.(),
+          });
+          return null;
+        }
+        const placed = world.structures().items.find((entry) => !before.has(entry.id)) ?? null;
+        if (!placed) {
+          failures.push({
+            item,
+            tile,
+            reason: 'placement reported success but no new structure appeared',
+            lastAction: world.structures().lastAction,
+            commands: world.buildCommands?.(),
+          });
+        }
+        return placed;
+      };
+      const candidateTiles = (rings, exclude = []) => {
+        const excluded = new Set([world.player.tile, ...exclude]);
+        return world.nearbyTiles(rings).filter((tile) => !excluded.has(tile) && !occupied().has(tile));
+      };
+      const placeFirst = (item, rings, exclude = []) => {
+        for (const tile of candidateTiles(rings, exclude)) {
+          const placed = place(item, tile);
+          if (placed) return placed;
+        }
+        return null;
       };
       const centers = world.nearbyTiles(3).filter((tile) => tile !== world.player.tile);
       for (const center of centers) {
@@ -258,11 +316,11 @@ async function main() {
         if (!bedroll) continue;
         world.useStructure(bedroll.id);
         const pieces = [
-          ['roofBundle', boundary[0]],
+          ['roofJoin', boundary[0]],
           ['roofBundle', boundary[1]],
-          ['doorKit', boundary[2]],
-          ['wallPanel', boundary[3]],
-          ['wallPanel', boundary[4]],
+          ['wallDoorPanel', boundary[2]],
+          ['wallWindowPanel', boundary[3]],
+          ['wallCorner', boundary[4]],
           ['campfire', boundary[5]],
         ];
         const placed = [];
@@ -281,10 +339,12 @@ async function main() {
         }
         const fire = placed.find((entry) => entry.item === 'campfire');
         if (fire) world.useStructure(fire.id);
-        const halfRailTile = world.nearbyTiles(3).find((tile) => tile !== world.player.tile && !occupied().has(tile));
-        const foundationTile = world.nearbyTiles(3).find((tile) => tile !== world.player.tile && tile !== halfRailTile && !occupied().has(tile));
-        const halfRail = halfRailTile === undefined ? null : place('wallHalfRail', halfRailTile);
-        const foundation = foundationTile === undefined ? null : place('floorFoundation', foundationTile);
+        const halfRail = placeFirst('wallHalfRail', 5);
+        const foundation = placeFirst('floorFoundation', 7, halfRail ? [halfRail.tile] : []);
+        if (!halfRail || !foundation) {
+          world.save.import(baseline);
+          continue;
+        }
         return {
           ok: true,
           center,
@@ -297,21 +357,31 @@ async function main() {
           text: JSON.parse(window.render_game_to_text()),
         };
       }
-      return { ok: false, reason: 'no valid center', playerTile: world.player.tile, nearby: centers };
+      return { ok: false, reason: 'no valid center', playerTile: world.player.tile, nearby: centers, failures };
     });
     if (!setup.ok) throw new Error(`C6 setup failed: ${JSON.stringify(setup)}`);
     if (setup.structures.sockets.houseKit.map((entry) => entry.item).join(',') !== 'doorKit,windowFrame,roofBundle') {
       throw new Error(`houseKit catalog changed unexpectedly: ${JSON.stringify(setup.structures.sockets.houseKit)}`);
     }
-    if (setup.structures.sockets.wallShell.map((entry) => entry.item).join(',') !== 'floorFoundation,wallPanel,wallHalfRail') {
+    if (setup.structures.sockets.wallShell.map((entry) => entry.item).join(',') !== 'floorFoundation,wallPanel,wallDoorPanel,wallWindowPanel,wallCorner,wallHalfRail,roofJoin') {
       throw new Error(`wallShell catalog missing: ${JSON.stringify(setup.structures.sockets.wallShell)}`);
     }
     const readyHome = setup.structures.home;
     if (!readyHome.shelter.protected || readyHome.functional) throw new Error(`wall shell room should be weather-safe but not fully functional: ${JSON.stringify(readyHome)}`);
-    if (readyHome.shelter.enclosure.boundaryCoverage < 0.75 || readyHome.shelter.enclosure.wallTiles.length < 2) {
+    if (!readyHome.shelter.hasWindow || readyHome.shelter.enclosure.openingTiles.length < 2) {
+      throw new Error(`integrated window/door panels did not register openings: ${JSON.stringify(readyHome.shelter)}`);
+    }
+    if (readyHome.shelter.enclosure.boundaryCoverage < 0.75 || readyHome.shelter.enclosure.wallTiles.length < 3 || readyHome.shelter.enclosure.cornerTiles.length < 1 || readyHome.shelter.enclosure.roofJoinTiles.length < 1) {
       throw new Error(`wall shell boundary did not register: ${JSON.stringify(readyHome.shelter.enclosure)}`);
     }
-    if ((setup.structures.renderer.wallShell?.fullWalls ?? 0) < 2 || (setup.structures.renderer.wallShell?.halfRails ?? 0) < 1 || (setup.structures.renderer.wallShell?.foundations ?? 0) < 1) {
+    if (
+      (setup.structures.renderer.wallShell?.doorPanels ?? 0) < 1
+      || (setup.structures.renderer.wallShell?.windowPanels ?? 0) < 1
+      || (setup.structures.renderer.wallShell?.corners ?? 0) < 1
+      || (setup.structures.renderer.wallShell?.roofJoins ?? 0) < 1
+      || (setup.structures.renderer.wallShell?.halfRails ?? 0) < 1
+      || (setup.structures.renderer.wallShell?.foundations ?? 0) < 1
+    ) {
       throw new Error(`renderer wall shell diagnostics missing: ${JSON.stringify(setup.structures.renderer.wallShell)}`);
     }
 
@@ -323,12 +393,22 @@ async function main() {
 
     const weakened = await page.evaluate((wallId) => {
       const world = window.__world;
-      const occupied = new Set(world.structures().items.map((entry) => entry.tile));
-      const target = world.nearbyTiles(4).find((tile) => tile !== world.player.tile && !occupied.has(tile));
-      if (target === undefined) return { ok: false, reason: 'no relocation target' };
-      const moved = world.relocateStructure(wallId, target);
-      return { ok: moved, target, structures: world.structures(), text: JSON.parse(window.render_game_to_text()) };
-    }, setup.placed.find((entry) => entry.item === 'wallPanel')?.id);
+      const failures = [];
+      for (const target of world.nearbyTiles(7)) {
+        const occupied = new Set(world.structures().items.map((entry) => entry.tile));
+        if (target === world.player.tile || occupied.has(target)) continue;
+        const moved = world.relocateStructure(wallId, target);
+        if (moved) {
+          return { ok: true, target, structures: world.structures(), text: JSON.parse(window.render_game_to_text()) };
+        }
+        failures.push({
+          target,
+          lastAction: world.structures().lastAction,
+          commands: world.buildCommands?.(),
+        });
+      }
+      return { ok: false, reason: 'no relocation target', failures, structures: world.structures(), text: JSON.parse(window.render_game_to_text()) };
+    }, setup.placed.find((entry) => entry.item === 'wallCorner')?.id);
     if (!weakened.ok) throw new Error(`wall relocate failed: ${JSON.stringify(weakened)}`);
     if (weakened.structures.home.shelter.protected || !weakened.structures.home.shelter.missing.includes('room boundary')) {
       throw new Error(`moving one wall should weaken shelter: ${JSON.stringify(weakened.structures.home)}`);

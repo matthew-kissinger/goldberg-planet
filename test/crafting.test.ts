@@ -292,6 +292,29 @@ describe('Hearth and Horizon crafting rules', () => {
     expect(materials).toEqual([0, 0, 0, 0, 0]);
   });
 
+  it('crafts integrated wall-shell pieces from the code-owned socket kit', () => {
+    const doorMaterials = [0, 0, 0, 0, 0];
+    const doorItems: InventoryItems = { wallPanel: 1, doorKit: 1, sticks: 1 };
+    expect(craftRecipe('wall_door_panel', doorMaterials, doorItems, { workbench: 1 })).toMatchObject({ ok: true, result: 'wallDoorPanel' });
+    expect(doorItems).toEqual({ wallDoorPanel: 1 });
+
+    const windowMaterials = [0, 0, 2, 0, 0];
+    const windowItems: InventoryItems = { wallPanel: 1, windowFrame: 1 };
+    expect(craftRecipe('wall_window_panel', windowMaterials, windowItems, { workbench: 1 })).toMatchObject({ ok: true, result: 'wallWindowPanel' });
+    expect(windowItems).toEqual({ wallWindowPanel: 1 });
+    expect(windowMaterials).toEqual([0, 0, 0, 0, 0]);
+
+    const cornerMaterials = [0, 1, 0, 0, 4];
+    const cornerItems: InventoryItems = { sticks: 2 };
+    expect(craftRecipe('wall_corner', cornerMaterials, cornerItems, { workbench: 1 })).toMatchObject({ ok: true, result: 'wallCorner', count: 2 });
+    expect(cornerItems).toEqual({ wallCorner: 2 });
+
+    const roofMaterials = [0, 0, 0, 0, 2];
+    const roofItems: InventoryItems = { roofBundle: 1, sticks: 2 };
+    expect(craftRecipe('roof_join', roofMaterials, roofItems, { workbench: 1 })).toMatchObject({ ok: true, result: 'roofJoin', count: 2 });
+    expect(roofItems).toEqual({ roofJoin: 2 });
+  });
+
   it('crafts weather vanes as route-planning camp instruments', () => {
     const materials = [0, 2, 1, 0, 3];
     const crafted: InventoryItems = { sticks: 2 };

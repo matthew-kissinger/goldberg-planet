@@ -14,6 +14,10 @@ export const PLACEABLE_ITEM_IDS = [
   'floorFoundation',
   'wallPanel',
   'wallHalfRail',
+  'wallDoorPanel',
+  'wallWindowPanel',
+  'wallCorner',
+  'roofJoin',
   'doorKit',
   'windowFrame',
   'roofBundle',
@@ -214,7 +218,9 @@ export interface ShelterEnclosureReport {
   foundationTiles: number[];
   wallTiles: number[];
   railTiles: number[];
+  cornerTiles: number[];
   roofTiles: number[];
+  roofJoinTiles: number[];
   openingTiles: number[];
   utilityTiles: number[];
   roofCoverage: number;
@@ -276,7 +282,7 @@ export interface StructureRelocationResult {
   blockers?: string[];
 }
 
-export type StructureSocketRole = 'floor' | 'foundation' | 'wall-panel' | 'half-rail' | 'wall-opening' | 'wall-light' | 'roof-cap' | 'shore-edge' | 'route-marker';
+export type StructureSocketRole = 'floor' | 'foundation' | 'wall-panel' | 'half-rail' | 'wall-opening' | 'wall-light' | 'wall-corner' | 'roof-cap' | 'roof-join' | 'shore-edge' | 'route-marker';
 
 export interface StructureSocketSpec {
   item: PlaceableItemId;
@@ -380,6 +386,54 @@ const STRUCTURE_SOCKET_SPEC_OVERRIDES: Partial<Record<PlaceableItemId, Partial<O
     snap: ['front edge on hex face', 'porch rail leaves weather gap open', 'does not satisfy full shelter boundary'],
     visualScale: 'procedural rail stays visibly lower than full walls',
   },
+  wallDoorPanel: {
+    role: 'wall-opening',
+    modularKit: true,
+    gridWidth: 1,
+    gridDepth: 0.22,
+    height: 1.75,
+    openingWidth: 0.72,
+    openingHeight: 1.55,
+    pivot: 'wall-center',
+    collider: 'thin-wall',
+    snap: ['front edge on hex face', 'full wall panel counts as shelter boundary', 'integrated doorway satisfies door access'],
+    visualScale: 'procedural full wall and doorway own boundary until shared-scale skins exist',
+  },
+  wallWindowPanel: {
+    role: 'wall-light',
+    modularKit: true,
+    gridWidth: 1,
+    gridDepth: 0.2,
+    height: 1.65,
+    openingWidth: 0.58,
+    openingHeight: 0.52,
+    pivot: 'wall-center',
+    collider: 'thin-wall',
+    snap: ['front edge on hex face', 'full wall panel counts as shelter boundary', 'integrated window satisfies shelter light/readability'],
+    visualScale: 'procedural full wall and window opening own boundary until shared-scale skins exist',
+  },
+  wallCorner: {
+    role: 'wall-corner',
+    modularKit: true,
+    gridWidth: 0.72,
+    gridDepth: 0.72,
+    height: 1.65,
+    pivot: 'wall-center',
+    collider: 'thin-wall',
+    snap: ['centered as a temporary corner join', 'counts as shelter boundary', 'future edge sockets will split this into two faces'],
+    visualScale: 'procedural corner placeholder bridges two wall directions without owning final edge math',
+  },
+  roofJoin: {
+    role: 'roof-join',
+    modularKit: true,
+    gridWidth: 1.12,
+    gridDepth: 0.3,
+    height: 0.5,
+    pivot: 'wall-center',
+    collider: 'roof-shell',
+    snap: ['front edge on roof span', 'counts toward roof coverage', 'future shared-scale skins can replace the join cap'],
+    visualScale: 'procedural roof join reads as ridge/eave support without changing shelter footprint',
+  },
   doorKit: {
     role: 'wall-opening',
     modularKit: true,
@@ -476,7 +530,7 @@ export function houseKitSocketCatalog(): StructureSocketSpec[] {
 }
 
 export function wallShellSocketCatalog(): StructureSocketSpec[] {
-  return structureSocketCatalog(['floorFoundation', 'wallPanel', 'wallHalfRail']);
+  return structureSocketCatalog(['floorFoundation', 'wallPanel', 'wallDoorPanel', 'wallWindowPanel', 'wallCorner', 'wallHalfRail', 'roofJoin']);
 }
 
 export function normalizeStructureYaw(yaw: number): number {
@@ -984,7 +1038,9 @@ function emptyShelterEnclosure(): ShelterEnclosureReport {
     foundationTiles: [],
     wallTiles: [],
     railTiles: [],
+    cornerTiles: [],
     roofTiles: [],
+    roofJoinTiles: [],
     openingTiles: [],
     utilityTiles: [],
     roofCoverage: 0,
@@ -1009,6 +1065,29 @@ function shelterComfortTier(functional: boolean, weatherSafe: boolean, home: boo
   if (weatherSafe) return 'weather-safe';
   if (home) return 'rough';
   return 'none';
+}
+
+function isWallBoundaryItem(item: PlaceableItemId): boolean {
+  return item === 'wallPanel'
+    || item === 'wallDoorPanel'
+    || item === 'wallWindowPanel'
+    || item === 'wallCorner';
+}
+
+function isDoorItem(item: PlaceableItemId): boolean {
+  return item === 'doorKit' || item === 'wallDoorPanel';
+}
+
+function isWindowItem(item: PlaceableItemId): boolean {
+  return item === 'windowFrame' || item === 'wallWindowPanel';
+}
+
+function isRoofItem(item: PlaceableItemId): boolean {
+  return item === 'roofBundle' || item === 'roofJoin';
+}
+
+function isOpeningItem(item: PlaceableItemId): boolean {
+  return isDoorItem(item) || isWindowItem(item);
 }
 
 export function shelterReport(structures: readonly StructureSave[], topology?: StructureTopology, rings = 1): ShelterReport {
@@ -1044,15 +1123,17 @@ export function shelterReport(structures: readonly StructureSave[], topology?: S
   const support = new Set(supportTiles);
   const nearby = structures.filter((s) => local.has(s.tile));
   const foundationTiles = nearby.filter((s) => s.item === 'floorFoundation').map((s) => s.tile);
-  const wallTiles = nearby.filter((s) => s.item === 'wallPanel').map((s) => s.tile);
+  const wallTiles = nearby.filter((s) => isWallBoundaryItem(s.item)).map((s) => s.tile);
   const railTiles = nearby.filter((s) => s.item === 'wallHalfRail').map((s) => s.tile);
-  const roofTiles = nearby.filter((s) => s.item === 'roofBundle').map((s) => s.tile);
-  const openingTiles = nearby.filter((s) => s.item === 'doorKit' || s.item === 'windowFrame').map((s) => s.tile);
+  const cornerTiles = nearby.filter((s) => s.item === 'wallCorner').map((s) => s.tile);
+  const roofTiles = nearby.filter((s) => isRoofItem(s.item)).map((s) => s.tile);
+  const roofJoinTiles = nearby.filter((s) => s.item === 'roofJoin').map((s) => s.tile);
+  const openingTiles = nearby.filter((s) => isOpeningItem(s.item)).map((s) => s.tile);
   const utilityTiles = nearby.filter((s) => s.item === 'campfire' || s.item === 'lantern' || s.item === 'workbench' || s.item === 'chest').map((s) => s.tile);
-  const roofPieces = nearby.filter((s) => s.item === 'roofBundle').length;
-  const hasDoor = nearby.some((s) => s.item === 'doorKit');
-  const hasWindow = nearby.some((s) => s.item === 'windowFrame');
-  const doorOnBoundary = nearby.some((s) => s.item === 'doorKit' && boundary.has(s.tile));
+  const roofPieces = nearby.filter((s) => isRoofItem(s.item)).length;
+  const hasDoor = nearby.some((s) => isDoorItem(s.item));
+  const hasWindow = nearby.some((s) => isWindowItem(s.item));
+  const doorOnBoundary = nearby.some((s) => isDoorItem(s.item) && boundary.has(s.tile));
   const hasWarmth = nearby.some((s) => s.item === 'campfire' && s.state?.lit === true);
   const hasStation = nearby.some((s) => s.item === 'workbench');
   const hasStorage = nearby.some((s) => s.item === 'chest');
@@ -1064,7 +1145,8 @@ export function shelterReport(structures: readonly StructureSave[], topology?: S
   const boundaryNeed = Math.max(1, Math.min(4, boundaryTiles.length || 1));
   const shellBoundaryAttempt = wallTiles.length > 0 || railTiles.length > 0;
   const boundaryContributorTiles = shellBoundaryAttempt ? [...wallTiles, ...openingTiles] : [...roofTiles, ...openingTiles];
-  const boundaryCoverage = Math.min(1, boundaryContributorTiles.filter((tile) => boundary.has(tile)).length / boundaryNeed);
+  const boundaryContributorSet = new Set(boundaryContributorTiles.filter((tile) => boundary.has(tile)));
+  const boundaryCoverage = Math.min(1, boundaryContributorSet.size / boundaryNeed);
   const utilityCoverage = Math.min(1, (Number(hasWarmth) + Number(hasStation) + Number(hasStorage)) / 3);
   const spatiallyEnclosed = roofPieces >= ROOF_NEED && boundaryCoverage >= 0.75 && doorOnBoundary;
   const weatherSafe = spatiallyEnclosed && hasWarmth;
@@ -1086,7 +1168,9 @@ export function shelterReport(structures: readonly StructureSave[], topology?: S
     foundationTiles,
     wallTiles,
     railTiles,
+    cornerTiles,
     roofTiles,
+    roofJoinTiles,
     openingTiles,
     utilityTiles,
     roofCoverage: Math.min(1, roofPieces / ROOF_NEED),

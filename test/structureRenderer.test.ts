@@ -342,7 +342,7 @@ describe('structure renderer asset readability', () => {
     ]));
   });
 
-  it('renders procedural wall-shell pieces with distinct foundation, wall, and rail roles', () => {
+  it('renders procedural wall-shell pieces with distinct foundation, wall, rail, corner, and roof roles', () => {
     const scene = new THREE.Scene();
     const geo = new Goldberg(8);
     const layers = buildLayers();
@@ -351,6 +351,10 @@ describe('structure renderer asset readability', () => {
       { id: 1, item: 'floorFoundation', tile: 1, layer: 100, yaw: 0 },
       { id: 2, item: 'wallPanel', tile: 2, layer: 100, yaw: Math.PI / 3 },
       { id: 3, item: 'wallHalfRail', tile: 3, layer: 100, yaw: Math.PI * 2 / 3 },
+      { id: 4, item: 'wallDoorPanel', tile: 4, layer: 100, yaw: 0 },
+      { id: 5, item: 'wallWindowPanel', tile: 5, layer: 100, yaw: 0 },
+      { id: 6, item: 'wallCorner', tile: 6, layer: 100, yaw: 0 },
+      { id: 7, item: 'roofJoin', tile: 7, layer: 100, yaw: 0 },
     ];
 
     renderer.setStructures(structures);
@@ -361,9 +365,13 @@ describe('structure renderer asset readability', () => {
       foundations: 1,
       fullWalls: 1,
       halfRails: 1,
+      doorPanels: 1,
+      windowPanels: 1,
+      corners: 1,
+      roofJoins: 1,
     });
-    expect(stats.wallShellReadabilityRoles).toBeGreaterThanOrEqual(8);
-    expect(stats.wallShellSignals).toBeGreaterThanOrEqual(8);
+    expect(stats.wallShellReadabilityRoles).toBeGreaterThanOrEqual(14);
+    expect(stats.wallShellSignals).toBeGreaterThanOrEqual(14);
     expect([...meshNames(renderer)]).toEqual(expect.arrayContaining([
       'foundationFootprint',
       'foundationLevelBand',
@@ -371,6 +379,11 @@ describe('structure renderer asset readability', () => {
       'wallPanelTopCap',
       'halfRailRun',
       'halfRailOpenGap',
+      'wallDoorPanelLeftFace',
+      'wallDoorPanelLintel',
+      'wallWindowPanelGlass',
+      'wallCornerPost',
+      'roofJoinRidge',
     ]));
     expect(stats.wallShell.visibleRoles).toEqual(expect.arrayContaining([
       'floor foundation level footprint',
@@ -378,6 +391,10 @@ describe('structure renderer asset readability', () => {
       'wall shell top cap under roof join',
       'half rail porch guard',
       'half rail open weather gap',
+      'wall-door panel shelter boundary',
+      'wall-window panel shelter boundary',
+      'wall corner shelter boundary',
+      'roof join ridge shelter cap',
     ]));
   });
 
@@ -538,7 +555,7 @@ describe('structure renderer asset readability', () => {
     const layers = buildLayers();
     const renderer = new StructureRenderer(scene);
     const cases: Array<{
-      item: 'floorFoundation' | 'wallPanel' | 'wallHalfRail';
+      item: 'floorFoundation' | 'wallPanel' | 'wallDoorPanel' | 'wallWindowPanel' | 'wallCorner' | 'wallHalfRail' | 'roofJoin';
       role: StructureSocketSpec['role'];
       collider: StructureSocketSpec['collider'];
       silhouette: string;
@@ -562,12 +579,44 @@ describe('structure renderer asset readability', () => {
         roles: ['snap preview full wall boundary', 'snap preview full wall post', 'snap preview wall top cap'],
       },
       {
+        item: 'wallDoorPanel',
+        role: 'wall-opening',
+        collider: 'thin-wall',
+        silhouette: 'wall-door-panel-preview',
+        meshNames: ['snapPreviewWallDoorLeftWall', 'snapPreviewWallDoorLeftJamb', 'snapPreviewWallDoorLintel'],
+        roles: ['snap preview wall door shelter boundary', 'snap preview integrated door opening', 'snap preview wall door lintel'],
+      },
+      {
+        item: 'wallWindowPanel',
+        role: 'wall-light',
+        collider: 'thin-wall',
+        silhouette: 'wall-window-panel-preview',
+        meshNames: ['snapPreviewWallWindowFace', 'snapPreviewWallWindowPane', 'snapPreviewWallWindowMullion'],
+        roles: ['snap preview wall window shelter boundary', 'snap preview wall window light opening', 'snap preview wall window centered opening'],
+      },
+      {
+        item: 'wallCorner',
+        role: 'wall-corner',
+        collider: 'thin-wall',
+        silhouette: 'wall-corner-preview',
+        meshNames: ['snapPreviewWallCornerPost', 'snapPreviewWallCornerLeftWing', 'snapPreviewWallCornerCap'],
+        roles: ['snap preview wall corner shelter boundary', 'snap preview wall corner wing', 'snap preview wall shell corner cap'],
+      },
+      {
         item: 'wallHalfRail',
         role: 'half-rail',
         collider: 'thin-wall',
         silhouette: 'half-rail-preview',
         meshNames: ['snapPreviewHalfRailLeftPost', 'snapPreviewHalfRailRun', 'snapPreviewHalfRailOpenGap'],
         roles: ['snap preview half rail post', 'snap preview porch rail', 'snap preview open weather gap'],
+      },
+      {
+        item: 'roofJoin',
+        role: 'roof-join',
+        collider: 'roof-shell',
+        silhouette: 'roof-join-preview',
+        meshNames: ['snapPreviewRoofJoinRidge', 'snapPreviewRoofJoinLeftBracket', 'snapPreviewRoofJoinCoverage'],
+        roles: ['snap preview roof join ridge', 'snap preview roof join bracket', 'snap preview roof join coverage'],
       },
     ];
 
