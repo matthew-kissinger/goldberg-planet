@@ -51,7 +51,7 @@ muted).
 | **R** | use a nearby placed prop: open chest storage, tend/harvest/fertilize/irrigate crop plots, turn scraps into compost at compost bins, catch rain at rain cisterns, cache or pull provisions at root cellars, cook at lit campfires, set/check/collect fish traps, set/check/comb shore nets, preserve food at drying racks, read weather vanes, light campfires/lanterns, set bedroll home/rest, cast from dock segments, or attune waystones; with no nearby prop, discover pentagon landmarks, gather active Skyfall craters, listen to active World Murmurs, read completed season afterglows, cast from shore with a fishing rod, or forage the current terrain |
 | **Shift+R** | pack a nearby empty/inactive placed prop back into inventory; stocked, lit, planted, home, attuned, anchored, or set trap props must be cleared first |
 | **M** | open the Route Slate: Hearth Beacon home signal, active Skyfall events, active World Murmurs, completed season afterglows, nearby cave/ecology pins, and after the first pentagon awakens, Horizon Chart target distance, turn direction, and expedition prep |
-| **P** / **Shift+P** | pin the current Route Slate candidates as a saved route itinerary, or append a new distinct stop / clear the itinerary |
+| **P** / **Shift+P** | pin the current Route Slate candidates as a saved route itinerary, or append a new distinct stop / clear the itinerary; while the Route Slate is open, Arrow Right moves the active stop later and Arrow Left drops the active stop |
 | **J** | open the Hearth Journal: home state, route prep, discoveries, cave/food/ecology notes, and current next goals |
 | **N** | mute / unmute generated ambience and interaction audio |
 | **E** | **the plane**: chop 2 trees for 12 wood, craft it once, then board / stow anytime |
@@ -66,7 +66,7 @@ muted).
 (push past the rim to sprint — in the plane it works the throttle), dragging anywhere else
 looks, **tap to mine or chop**, **hold ~0.4 s to build** (keep holding and drag to paint),
 pinch to zoom from first person to orbit, and round buttons handle jump/climb, descend,
-nearby prop use, crafting/Pack Ledger, Route Slate open/pin/clear, and boarding / stowing the plane. With `?creative=1`, the plane
+nearby prop use, crafting/Pack Ledger, Route Slate open plus panel buttons for pin/later/drop/clear, and boarding / stowing the plane. With `?creative=1`, the plane
 button toggles walk/free-flight so mobile has the same Creative shortcut as desktop `F`.
 Long-press the touch `use` button to pack a nearby safe prop, matching `Shift+R` on keyboard.
 
@@ -74,7 +74,7 @@ Long-press the touch `use` button to pack a nearby safe prop, matching `Shift+R`
 input: left stick moves, right stick looks, full stick/RB sprints, LB+right stick zooms,
 `A` jumps/swims up, `LT` descends, `X` mines/chops, `RT` builds, D-pad left/right cycles the
 hotbar, `B` uses or closes the open panel, `LB+B` packs a safe prop, `Y` toggles crafting,
-Back opens the Route Slate, `LB+D-pad` pins or clears routes, and Start boards/stows the
+Back opens the Route Slate, D-pad left/right inside the slate drops or moves the active itinerary stop later, `LB+D-pad` pins or clears routes, and Start boards/stows the
 plane. `LB+Back` toggles mute. While crafting or chest storage is open, D-pad moves the focused row/action, `A`
 confirms craft/place/transfer, and `B` closes the focused panel without leaking jump, use,
 hotbar, mine, or build input into the world.

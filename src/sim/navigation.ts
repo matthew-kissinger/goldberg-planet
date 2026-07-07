@@ -286,6 +286,15 @@ export interface RoutePlanAddResult {
   legCount: number;
 }
 
+export interface RoutePlanEditResult {
+  ok: boolean;
+  reason: 'deferred' | 'removed' | 'single' | 'complete' | 'locked' | 'invalid';
+  plan: RoutePlanSave | null;
+  label: string;
+  legCount: number;
+  activeIndex: number;
+}
+
 export interface RoutePlanArrivalResult {
   changed: boolean;
   plan: RoutePlanSave | null;
@@ -518,6 +527,10 @@ function routePlanLegKey(leg: Pick<RoutePlanLegSave, 'sourceKind' | 'targetTile'
   return `tile:${Math.trunc(leg.targetTile)}`;
 }
 
+function routePlanLegEditLocked(leg: Pick<RoutePlanLegSave, 'sourceKind' | 'label'>): boolean {
+  return (leg.sourceKind === 'skyfall' || leg.sourceKind === 'murmur') && leg.label.startsWith('Season ');
+}
+
 function distinctRoutePlanLegs(legs: readonly RoutePlanLegSave[], maxLegs = ROUTE_ITINERARY_MAX_LEGS): RoutePlanLegSave[] {
   const out: RoutePlanLegSave[] = [];
   const seen = new Set<string>();
@@ -633,6 +646,57 @@ export function addRoutePlanLeg(
   legs.push(leg);
   const next = routePlanFromLegs(legs);
   return { ok: next !== null, reason: 'added', plan: next, label: leg.label, legCount: next?.legs?.length ?? legs.length };
+}
+
+export function deferActiveRoutePlanLeg(plan: RoutePlanSave | null | undefined): RoutePlanEditResult {
+  const status = routePlanItineraryStatus(plan);
+  if (!status) return { ok: false, reason: 'invalid', plan: plan ?? null, label: '', legCount: 0, activeIndex: 0 };
+  if (status.complete) {
+    return { ok: false, reason: 'complete', plan: routePlanFromLegs(status.legs), label: status.active.label, legCount: status.legs.length, activeIndex: status.activeIndex };
+  }
+  if (routePlanLegEditLocked(status.active)) {
+    return { ok: false, reason: 'locked', plan: routePlanFromLegs(status.legs), label: status.active.label, legCount: status.legs.length, activeIndex: status.activeIndex };
+  }
+  const laterUnreached = status.legs.some((leg, index) => index > status.activeIndex && leg.reached !== true);
+  if (!laterUnreached) {
+    return { ok: false, reason: 'single', plan: routePlanFromLegs(status.legs), label: status.active.label, legCount: status.legs.length, activeIndex: status.activeIndex };
+  }
+  const legs = status.legs.map((leg) => ({ ...leg }));
+  const [active] = legs.splice(status.activeIndex, 1);
+  legs.push(active);
+  const next = routePlanFromLegs(legs);
+  const nextStatus = routePlanItineraryStatus(next);
+  return {
+    ok: next !== null,
+    reason: next ? 'deferred' : 'invalid',
+    plan: next,
+    label: active.label,
+    legCount: nextStatus?.legs.length ?? legs.length,
+    activeIndex: nextStatus?.activeIndex ?? 0,
+  };
+}
+
+export function removeActiveRoutePlanLeg(plan: RoutePlanSave | null | undefined): RoutePlanEditResult {
+  const status = routePlanItineraryStatus(plan);
+  if (!status) return { ok: false, reason: 'invalid', plan: plan ?? null, label: '', legCount: 0, activeIndex: 0 };
+  if (status.complete) {
+    return { ok: false, reason: 'complete', plan: routePlanFromLegs(status.legs), label: status.active.label, legCount: status.legs.length, activeIndex: status.activeIndex };
+  }
+  if (routePlanLegEditLocked(status.active)) {
+    return { ok: false, reason: 'locked', plan: routePlanFromLegs(status.legs), label: status.active.label, legCount: status.legs.length, activeIndex: status.activeIndex };
+  }
+  const legs = status.legs.map((leg) => ({ ...leg }));
+  const [removed] = legs.splice(status.activeIndex, 1);
+  const next = routePlanFromLegs(legs);
+  const nextStatus = routePlanItineraryStatus(next);
+  return {
+    ok: true,
+    reason: 'removed',
+    plan: next,
+    label: removed.label,
+    legCount: nextStatus?.legs.length ?? 0,
+    activeIndex: nextStatus?.activeIndex ?? 0,
+  };
 }
 
 export function markRoutePlanLegReached(

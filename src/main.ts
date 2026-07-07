@@ -187,6 +187,8 @@ import {
   nextHorizonChartSignal,
   normalizeRoutePlan,
   planExpedition,
+  deferActiveRoutePlanLeg,
+  removeActiveRoutePlanLeg,
   routeAdjacentTile,
   routeEcologyForExpedition,
   routeGuide,
@@ -270,15 +272,16 @@ const STORAGE_FOCUS_ACTIONS: ChestTransferAction[] = ['depositOne', 'depositAll'
 const KEYBOARD_HELP = `WASD move · space jump · shift sprint · wheel zoom
 LMB mine + chop trees · RMB build · 1-5 pick block · Q eat
 Plane: chop 2 trees for 12 wood · B craft · R use/open chest/farm/fish/forage · Shift+R pack prop · M chart · P itinerary · Shift+P clear · J journal · E board/stow
+Route Slate: Arrow keys choose/drop/move stops · Enter pin · Esc close
 F free-flight · F3 stats · H help`;
 
 const TOUCH_HELP = `Touch: left stick move · drag to look · pinch zoom
 Tap terrain to mine/chop · hold terrain to build · hold use to pack prop
-Craft opens recipes/pack · route/pin/clear manage itinerary · plane boards/stows · log opens the Hearth Journal`;
+Craft opens recipes/pack · route panel buttons pin/later/drop/clear itinerary stops · plane boards/stows · log opens the Hearth Journal`;
 
 const GAMEPAD_HELP = `Gamepad: LS move · RS look · full stick/RB sprint · LB+RS zoom
 A jump/swim · LT descend · X mine/chop · RT build · D-pad hotbar
-B use · LB+B pack prop · Y craft · Back route slate · LB+D-pad itinerary/clear · Start board/stow`;
+B use · LB+B pack prop · Y craft · Back route slate · D-pad edits open itinerary · LB+D-pad pin/clear · Start board/stow`;
 
 function inputHelpText(mode: UxInputMode): string {
   if (mode === 'gamepad' || mode === 'hybrid') return GAMEPAD_HELP;
@@ -2133,6 +2136,58 @@ async function boot(): Promise<void> {
     return true;
   };
 
+  const deferActiveRouteStop = (): boolean => {
+    const result = deferActiveRoutePlanLeg(activeRoutePlan);
+    if (!result.ok) {
+      playAudio('uiDeny');
+      lastNavigationAction = `route itinerary later: ${result.reason}`;
+      hud.flash(result.reason === 'single'
+        ? 'no later stop to swap in'
+        : result.reason === 'complete'
+        ? 'itinerary already complete'
+        : result.reason === 'locked'
+        ? 'season route stops stay in order'
+        : 'no planned stop to move', 2.4);
+      return false;
+    }
+    activeRoutePlan = result.plan;
+    const signal = currentRoutePlanSignal();
+    routeFocusDirty = false;
+    triggerCharacterAction('discover', 'map', 0.52);
+    playAudio('routeSlate');
+    markSaveDirty();
+    refreshRouteSlate(8);
+    lastNavigationAction = `route itinerary later: ${result.label}`;
+    hud.flash(`moved ${result.label} later${signal ? ` · next ${signal.label}` : ''}`, 3.2);
+    return true;
+  };
+
+  const removeActiveRouteStop = (): boolean => {
+    const result = removeActiveRoutePlanLeg(activeRoutePlan);
+    if (!result.ok) {
+      playAudio('uiDeny');
+      lastNavigationAction = `route itinerary drop: ${result.reason}`;
+      hud.flash(result.reason === 'complete'
+        ? 'itinerary already complete'
+        : result.reason === 'locked'
+        ? 'season route stops stay in order'
+        : 'no planned stop to drop', 2.4);
+      return false;
+    }
+    activeRoutePlan = result.plan;
+    const signal = currentRoutePlanSignal();
+    routeFocusDirty = false;
+    triggerCharacterAction('discover', 'map', 0.52);
+    playAudio('uiConfirm');
+    markSaveDirty();
+    refreshRouteSlate(8);
+    lastNavigationAction = `route itinerary dropped: ${result.label}`;
+    hud.flash(signal
+      ? `dropped ${result.label} · next ${signal.label}`
+      : `dropped ${result.label} · itinerary empty`, 3.2);
+    return true;
+  };
+
   const openRouteSlateCommand = (): boolean => {
     if (journalOpen) closeJournal();
     if (openChestId !== null) closeStorage();
@@ -2155,8 +2210,30 @@ async function boot(): Promise<void> {
     return clearRoutePlan();
   };
 
+  const deferRouteCommand = (): boolean => {
+    if (journalOpen) closeJournal();
+    if (openChestId !== null) closeStorage();
+    if (craftingOpen) {
+      craftingOpen = false;
+      refreshCraftingHud();
+    }
+    return deferActiveRouteStop();
+  };
+
+  const dropRouteCommand = (): boolean => {
+    if (journalOpen) closeJournal();
+    if (openChestId !== null) closeStorage();
+    if (craftingOpen) {
+      craftingOpen = false;
+      refreshCraftingHud();
+    }
+    return removeActiveRouteStop();
+  };
+
   hud.onRoutePin = pinRouteCommand;
   hud.onRouteClear = clearRouteCommand;
+  hud.onRouteLater = deferRouteCommand;
+  hud.onRouteDrop = dropRouteCommand;
   hud.onRouteSelect = (index) => { selectRouteCandidate(index, true); };
 
   const useLandmark = (tile?: number): boolean => {
@@ -3744,7 +3821,7 @@ async function boot(): Promise<void> {
     action === 'depositOne' || action === 'depositAll' ? row.canDeposit : row.canWithdraw;
 
   const handleGamepadPanelInput = (gp: GamepadFrame): boolean => {
-    const routeInput = routeSlateOpen() && (gp.menuUp || gp.menuDown || gp.confirm || gp.cancel || gp.chart || gp.pin || gp.clearPin);
+    const routeInput = routeSlateOpen() && (gp.menuUp || gp.menuDown || gp.menuLeft || gp.menuRight || gp.confirm || gp.cancel || gp.chart || gp.pin || gp.clearPin);
     const hasPanelInput = gp.menuUp || gp.menuDown || gp.menuLeft || gp.menuRight || gp.confirm || gp.cancel || routeInput;
     if (!hasPanelInput) return false;
 
@@ -3824,6 +3901,14 @@ async function boot(): Promise<void> {
         clearRouteCommand();
         return true;
       }
+      if (gp.menuLeft && !gp.clearPin) {
+        dropRouteCommand();
+        return true;
+      }
+      if (gp.menuRight && !gp.pin) {
+        deferRouteCommand();
+        return true;
+      }
       if (gp.menuUp || gp.menuDown) {
         if (candidates.length === 0) {
           playAudio('uiDeny');
@@ -3847,12 +3932,20 @@ async function boot(): Promise<void> {
     return false;
   };
 
-  const handleRouteKeyboardInput = (up: boolean, down: boolean, confirm: boolean, cancel: boolean): boolean => {
-    if (!routeSlateOpen() || (!up && !down && !confirm && !cancel)) return false;
+  const handleRouteKeyboardInput = (up: boolean, down: boolean, left: boolean, right: boolean, confirm: boolean, cancel: boolean): boolean => {
+    if (!routeSlateOpen() || (!up && !down && !left && !right && !confirm && !cancel)) return false;
     const candidates = clampRouteFocus();
     if (cancel) {
       closeRouteSlate();
       playAudio('uiConfirm');
+      return true;
+    }
+    if (left) {
+      dropRouteCommand();
+      return true;
+    }
+    if (right) {
+      deferRouteCommand();
       return true;
     }
     if (up || down) {
@@ -4470,6 +4563,8 @@ async function boot(): Promise<void> {
     selectRouteCandidate: (index = 0) => { selectRouteCandidate(index, true); return routeSelectionState(); },
     pinRoute: (selected = false) => pinRouteCommand(selected),
     clearRoutePlan: () => clearRoutePlan(),
+    deferRouteStop: () => deferActiveRouteStop(),
+    dropRouteStop: () => removeActiveRouteStop(),
     journal: () => ({ open: journalOpen, state: currentHearthJournal() }),
     toggleJournal: () => { toggleJournal(); return { open: journalOpen, state: currentHearthJournal() }; },
     storage: () => ({ open: openChestId !== null, chestId: openChestId, state: currentChestStorage() }),
@@ -5089,6 +5184,8 @@ async function boot(): Promise<void> {
     const routeKeyboardConsumed = handleRouteKeyboardInput(
       input.pressed('ArrowUp'),
       input.pressed('ArrowDown'),
+      input.pressed('ArrowLeft'),
+      input.pressed('ArrowRight'),
       input.pressed('Enter'),
       escPressed,
     );

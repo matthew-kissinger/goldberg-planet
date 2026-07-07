@@ -106,6 +106,8 @@ export class Hud {
   onPlaceSelect: ((id: string) => void) | null = null;
   onRoutePin: (() => void) | null = null;
   onRouteClear: (() => void) | null = null;
+  onRouteLater: (() => void) | null = null;
+  onRouteDrop: (() => void) | null = null;
   onRouteSelect: ((index: number) => void) | null = null;
   onJournalToggle: (() => void) | null = null;
   onJournalClose: (() => void) | null = null;
@@ -181,6 +183,8 @@ export class Hud {
       e.preventDefault();
       if (action.dataset.routeAction === 'pin') this.onRoutePin?.();
       else if (action.dataset.routeAction === 'clear') this.onRouteClear?.();
+      else if (action.dataset.routeAction === 'later') this.onRouteLater?.();
+      else if (action.dataset.routeAction === 'drop') this.onRouteDrop?.();
     });
     this.journalButton.addEventListener('pointerdown', (e) => {
       e.preventDefault();
@@ -311,6 +315,8 @@ export class Hud {
     const html = `<div class="route-head"><span>${slate.title}</span><span>${escapeHtml(this.controls.route)}</span></div>` +
       `<div class="route-summary">${slate.summary}</div>` +
       `<div class="route-actions"><button data-route-action="pin" aria-label="Pin current route" title="Pin current route">pin</button>` +
+      `<button data-route-action="later" aria-label="Move active stop later" title="Move active stop later">later</button>` +
+      `<button data-route-action="drop" aria-label="Drop active stop" title="Drop active stop">drop</button>` +
       `<button data-route-action="clear" aria-label="Clear current route" title="Clear current route">clear</button></div>${rows}`;
     if (html !== this.routeCache) {
       this.route.innerHTML = html;

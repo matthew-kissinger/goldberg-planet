@@ -5,6 +5,7 @@ import {
   chartTurnLabel,
   createRoutePlanFromGuide,
   createRoutePlanFromGuides,
+  deferActiveRoutePlanLeg,
   formatChartDistance,
   greatCircleDistanceMeters,
   hearthBeaconSignal,
@@ -12,6 +13,7 @@ import {
   nextHorizonChartSignal,
   normalizeRoutePlan,
   planExpedition,
+  removeActiveRoutePlanLeg,
   routeAdjacentTile,
   routeEcologyForExpedition,
   routeAtlasVisible,
@@ -875,6 +877,45 @@ describe('Hearth and Horizon horizon chart navigation', () => {
     expect(routeGuide({ chart: null, beacon: null, routePlan: complete })).toBeNull();
   });
 
+  it('moves or drops the active saved itinerary stop without desyncing the active route', () => {
+    const signal = nextHorizonChartSignal(landmarks, new Set([1]), centers, frame, 0, [1, 0, 0], 100)!;
+    const candidates = routeGuideCandidates({
+      chart: signal,
+      beacon: null,
+      waystones: [{ tile: 3, mark: 'cave', label: 'cave waystone', distanceLabel: '84 m', turn: 'right' }],
+      skyfall: { tile: 1, kind: 'glassRain', label: 'glass-rain shoal', detail: 'sand fused into pale window-glass ribs', omenLabel: 'pale shard halo', omenDetail: 'a thin ring of sky-glass glints above the fall', rewardLabel: 'sand', rewardCount: 6, distanceM: 140, distanceLabel: '140 m', turn: 'ahead', minutesRemaining: 42, active: true, harvested: false },
+      murmur: { tile: 2, kind: 'starGlass', label: 'star-glass glimmer', detail: 'a faint shard reflection appears only when you move', note: 'the sky leaves fingerprints even where nothing has fallen', distanceM: 120, distanceLabel: '120 m', turn: 'left', minutesRemaining: 31, active: true, observed: false },
+    });
+    let plan = createRoutePlanFromGuides(candidates, 0, 4, 360, 3)!;
+
+    const deferred = deferActiveRoutePlanLeg(plan);
+    expect(deferred).toMatchObject({ ok: true, reason: 'deferred', label: 'North Gate', legCount: 3, activeIndex: 0 });
+    plan = deferred.plan!;
+    expect(plan.label).toBe('glass-rain shoal');
+    expect(plan.legs?.map((leg) => leg.label)).toEqual(['glass-rain shoal', 'cave waystone', 'North Gate']);
+    expect(routePlanSignal(plan, centers, frame, 0, [1, 0, 0], 100)).toMatchObject({
+      label: 'glass-rain shoal',
+      legIndex: 0,
+      legCount: 3,
+      reachedCount: 0,
+    });
+
+    const dropped = removeActiveRoutePlanLeg(plan);
+    expect(dropped).toMatchObject({ ok: true, reason: 'removed', label: 'glass-rain shoal', legCount: 2, activeIndex: 0 });
+    plan = dropped.plan!;
+    expect(plan.label).toBe('cave waystone');
+    expect(plan.legs?.map((leg) => leg.label)).toEqual(['cave waystone', 'North Gate']);
+
+    const reached = markRoutePlanLegReached(plan, 4, 420).plan!;
+    expect(routePlanItineraryStatus(reached)).toMatchObject({ activeIndex: 1, reachedCount: 1, complete: false });
+    const reachedDeferred = deferActiveRoutePlanLeg(reached);
+    expect(reachedDeferred).toMatchObject({ ok: false, reason: 'single', label: 'North Gate', legCount: 2, activeIndex: 1 });
+
+    const oneStop = createRoutePlanFromGuides([candidates[0]], 0, 4, 360, 3)!;
+    expect(deferActiveRoutePlanLeg(oneStop)).toMatchObject({ ok: false, reason: 'single', label: 'North Gate' });
+    expect(removeActiveRoutePlanLeg(oneStop)).toMatchObject({ ok: true, reason: 'removed', label: 'North Gate', plan: null, legCount: 0 });
+  });
+
   it('lets active Stranger Seasons produce seasonal multi-stop route itineraries', () => {
     const signal = nextHorizonChartSignal(landmarks, new Set([1]), centers, frame, 0, [1, 0, 0], 100)!;
     const seasonGuides = [
@@ -921,6 +962,8 @@ describe('Hearth and Horizon horizon chart navigation', () => {
       'murmur:Season Note: tide-bell hush',
     ]);
     expect(plan.legs?.[0].detail).toBe('season fall · pale shard halo · 42m left');
+    expect(deferActiveRoutePlanLeg(plan)).toMatchObject({ ok: false, reason: 'locked', label: 'Season Fall: glass-rain shoal' });
+    expect(removeActiveRoutePlanLeg(plan)).toMatchObject({ ok: false, reason: 'locked', label: 'Season Fall: glass-rain shoal' });
     expect(routePlanSignal(plan, centers, frame, 0, [1, 0, 0], 100)).toMatchObject({
       label: 'Season Fall: glass-rain shoal',
       legCount: 3,

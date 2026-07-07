@@ -74,7 +74,7 @@ function startServer(port) {
     cwd: root,
     env: { ...process.env, BROWSER: 'none' },
     stdio: ['ignore', 'pipe', 'pipe'],
-    shell: false,
+    shell: process.platform === 'win32',
   });
   child.stdout.on('data', (chunk) => process.stdout.write(chunk));
   child.stderr.on('data', (chunk) => process.stderr.write(chunk));

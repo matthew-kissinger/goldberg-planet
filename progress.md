@@ -3,6 +3,29 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-07
 
+- Closed the F1 active-stop itinerary polish slice under the DAG/subagent workflow. Saved
+  route itineraries can now move the active stop later or drop the active stop without
+  clearing the whole route, and the pure helpers rebuild through the normalized route-plan
+  path so the active top-level route stays synced with saved legs. Stranger Season fall/note
+  stops are locked against later/drop edits so the convenience controls cannot skip the
+  season-chord order.
+- Route Slate now exposes `later` and `drop` actions alongside pin/clear, and the same edit
+  path is reachable by keyboard Arrow Right/Arrow Left while the slate is open, touch route
+  panel buttons, and gamepad D-pad right/left inside the slate. `__world.deferRouteStop()`
+  and `__world.dropRouteStop()` expose the same path for proof/debug readback.
+- Added `npm run proof:f1-itinerary`. The proof seeds a real three-stop saved itinerary,
+  opens Route Slate through desktop keyboard, laptop keyboard, tablet touch, phone touch,
+  and synthetic gamepad profiles, moves `North Gate` later, drops `glass-rain shoal`,
+  verifies the saved order becomes `cave waystone -> North Gate`, captures full and
+  canvas-clipped screenshots, checks panel bounds, and records no console/page errors in
+  `output/playwright/f1-itinerary-controls/proof.json`.
+- Verified the F1 slice with `npm run typecheck`, `npm test -- test/navigation.test.ts
+  test/ux.test.ts test/gamepad.test.ts`, `npm test -- test/save.test.ts
+  test/navigation.test.ts`, full `npm test` (264 tests), `npm run build`, `npm run
+  proof:f1-itinerary`, `npm run proof:panel-ownership`, and
+  `PROOF_PROFILE=desktop npm run proof:e4-ecology-route`. The panel proof harness now uses
+  the same Windows Vite launch mode as the E4/F1 proofs after `spawn EINVAL` exposed the
+  older launch path as brittle on this host.
 - Advanced E4 route-food proof from seeded readiness into organic placement/wait/haul
   evidence. `proof:e4-ecology-route` now searches for valid route-adjacent and off-route
   shore tiles, places fish trap and shore net props for both source classes through the
