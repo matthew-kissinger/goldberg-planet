@@ -61,6 +61,22 @@ node transforms, so treat it as a rough extent. The hex tile is **~5.6 world uni
 (`hexReference.flatToFlatWorldUnits`). Scale each asset so its footprint matches its intended
 `footprint` (single/small/landmark), then eyeball in-engine.
 
+**1b. Modular building pieces will NOT agree on proportions — this is the biggest wiring risk.**
+Each asset was generated independently with **no shared dimensional contract**, so the pieces that
+are meant to assemble into a structure — **`door-kit`, `window-frame`, `roof-bundle`,
+`dock-segment`, `root-cellar`, `compost-bin`** (and anything else the player crafts and places into
+a house) — do not share a wall height, opening size, wall thickness, or grid unit. Kiln has no idea
+the door and the window belong to the same wall. Concretely: the door's opening may not match the
+window's, the roof wedge won't span a wall built to the door's width, the dock plank width won't
+tile. **If these are craftable placeables the player snaps together, they will look broken until the
+game imposes the dimensional contract, not the assets.** Options, cheapest first: (a) treat each GLB
+as *decoration inside* a code-authored, correctly-proportioned socket (the existing procedural frame
+stays the load-bearing collider/snap volume; the GLB just skins it); (b) per-asset normalize each
+piece to a shared module grid at import (uniform scale + offset so openings/edges land on grid
+lines); (c) regenerate the whole kit as ONE Kiln *pack* so it shares a style/scale context, then
+still normalize. Do **not** assume raw scale — measure each piece's opening/edge against your build
+grid and snap. This is exactly why placement + snapping has to be solid before the house kit ships.
+
 **2. Animations are skeleton-free node-transform clips.** `hasSkin` is false everywhere — Kiln
 keyframed the mesh parts directly (transform channels on nodes), which lines up with the game's
 existing procedural-animation-by-mesh-name convention. Play them with a `THREE.AnimationMixer`
