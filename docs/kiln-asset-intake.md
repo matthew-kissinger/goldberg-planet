@@ -108,6 +108,9 @@ No GLB becomes shipped gameplay art until it has:
   HTTP URL, or presigned URL marker.
 - A runtime asset entry declaring scale, pivot, orientation, socket/collider ownership,
   interaction overlays, repetition policy, and procedural fallback.
+- An orientation normalization record for any upright or axis-sensitive asset family. The
+  runtime must decide whether to preserve authored Y-up or rotate a detected source axis to
+  local Y before computing pivots, fitted bounds, and instanced geometry.
 - A batching policy for repeated assets, including whether the implementation uses
   `InstancedMesh`, merged geometry, LOD buckets, or a deliberate one-off mesh.
 - A distance policy for animated assets, including active mixer radius, low-rate/frozen far
@@ -148,10 +151,13 @@ First wired pilot:
 - `tree-pine`, `tree-broadleaf`, `tree-dead-snag`, and `tree-shrub`: accepted as H5/K5
   instanced vegetation skins. `Trees` remains the gameplay authority for tree existence,
   visual kind, chop progress, and drops; `TreeAssetRenderer` mirrors resident streamer
-  chunks and turns each accepted tree GLB into a material-merged instanced batch. Procedural
-  chunk tree meshes stay active until every tree skin is ready, then become fallback. The
-  proof caps the family at 11 instanced draw calls for 210 resident trees and gates cosmetic
-  sway to 96 world units while keeping chop damage matrix-driven.
+  chunks and turns each accepted tree GLB into a material-merged instanced batch. Stemmed
+  trees now use the shared longest-axis-to-local-Y orientation normalizer before centering
+  and bottom-pivoting; shrubs preserve authored Y-up because squat vegetation should not be
+  spun simply for being wide. Procedural chunk tree meshes stay active until every tree skin
+  is ready, then become fallback. The proof caps the family at 11 instanced draw calls for
+  210 resident trees and gates cosmetic sway to 96 world units while keeping chop damage
+  matrix-driven.
 - All 9 `creature-*` native-life bodies: accepted as H5/K6 animated creature skins.
   `NativeLifeRenderer` keeps the native-life simulation, pressure, tend/ward rules, and
   reward/warning overlays code-authored, then hides duplicated procedural body meshes after

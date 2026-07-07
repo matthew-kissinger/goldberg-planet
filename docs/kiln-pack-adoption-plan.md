@@ -34,6 +34,9 @@ scene graphs. The default implementation target is:
 - Reuse the packed palette/vertex-color look with as few shared materials as possible.
 - Convert repeated static families into `THREE.InstancedMesh` or equivalent merged batches
   by slug, material, LOD, and state.
+- Normalize orientation before pivot/scale/instancing. Any upright family whose exported
+  local up axis is suspect must declare an orientation policy, record the source up axis and
+  correction, and prove the corrected bounds before it can replace procedural art.
 - Keep per-instance transforms, tint, phase, and simple state in instance attributes where
   that is cheaper than unique meshes.
 - Use code-authored overlays for dynamic gameplay signals such as glows, route glyphs,
@@ -108,6 +111,10 @@ The asset-pack adoption track is done when:
   the authoritative `Trees` simulation, and uses one material-merged instanced batch per
   tree skin. The older procedural chunk tree geometry stays active until every tree GLB
   batch is ready, then becomes fallback/scaffold rather than the default visual.
+- Tree GLBs now run through the shared instanced orientation normalizer before centering and
+  bottom-pivoting. Stemmed trees use a longest-axis-to-local-Y policy, shrubs preserve
+  authored Y-up orientation, and diagnostics report the source up axis plus correction so a
+  sideways exported GLB cannot silently become a sideways forest.
 - Cosmetic sway is distance-gated to 96 world units. Chop damage remains matrix-driven so
   hit feedback still works without starting per-tree animation systems.
 - `npm run proof:k5-trees` covers desktop and phone: all four committed tree GLBs load from

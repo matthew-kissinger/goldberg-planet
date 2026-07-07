@@ -6385,7 +6385,16 @@ async function boot(): Promise<void> {
   });
 }
 
-boot().catch((err) => {
-  console.error(err);
-  splash(`boot failed: ${err}`, 0);
-});
+if (params.get('assetViewer') === 'kiln') {
+  import('./tools/kilnAssetViewer')
+    .then((module) => module.bootKilnAssetViewer())
+    .catch((err) => {
+      console.error(err);
+      splash(`asset viewer failed: ${err}`, 0);
+    });
+} else {
+  boot().catch((err) => {
+    console.error(err);
+    splash(`boot failed: ${err}`, 0);
+  });
+}

@@ -10,6 +10,7 @@
     "proof:audio-assets": "node scripts/proof-audio-assets.mjs",
     "proof:audio-music": "node scripts/proof-audio-music.mjs",
     "proof:kiln-assets": "node scripts/proof-kiln-asset-pack.mjs",
+    "proof:kiln-asset-viewer": "node scripts/proof-kiln-asset-viewer.mjs",
     "proof:route-markers": "node scripts/proof-route-marker-readability.mjs",
     "proof:character": "node scripts/proof-character-readability.mjs",
     "proof:panel-ownership": "node scripts/proof-panel-ownership.mjs",

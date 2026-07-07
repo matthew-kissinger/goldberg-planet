@@ -244,6 +244,13 @@ function assertTreeRenderer(renderer, label, requiredVisibleSlug = null) {
     if (fit?.batchingPolicy !== 'instanced-merged-by-material' || fit?.animationPolicy !== 'matrix-sway-near-and-damage-only') {
       throw new Error(`${label}: ${slug} policy drifted ${JSON.stringify(fit)}`);
     }
+    const expectedOrientationPolicy = slug === 'tree-shrub' ? 'preserve-y-up' : 'longest-axis-to-y';
+    if (fit?.orientation?.policy !== expectedOrientationPolicy || !fit?.orientation?.sourceUpAxis || !Array.isArray(fit?.orientation?.axisCorrection)) {
+      throw new Error(`${label}: ${slug} orientation policy missing or drifted ${JSON.stringify(fit)}`);
+    }
+    if (slug !== 'tree-shrub' && (fit?.orientedSourceBboxSize?.[1] ?? 0) < Math.max(fit?.orientedSourceBboxSize?.[0] ?? 0, fit?.orientedSourceBboxSize?.[2] ?? 0) * 0.8) {
+      throw new Error(`${label}: ${slug} still reads as side-loaded after orientation normalization ${JSON.stringify(fit)}`);
+    }
     if (!String(fit?.sourceUrl ?? '').includes(`/assets/kiln/models/${slug}.glb`)) {
       throw new Error(`${label}: ${slug} source URL is not a committed model path ${JSON.stringify(fit)}`);
     }

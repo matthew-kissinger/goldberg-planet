@@ -155,14 +155,25 @@ export interface KilnInstancedAssetPart {
   material: THREE.Material | THREE.Material[];
 }
 
+export type KilnInstancedOrientationPolicy = 'preserve-y-up' | 'longest-axis-to-y';
+export type KilnSourceUpAxis = 'x' | 'y' | 'z';
+
+export interface KilnInstancedOrientationSnapshot {
+  policy: KilnInstancedOrientationPolicy;
+  sourceUpAxis: KilnSourceUpAxis;
+  axisCorrection: readonly [number, number, number];
+}
+
 export interface KilnResourceDropSkinFitSnapshot {
   slug: KilnResourceDropSkinSlug;
   item: string;
   socketRole: 'ground-pickup';
   sourceBboxSize: readonly number[];
   runtimeSourceBboxSize: readonly number[];
+  orientedSourceBboxSize: readonly number[];
   normalizedBboxSize: readonly number[];
   normalizePolicy: 'center-xz-bottom-y';
+  orientation: KilnInstancedOrientationSnapshot;
   batchingPolicy: 'instanced-merged-by-material';
   animationPolicy: 'matrix-bob-only';
   sourceUrl: string;
@@ -191,8 +202,10 @@ export interface KilnDomainResourceSkinFitSnapshot {
   socketRole: 'domain-resource-node';
   sourceBboxSize: readonly number[];
   runtimeSourceBboxSize: readonly number[];
+  orientedSourceBboxSize: readonly number[];
   normalizedBboxSize: readonly number[];
   normalizePolicy: 'center-xz-bottom-y';
+  orientation: KilnInstancedOrientationSnapshot;
   batchingPolicy: 'instanced-merged-by-material';
   animationPolicy: 'matrix-pulse-only';
   sourceUrl: string;
@@ -222,8 +235,10 @@ export interface KilnTreeSkinFitSnapshot {
   socketRole: 'tree-scatter';
   sourceBboxSize: readonly number[];
   runtimeSourceBboxSize: readonly number[];
+  orientedSourceBboxSize: readonly number[];
   normalizedBboxSize: readonly number[];
   normalizePolicy: 'center-xz-bottom-y';
+  orientation: KilnInstancedOrientationSnapshot;
   batchingPolicy: 'instanced-merged-by-material';
   animationPolicy: 'matrix-sway-near-and-damage-only';
   sourceUrl: string;
@@ -421,22 +436,27 @@ const RUNTIME_DOMAIN_RESOURCE_SKINS: Record<KilnDomainResourceSkinSlug, {
 
 const RUNTIME_TREE_SKINS: Record<KilnTreeSkinSlug, {
   kind: TreeVisualKind;
+  orientationPolicy: KilnInstancedOrientationPolicy;
   acceptanceNote: string;
 }> = {
   'tree-pine': {
     kind: 'pine',
+    orientationPolicy: 'longest-axis-to-y',
     acceptanceNote: 'accepted as an instanced evergreen tree skin; chop state, hit proxy, and wood drops remain code-authored',
   },
   'tree-broadleaf': {
     kind: 'broadleaf',
+    orientationPolicy: 'longest-axis-to-y',
     acceptanceNote: 'accepted as an instanced broadleaf tree skin; chop state, hit proxy, and wood drops remain code-authored',
   },
   'tree-dead-snag': {
     kind: 'deadSnag',
+    orientationPolicy: 'longest-axis-to-y',
     acceptanceNote: 'accepted as an instanced dead-snag tree skin; chop state, hit proxy, and wood drops remain code-authored',
   },
   'tree-shrub': {
     kind: 'shrub',
+    orientationPolicy: 'preserve-y-up',
     acceptanceNote: 'accepted as an instanced shrub/young-tree skin; chop state, hit proxy, and wood drops remain code-authored',
   },
 };
@@ -640,19 +660,63 @@ function harmonizeMergeAttributes(geometries: THREE.BufferGeometry[]): THREE.Buf
   });
 }
 
-function makeInstancedAssetParts(template: THREE.Object3D, slug: string): {
+function axisCorrectionFor(sourceUpAxis: KilnSourceUpAxis): { matrix: THREE.Matrix4; euler: [number, number, number] } {
+  if (sourceUpAxis === 'x') {
+    return {
+      matrix: new THREE.Matrix4().makeRotationZ(Math.PI / 2),
+      euler: [0, 0, Number((Math.PI / 2).toFixed(6))],
+    };
+  }
+  if (sourceUpAxis === 'z') {
+    return {
+      matrix: new THREE.Matrix4().makeRotationX(-Math.PI / 2),
+      euler: [Number((-Math.PI / 2).toFixed(6)), 0, 0],
+    };
+  }
+  return {
+    matrix: new THREE.Matrix4().identity(),
+    euler: [0, 0, 0],
+  };
+}
+
+function dominantAxis(size: THREE.Vector3, policy: KilnInstancedOrientationPolicy): KilnSourceUpAxis {
+  if (policy !== 'longest-axis-to-y') return 'y';
+  const axes: { axis: KilnSourceUpAxis; value: number }[] = [
+    { axis: 'x', value: size.x },
+    { axis: 'y', value: size.y },
+    { axis: 'z', value: size.z },
+  ];
+  axes.sort((a, b) => b.value - a.value);
+  const largest = axes[0];
+  return largest.value > size.y * 1.12 ? largest.axis : 'y';
+}
+
+export function makeInstancedAssetParts(
+  template: THREE.Object3D,
+  slug: string,
+  orientationPolicy: KilnInstancedOrientationPolicy = 'preserve-y-up',
+): {
   parts: KilnInstancedAssetPart[];
   runtimeSourceBboxSize: number[];
+  orientedSourceBboxSize: number[];
   normalizedBboxSize: number[];
   sourceMeshCount: number;
+  orientation: KilnInstancedOrientationSnapshot;
 } {
   template.updateMatrixWorld(true);
   const sourceBox = new THREE.Box3().setFromObject(template);
-  const center = new THREE.Vector3();
-  sourceBox.getCenter(center);
-  const normalize = new THREE.Matrix4().makeTranslation(-center.x, -sourceBox.min.y, -center.z);
+  const sourceSize = new THREE.Vector3();
+  sourceBox.getSize(sourceSize);
+  const sourceUpAxis = dominantAxis(sourceSize, orientationPolicy);
+  const correction = axisCorrectionFor(sourceUpAxis);
+  const orientedSourceBox = new THREE.Box3();
   const byMaterial = new Map<THREE.Material, { geometries: THREE.BufferGeometry[]; sourceMeshNames: string[] }>();
   const looseParts: KilnInstancedAssetPart[] = [];
+  const correctedMeshes: {
+    geometry: THREE.BufferGeometry;
+    material: THREE.Material | THREE.Material[];
+    sourceName: string;
+  }[] = [];
   let sourceMeshCount = 0;
 
   template.traverse((child) => {
@@ -661,24 +725,40 @@ function makeInstancedAssetParts(template: THREE.Object3D, slug: string): {
     sourceMeshCount += 1;
     const geometry = source.geometry.clone();
     geometry.applyMatrix4(source.matrixWorld);
+    geometry.applyMatrix4(correction.matrix);
+    geometry.computeBoundingBox();
+    if (geometry.boundingBox) orientedSourceBox.union(geometry.boundingBox);
+    correctedMeshes.push({
+      geometry,
+      material: source.material,
+      sourceName: source.name || `mesh-${sourceMeshCount}`,
+    });
+  });
+
+  if (orientedSourceBox.isEmpty()) orientedSourceBox.copy(sourceBox);
+  const center = new THREE.Vector3();
+  orientedSourceBox.getCenter(center);
+  const normalize = new THREE.Matrix4().makeTranslation(-center.x, -orientedSourceBox.min.y, -center.z);
+
+  for (const corrected of correctedMeshes) {
+    const geometry = corrected.geometry;
     geometry.applyMatrix4(normalize);
     const instancedGeometry = sanitizeInstancedGeometry(geometry);
-    const sourceName = source.name || `mesh-${sourceMeshCount}`;
-    if (Array.isArray(source.material)) {
+    if (Array.isArray(corrected.material)) {
       looseParts.push({
-        name: `kiln-instanced-${slug}-${sourceMeshCount}`,
-        sourceMeshNames: [sourceName],
+        name: `kiln-instanced-${slug}-loose-${looseParts.length}`,
+        sourceMeshNames: [corrected.sourceName],
         sourceMeshCount: 1,
         geometry: instancedGeometry,
-        material: cloneMaterial(source.material),
+        material: cloneMaterial(corrected.material),
       });
-      return;
+      continue;
     }
-    const entry = byMaterial.get(source.material) ?? { geometries: [], sourceMeshNames: [] };
+    const entry = byMaterial.get(corrected.material) ?? { geometries: [], sourceMeshNames: [] };
     entry.geometries.push(instancedGeometry);
-    entry.sourceMeshNames.push(sourceName);
-    byMaterial.set(source.material, entry);
-  });
+    entry.sourceMeshNames.push(corrected.sourceName);
+    byMaterial.set(corrected.material, entry);
+  }
 
   const parts: KilnInstancedAssetPart[] = [];
   let materialIndex = 0;
@@ -725,8 +805,14 @@ function makeInstancedAssetParts(template: THREE.Object3D, slug: string): {
   return {
     parts,
     runtimeSourceBboxSize: bboxSizeOfBox(sourceBox),
+    orientedSourceBboxSize: bboxSizeOfBox(orientedSourceBox),
     normalizedBboxSize: bboxSizeOfBox(normalizedBox),
     sourceMeshCount,
+    orientation: {
+      policy: orientationPolicy,
+      sourceUpAxis,
+      axisCorrection: correction.euler,
+    },
   };
 }
 
@@ -958,7 +1044,8 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
         this.modelRequests.push(sourceUrl);
         const gltf = await this.loader.loadAsync(sourceUrl);
         const template = gltf.scene as unknown as THREE.Object3D;
-        const { parts, runtimeSourceBboxSize, normalizedBboxSize, sourceMeshCount } = makeInstancedAssetParts(template, slug);
+        const { parts, runtimeSourceBboxSize, orientedSourceBboxSize, normalizedBboxSize, sourceMeshCount, orientation } =
+          makeInstancedAssetParts(template, slug);
         if (parts.length === 0) {
           this.failed.push(`${slug}: no mesh parts available for instancing`);
           return null;
@@ -971,8 +1058,10 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
           socketRole: 'ground-pickup',
           sourceBboxSize: sourceBboxSize(asset),
           runtimeSourceBboxSize,
+          orientedSourceBboxSize,
           normalizedBboxSize,
           normalizePolicy: 'center-xz-bottom-y',
+          orientation,
           batchingPolicy: 'instanced-merged-by-material',
           animationPolicy: 'matrix-bob-only',
           sourceUrl,
@@ -1014,7 +1103,8 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
         this.modelRequests.push(sourceUrl);
         const gltf = await this.loader.loadAsync(sourceUrl);
         const template = gltf.scene as unknown as THREE.Object3D;
-        const { parts, runtimeSourceBboxSize, normalizedBboxSize, sourceMeshCount } = makeInstancedAssetParts(template, slug);
+        const { parts, runtimeSourceBboxSize, orientedSourceBboxSize, normalizedBboxSize, sourceMeshCount, orientation } =
+          makeInstancedAssetParts(template, slug);
         if (parts.length === 0) {
           this.failed.push(`${slug}: no mesh parts available for instancing`);
           return null;
@@ -1027,8 +1117,10 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
           socketRole: 'domain-resource-node',
           sourceBboxSize: sourceBboxSize(asset),
           runtimeSourceBboxSize,
+          orientedSourceBboxSize,
           normalizedBboxSize,
           normalizePolicy: 'center-xz-bottom-y',
+          orientation,
           batchingPolicy: 'instanced-merged-by-material',
           animationPolicy: 'matrix-pulse-only',
           sourceUrl,
@@ -1071,21 +1163,24 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
         this.modelRequests.push(sourceUrl);
         const gltf = await this.loader.loadAsync(sourceUrl);
         const template = gltf.scene as unknown as THREE.Object3D;
-        const { parts, runtimeSourceBboxSize, normalizedBboxSize, sourceMeshCount } = makeInstancedAssetParts(template, slug);
+        const tree = RUNTIME_TREE_SKINS[slug];
+        const { parts, runtimeSourceBboxSize, orientedSourceBboxSize, normalizedBboxSize, sourceMeshCount, orientation } =
+          makeInstancedAssetParts(template, slug, tree.orientationPolicy);
         if (parts.length === 0) {
           this.failed.push(`${slug}: no mesh parts available for instancing`);
           return null;
         }
         this.loadedTreeSkins.add(slug);
-        const tree = RUNTIME_TREE_SKINS[slug];
         const fit: KilnTreeSkinFitSnapshot = {
           slug,
           kind: tree.kind,
           socketRole: 'tree-scatter',
           sourceBboxSize: sourceBboxSize(asset),
           runtimeSourceBboxSize,
+          orientedSourceBboxSize,
           normalizedBboxSize,
           normalizePolicy: 'center-xz-bottom-y',
+          orientation,
           batchingPolicy: 'instanced-merged-by-material',
           animationPolicy: 'matrix-sway-near-and-damage-only',
           sourceUrl,

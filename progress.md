@@ -40,6 +40,13 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   and phone committed model requests, zero `generated/` runtime requests, 210 resident tree
   instances on 11 instanced draw calls, zero pending/fallback, screenshot pixels, no browser
   errors, and a felled tree spawning collectible wood drops.
+- Fixed the K5 tree orientation risk from screenshot review with a broad GLB import policy.
+  The shared instanced asset normalizer can now preserve authored Y-up or rotate a detected
+  dominant source axis into local Y before centering, bottom-pivoting, and batching. Stemmed
+  tree skins use the longest-axis-to-Y policy, shrubs preserve authored Y-up, and fit
+  diagnostics now report orientation policy, chosen source up axis, correction, and
+  oriented source bounds. Added `test/kilnAssetOrientation.test.ts` so sideways source
+  geometry is corrected at the loader level instead of patched per renderer.
 - Closed the first H5/K6 approved-pack native-creature skin slice. All nine promoted
   `creature-*` GLBs now load through `KilnRuntimeAssets`, require `idle` and `walk` clips,
   normalize to native-life body sockets, and attach to `NativeLifeRenderer` while the

@@ -49,8 +49,10 @@ function template(slug: KilnTreeSkinSlug): KilnTreeSkinTemplate {
       socketRole: 'tree-scatter',
       sourceBboxSize: [1, 2, 1],
       runtimeSourceBboxSize: [1, 2, 1],
+      orientedSourceBboxSize: [1, 2, 1],
       normalizedBboxSize: [1, 2, 1],
       normalizePolicy: 'center-xz-bottom-y',
+      orientation: { policy: slug === 'tree-shrub' ? 'preserve-y-up' : 'longest-axis-to-y', sourceUpAxis: 'y', axisCorrection: [0, 0, 0] },
       batchingPolicy: 'instanced-merged-by-material',
       animationPolicy: 'matrix-sway-near-and-damage-only',
       sourceUrl: `/assets/kiln/models/${slug}.glb`,
@@ -150,6 +152,7 @@ describe('tree asset renderer Kiln skin batching', () => {
     expect(stats.kilnTreeSkinsBySlug['tree-shrub']).toMatchObject({ instancedMeshes: 1 });
     expect(stats.kilnTreeSkinFits['tree-pine']).toMatchObject({
       sourceUrl: '/assets/kiln/models/tree-pine.glb',
+      orientation: { policy: 'longest-axis-to-y', sourceUpAxis: 'y' },
       batchingPolicy: 'instanced-merged-by-material',
       animationPolicy: 'matrix-sway-near-and-damage-only',
     });
