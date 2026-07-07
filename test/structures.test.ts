@@ -6,9 +6,11 @@ import {
   consumeWaterlineRouteResupply,
   dismantleStructure,
   homeScore,
+  houseKitSocketCatalog,
   interactStructure,
   normalizeStructureSaves,
   normalizeStructureYaw,
+  relocateStructure,
   rotateStructure,
   rootCellarProvisionCapacity,
   rootCellarProvisionCount,
@@ -16,6 +18,7 @@ import {
   spendRootCellarProvision,
   spendPlacedItem,
   STRUCTURE_YAW_STEP,
+  structureSocketSpec,
   structureYawTurn,
   structureStationInventory,
   transferChestMaterial,
@@ -99,6 +102,80 @@ describe('Hearth and Horizon structures', () => {
     const normalized = normalizeStructureSaves([{ id: 4, item: 'windowFrame', tile: 8, layer: 2, yaw: Math.PI * 3 }], 20, 8);
     expect(normalized[0].yaw).toBeCloseTo(Math.PI);
     expect(normalizeStructureYaw(Number.NaN)).toBe(0);
+  });
+
+  it('relocates only inactive props across the snap grid while preserving identity and state', () => {
+    const structures: StructureSave[] = [];
+    const door = addStructure(structures, { item: 'doorKit', tile: 6, layer: 2, yaw: STRUCTURE_YAW_STEP })!;
+    const chest = addStructure(structures, { item: 'chest', tile: 8, layer: 2, yaw: 0 })!;
+    chest.state = { storage: { wood: 2 } };
+
+    expect(relocateStructure(structures, door.id, { tile: 8, layer: 2 })).toMatchObject({
+      ok: false,
+      id: door.id,
+      item: 'doorKit',
+      fromTile: 6,
+      toTile: 8,
+      message: 'that hex already has a prop',
+      blockers: ['occupied snap target'],
+    });
+    expect(relocateStructure(structures, door.id, { tile: 6, layer: 2 })).toMatchObject({
+      ok: false,
+      id: door.id,
+      item: 'doorKit',
+      fromTile: 6,
+      toTile: 6,
+      message: 'door kit already on that snap hex',
+      blockers: ['same snap target'],
+    });
+
+    const moved = relocateStructure(structures, door.id, { tile: 10, layer: 3 });
+    expect(moved).toMatchObject({
+      ok: true,
+      id: door.id,
+      item: 'doorKit',
+      fromTile: 6,
+      fromLayer: 2,
+      toTile: 10,
+      toLayer: 3,
+      turn: 1,
+      message: 'moved door kit to snap hex',
+    });
+    expect(door).toMatchObject({ id: 1, item: 'doorKit', tile: 10, layer: 3 });
+    expect(door.yaw).toBeCloseTo(STRUCTURE_YAW_STEP);
+
+    expect(relocateStructure(structures, chest.id, { tile: 12, layer: 2 })).toMatchObject({
+      ok: false,
+      id: chest.id,
+      item: 'chest',
+      fromTile: 8,
+      blockers: ['empty chest first'],
+      message: 'chest cannot be moved · empty chest first',
+    });
+    expect(chest).toMatchObject({ tile: 8, layer: 2, state: { storage: { wood: 2 } } });
+  });
+
+  it('defines code-owned house-kit socket dimensions before modular GLB snapping', () => {
+    const catalog = houseKitSocketCatalog();
+    expect(catalog.map((entry) => entry.item)).toEqual(['doorKit', 'windowFrame', 'roofBundle']);
+    expect(structureSocketSpec('doorKit')).toMatchObject({
+      role: 'wall-opening',
+      modularKit: true,
+      gridWidth: 1,
+      collider: 'thin-wall',
+      loadBearing: 'code-socket',
+      glbPolicy: 'decorative-skin-after-normalization',
+    });
+    expect(structureSocketSpec('windowFrame')).toMatchObject({
+      role: 'wall-light',
+      openingHeight: 0.52,
+      pivot: 'wall-center',
+    });
+    expect(structureSocketSpec('roofBundle')).toMatchObject({
+      role: 'roof-cap',
+      collider: 'roof-shell',
+      gridDepth: 1.12,
+    });
   });
 
   it('saves dock segments and identifies them as fishing platforms', () => {

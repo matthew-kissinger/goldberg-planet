@@ -3,6 +3,7 @@ import {
   normalizePlacementTurn,
   packStructureCommand,
   placeStructureCommand,
+  relocateStructureCommand,
   rotatePlacedStructureCommand,
   rotateSelectedPlacementCommand,
   selectStructurePlacementCommand,
@@ -109,6 +110,18 @@ describe('Hearth and Horizon build commands', () => {
       command: 'rotatePlaced',
       action: 'rotate:none',
     });
+    expect(relocateStructureCommand({
+      structures,
+      target: null,
+      tile: 8,
+      layer: 2,
+      playerTile: 4,
+    })).toMatchObject({
+      ok: false,
+      command: 'relocate',
+      action: 'relocate:none',
+      message: 'no nearby prop to move',
+    });
     expect(rotatePlacedStructureCommand(structures, placed.placed!, -1)).toMatchObject({
       ok: true,
       command: 'rotatePlaced',
@@ -116,6 +129,92 @@ describe('Hearth and Horizon build commands', () => {
       turn: 1,
       action: 'doorKit:rotate:rotated door kit to hex face 2',
     });
+
+    addStructure(structures, { item: 'windowFrame', tile: 9, layer: 2, yaw: 0 });
+    expect(relocateStructureCommand({
+      structures,
+      target: placed.placed!,
+      tile: 4,
+      layer: 2,
+      playerTile: 4,
+    })).toMatchObject({
+      ok: false,
+      command: 'relocate',
+      item: 'doorKit',
+      id: placed.placed!.id,
+      fromTile: 6,
+      toTile: 4,
+      action: 'doorKit:relocate:blocked:player',
+      blockers: ['player on snap target'],
+    });
+    expect(relocateStructureCommand({
+      structures,
+      target: placed.placed!,
+      tile: 7,
+      layer: 2,
+      playerTile: 4,
+      blocker: 'needs solid ground',
+    })).toMatchObject({
+      ok: false,
+      command: 'relocate',
+      item: 'doorKit',
+      id: placed.placed!.id,
+      fromTile: 6,
+      toTile: 7,
+      action: 'doorKit:relocate:blocked:needs solid ground',
+      blockers: ['needs solid ground'],
+    });
+    expect(relocateStructureCommand({
+      structures,
+      target: placed.placed!,
+      tile: 9,
+      layer: 2,
+      playerTile: 4,
+    })).toMatchObject({
+      ok: false,
+      command: 'relocate',
+      item: 'doorKit',
+      id: placed.placed!.id,
+      fromTile: 6,
+      toTile: 9,
+      action: 'doorKit:relocate:that hex already has a prop',
+      blockers: ['occupied snap target'],
+    });
+    expect(relocateStructureCommand({
+      structures,
+      target: placed.placed!,
+      tile: 6,
+      layer: 2,
+      playerTile: 4,
+    })).toMatchObject({
+      ok: false,
+      command: 'relocate',
+      item: 'doorKit',
+      id: placed.placed!.id,
+      fromTile: 6,
+      toTile: 6,
+      action: 'doorKit:relocate:door kit already on that snap hex',
+      blockers: ['same snap target'],
+    });
+    expect(relocateStructureCommand({
+      structures,
+      target: placed.placed!,
+      tile: 8,
+      layer: 3,
+      playerTile: 4,
+    })).toMatchObject({
+      ok: true,
+      command: 'relocate',
+      item: 'doorKit',
+      id: placed.placed!.id,
+      fromTile: 6,
+      fromLayer: 2,
+      toTile: 8,
+      toLayer: 3,
+      turn: 1,
+      action: 'doorKit:relocate:moved door kit to snap hex',
+    });
+    expect(placed.placed).toMatchObject({ tile: 8, layer: 3 });
 
     const packed = packStructureCommand(structures, placed.placed!, crafted, false);
     expect(packed).toMatchObject({
@@ -134,7 +233,7 @@ describe('Hearth and Horizon build commands', () => {
       message: 'no nearby prop to pack',
     });
 
-    const fire = addStructure(structures, { item: 'campfire', tile: 9, layer: 2, yaw: 0 })!;
+    const fire = addStructure(structures, { item: 'campfire', tile: 10, layer: 2, yaw: 0 })!;
     const useFire = useStructureInteractionCommand({
       structures,
       target: fire,

@@ -225,6 +225,46 @@ export interface StructureRotationResult {
   turn?: number;
 }
 
+export interface StructureRelocationInput {
+  tile: number;
+  layer: number;
+  yaw?: number;
+}
+
+export interface StructureRelocationResult {
+  ok: boolean;
+  message: string;
+  item?: PlaceableItemId;
+  id?: number;
+  fromTile?: number;
+  fromLayer?: number;
+  toTile?: number;
+  toLayer?: number;
+  yaw?: number;
+  turn?: number;
+  blockers?: string[];
+}
+
+export type StructureSocketRole = 'floor' | 'wall-opening' | 'wall-light' | 'roof-cap' | 'shore-edge' | 'route-marker';
+
+export interface StructureSocketSpec {
+  item: PlaceableItemId;
+  name: string;
+  role: StructureSocketRole;
+  modularKit: boolean;
+  gridWidth: number;
+  gridDepth: number;
+  height: number;
+  openingWidth?: number;
+  openingHeight?: number;
+  pivot: 'center' | 'wall-center' | 'shore-center';
+  collider: 'hex-cell' | 'thin-wall' | 'roof-shell' | 'edge-strip';
+  snap: string[];
+  visualScale: string;
+  loadBearing: 'code-socket';
+  glbPolicy: 'decorative-skin-after-normalization' | 'procedural-only';
+}
+
 export interface RootCellarSpendResult {
   ok: boolean;
   cellarId?: number;
@@ -261,12 +301,114 @@ const FISH_TRAP_SLOW_MINUTES = 300;
 const SHORE_NET_FAST_MINUTES = 90;
 const SHORE_NET_SLOW_MINUTES = 150;
 
+const DEFAULT_SOCKET_SPEC = {
+  role: 'floor' as const,
+  modularKit: false,
+  gridWidth: 0.8,
+  gridDepth: 0.8,
+  height: 0.8,
+  pivot: 'center' as const,
+  collider: 'hex-cell' as const,
+  snap: ['center of one hex'],
+  visualScale: 'fit inside one hex socket',
+  loadBearing: 'code-socket' as const,
+  glbPolicy: 'procedural-only' as const,
+};
+
+const STRUCTURE_SOCKET_SPEC_OVERRIDES: Partial<Record<PlaceableItemId, Partial<Omit<StructureSocketSpec, 'item' | 'name'>>>> = {
+  doorKit: {
+    role: 'wall-opening',
+    modularKit: true,
+    gridWidth: 1,
+    gridDepth: 0.22,
+    height: 1.9,
+    openingWidth: 0.72,
+    openingHeight: 1.55,
+    pivot: 'wall-center',
+    collider: 'thin-wall',
+    snap: ['front edge on hex face', 'hinge side follows yaw turn', 'opening remains inside one hex edge'],
+    visualScale: 'normalize decorative GLB to one hex edge and keep opening centered',
+    glbPolicy: 'decorative-skin-after-normalization',
+  },
+  windowFrame: {
+    role: 'wall-light',
+    modularKit: true,
+    gridWidth: 0.92,
+    gridDepth: 0.18,
+    height: 1.45,
+    openingWidth: 0.58,
+    openingHeight: 0.52,
+    pivot: 'wall-center',
+    collider: 'thin-wall',
+    snap: ['front edge on hex face', 'sill floats above floor socket', 'opening remains centered'],
+    visualScale: 'normalize decorative GLB to one hex edge with sill above waist height',
+    glbPolicy: 'decorative-skin-after-normalization',
+  },
+  roofBundle: {
+    role: 'roof-cap',
+    modularKit: true,
+    gridWidth: 1.12,
+    gridDepth: 1.12,
+    height: 0.62,
+    pivot: 'center',
+    collider: 'roof-shell',
+    snap: ['centered over one occupied shelter hex', 'eaves may overhang but collider stays in socket'],
+    visualScale: 'normalize decorative GLB to cap one hex without changing shelter footprint',
+    glbPolicy: 'decorative-skin-after-normalization',
+  },
+  dockSegment: {
+    role: 'shore-edge',
+    gridWidth: 1.05,
+    gridDepth: 0.55,
+    height: 0.28,
+    pivot: 'shore-center',
+    collider: 'edge-strip',
+    snap: ['edge must touch shore or waterline'],
+    visualScale: 'fit along one waterline edge',
+  },
+  caveAnchor: {
+    role: 'route-marker',
+    gridWidth: 0.55,
+    gridDepth: 0.55,
+    height: 1.15,
+    snap: ['centered near a real cave mouth'],
+    visualScale: 'fit as marker, not a fake cave entrance',
+  },
+  waystone: {
+    role: 'route-marker',
+    gridWidth: 0.62,
+    gridDepth: 0.62,
+    height: 1.25,
+    snap: ['centered on route marker hex'],
+    visualScale: 'procedural glyph remains readable over decorative skin',
+    glbPolicy: 'decorative-skin-after-normalization',
+  },
+};
+
 export function isPlaceableItemId(id: unknown): id is PlaceableItemId {
   return typeof id === 'string' && (PLACEABLE_ITEM_IDS as readonly string[]).includes(id);
 }
 
 export function placeableName(item: PlaceableItemId): string {
   return ITEM_DEFS[item].name;
+}
+
+export function structureSocketSpec(item: PlaceableItemId): StructureSocketSpec {
+  const override = STRUCTURE_SOCKET_SPEC_OVERRIDES[item] ?? {};
+  return {
+    item,
+    name: placeableName(item),
+    ...DEFAULT_SOCKET_SPEC,
+    ...override,
+  };
+}
+
+export function structureSocketCatalog(items: readonly PlaceableItemId[] = PLACEABLE_ITEM_IDS): StructureSocketSpec[] {
+  return items.map((item) => structureSocketSpec(item));
+}
+
+export function houseKitSocketCatalog(): StructureSocketSpec[] {
+  return structureSocketCatalog(['doorKit', 'windowFrame', 'roofBundle']);
 }
 
 export function normalizeStructureYaw(yaw: number): number {
@@ -527,6 +669,85 @@ export function rotateStructure(structures: StructureSave[], id: number, turns =
     yaw: structure.yaw,
     turn,
     message: `rotated ${placeableName(structure.item).toLowerCase()} to hex face ${turn + 1}`,
+  };
+}
+
+export function relocateStructure(
+  structures: StructureSave[],
+  id: number,
+  input: StructureRelocationInput,
+): StructureRelocationResult {
+  const targetId = Math.trunc(id);
+  const structure = structures.find((entry) => entry.id === targetId);
+  if (!structure) return { ok: false, message: 'no structure' };
+  const toTile = Math.trunc(input.tile);
+  const toLayer = Math.trunc(input.layer);
+  if (toTile < 0 || toLayer < 0) {
+    return {
+      ok: false,
+      id: structure.id,
+      item: structure.item,
+      message: `${placeableName(structure.item).toLowerCase()} cannot be moved there`,
+      blockers: ['invalid snap target'],
+    };
+  }
+  const blockers = structureDismantleBlockers(structure);
+  if (blockers.length > 0) {
+    return {
+      ok: false,
+      id: structure.id,
+      item: structure.item,
+      fromTile: structure.tile,
+      fromLayer: structure.layer,
+      blockers,
+      message: `${placeableName(structure.item).toLowerCase()} cannot be moved · ${blockers[0]}`,
+    };
+  }
+  if (structure.tile === toTile) {
+    return {
+      ok: false,
+      id: structure.id,
+      item: structure.item,
+      fromTile: structure.tile,
+      fromLayer: structure.layer,
+      toTile,
+      toLayer,
+      message: `${placeableName(structure.item).toLowerCase()} already on that snap hex`,
+      blockers: ['same snap target'],
+    };
+  }
+  const occupied = structures.find((entry) => entry.id !== structure.id && entry.tile === toTile);
+  if (occupied) {
+    return {
+      ok: false,
+      id: structure.id,
+      item: structure.item,
+      fromTile: structure.tile,
+      fromLayer: structure.layer,
+      toTile,
+      toLayer,
+      message: 'that hex already has a prop',
+      blockers: ['occupied snap target'],
+    };
+  }
+  const fromTile = structure.tile;
+  const fromLayer = structure.layer;
+  const nextYaw = Number.isFinite(input.yaw) ? normalizeStructureYaw(input.yaw!) : structure.yaw;
+  structure.tile = toTile;
+  structure.layer = toLayer;
+  structure.yaw = nextYaw;
+  const turn = structureYawTurn(structure.yaw);
+  return {
+    ok: true,
+    id: structure.id,
+    item: structure.item,
+    fromTile,
+    fromLayer,
+    toTile,
+    toLayer,
+    yaw: structure.yaw,
+    turn,
+    message: `moved ${placeableName(structure.item).toLowerCase()} to snap hex`,
   };
 }
 

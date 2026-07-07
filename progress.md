@@ -3,6 +3,25 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-07
 
+- Closed the first C2/C3 building relocation and snap-grid contract slice under the
+  DAG/subagent workflow. Inactive placed props can now relocate across the same terrain
+  snap rules as placement while preserving id, item, state, yaw turn, and save shape;
+  occupied/player/invalid terrain targets return structured blockers; and active/stocked
+  props reuse the existing pack-safety blockers so lit fires, home bedrolls, stocked
+  chests, planted plots, attuned waystones, and set waterline gear cannot be exploited by
+  moving them.
+- Added code-owned house-kit socket specs for door kits, window frames, and roof bundles.
+  The specs expose grid footprint, snap role, opening dimensions, collider ownership,
+  visual-scale policy, and the rule that future modular GLBs are decorative skins after
+  normalization, not load-bearing snap/collider truth. `__world.structures()` and
+  `render_game_to_text` now expose those specs for proof and asset-review lanes.
+- Added `npm run proof:c2-c3-building-snap-grid`. The proof builds a real functional
+  shelter, relocates a roof out of the shelter ring so shelter quality drops, rejects
+  occupied and player-tile relocation, snaps the roof back so shelter returns, checks
+  `fromTile`/`toTile` command diagnostics and house-kit sockets, captures screenshots, and
+  records the deliberate input limitation: relocation is debug-hook proven across
+  desktop/laptop/tablet/phone/gamepad-sized profiles, while touch relocation UI and real
+  hardware gamepad support remain unclaimed.
 - Closed the first B1 build-command boundary slice under the DAG/subagent workflow. The new
   `src/sim/buildCommands.ts` facade owns structured command results for selecting build
   props, rotating selected placement, rotating placed props, placing, using, and packing

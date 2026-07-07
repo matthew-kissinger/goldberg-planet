@@ -90,6 +90,7 @@ import { caveMouthSignals, nearestCaveMouthSignal, type CaveMouthTile } from './
 import {
   packStructureCommand,
   placeStructureCommand,
+  relocateStructureCommand,
   rotatePlacedStructureCommand,
   rotateSelectedPlacementCommand,
   selectStructurePlacementCommand,
@@ -102,6 +103,7 @@ import {
   caveAnchorKindLabel,
   chestStorageView,
   consumeWaterlineRouteResupply,
+  houseKitSocketCatalog,
   homeScore,
   isPlaceableItemId,
   nearestStructureOnTiles,
@@ -659,7 +661,7 @@ async function boot(): Promise<void> {
   let placementYawTurns = 0;
   let lastStructureAction = '';
   type BuildCommandSource = 'keyboard' | 'pointer' | 'touch' | 'gamepad' | 'debug';
-  type BuildCommandVerb = 'select' | 'rotate' | 'place' | 'use' | 'pack';
+  type BuildCommandVerb = 'select' | 'rotate' | 'place' | 'relocate' | 'use' | 'pack';
   type BuildCommandTarget = 'placement' | 'structure' | 'none';
   interface RuntimeBuildCommandRecord {
     index: number;
@@ -672,6 +674,10 @@ async function boot(): Promise<void> {
     item?: PlaceableItemId;
     id?: number;
     tile?: number;
+    fromTile?: number;
+    fromLayer?: number;
+    toTile?: number;
+    toLayer?: number;
     turn?: number;
     mode?: string;
     blockers?: string[];
@@ -1740,6 +1746,24 @@ async function boot(): Promise<void> {
     );
   };
 
+  const structureSnapTarget = (item: PlaceableItemId, tile: number, layer?: number): { layer: number; blocker: string | null } => {
+    let k = layer ?? columns.groundLayerBelow(tile, layers.bounds[0]);
+    let blocker: string | null = null;
+    if (item === 'dockSegment') {
+      if (!waterNearTile(tile, 1)) {
+        blocker = 'dock needs a shore or water edge';
+      } else {
+        const groundK = columns.groundLayerBelow(tile, layers.bounds[0]);
+        const groundTop = layers.topRadius(groundK);
+        const waterK = layers.layerOfRadius(WATER_SURFACE);
+        k = groundTop < WATER_SURFACE + 0.2 ? waterK : groundK;
+      }
+    } else if (!columns.solidAt(tile, k)) {
+      blocker = 'needs solid ground';
+    }
+    return { layer: k, blocker };
+  };
+
   const placementYawOffset = (): number => placementYawTurns * STRUCTURE_YAW_STEP;
   const placementDiagnostics = () => ({
     selected: selectedStructureItem,
@@ -1768,7 +1792,11 @@ async function boot(): Promise<void> {
       message: result.message,
       item: result.item,
       id: result.id,
-      tile: result.placed?.tile ?? targetStructure?.tile,
+      tile: result.toTile ?? result.placed?.tile ?? targetStructure?.tile,
+      fromTile: result.fromTile,
+      fromLayer: result.fromLayer,
+      toTile: result.toTile,
+      toLayer: result.toLayer,
       turn: result.turn,
       mode: result.mode,
       blockers: result.blockers,
@@ -1818,33 +1846,20 @@ async function boot(): Promise<void> {
   };
 
   const placeStructureAt = (item: PlaceableItemId, tile: number, layer?: number, yaw?: number, source: BuildCommandSource = 'debug'): boolean => {
-    let k = layer ?? columns.groundLayerBelow(tile, layers.bounds[0]);
-    let blocker: string | null = null;
+    const snap = structureSnapTarget(item, tile, layer);
     const inventoryBefore = itemCount(counts, craftedItems, item);
-    if (item === 'dockSegment') {
-      if (!waterNearTile(tile, 1)) {
-        blocker = 'dock needs a shore or water edge';
-      } else {
-        const groundK = columns.groundLayerBelow(tile, layers.bounds[0]);
-        const groundTop = layers.topRadius(groundK);
-        const waterK = layers.layerOfRadius(WATER_SURFACE);
-        k = groundTop < WATER_SURFACE + 0.2 ? waterK : groundK;
-      }
-    } else if (!columns.solidAt(tile, k)) {
-      blocker = 'needs solid ground';
-    }
     const result = placeStructureCommand({
       structures,
       item,
       tile,
-      layer: k,
+      layer: snap.layer,
       yaw: yaw ?? yawForTile(tile) + placementYawOffset(),
       placementTurn: placementYawTurns,
       materialCounts: counts,
       craftedItems,
       creative: creativeActive,
       playerTile: player.tile,
-      blocker,
+      blocker: snap.blocker,
     });
     recordBuildCommand(source, 'place', 'placement', result, result.placed, inventoryBefore, itemCount(counts, craftedItems, item));
     if (!result.ok || !result.placed) {
@@ -1868,6 +1883,35 @@ async function boot(): Promise<void> {
   const tryPlaceStructure = (source: BuildCommandSource = 'pointer'): boolean => {
     if (!selectedStructureItem || !lastPick) return false;
     return placeStructureAt(selectedStructureItem, lastPick.hitTile, lastPick.hitLayer, undefined, source);
+  };
+
+  const relocateStructureAt = (id: number, tile: number, layer?: number, yaw?: number, source: BuildCommandSource = 'debug'): boolean => {
+    const target = structures.find((s) => s.id === Math.trunc(id)) ?? null;
+    const snap = target ? structureSnapTarget(target.item, tile, layer) : { layer: layer ?? 0, blocker: null };
+    const result = relocateStructureCommand({
+      structures,
+      target,
+      tile,
+      layer: snap.layer,
+      yaw,
+      playerTile: player.tile,
+      blocker: snap.blocker,
+    });
+    lastStructureAction = result.action;
+    recordBuildCommand(source, 'relocate', target ? 'structure' : 'none', result, target);
+    if (!result.ok || !result.item) {
+      playAudio('uiDeny');
+      hud.flash(result.message, 2.8);
+      return false;
+    }
+    if (target && openChestId === target.id) closeStorage();
+    structureRenderer.setStructures(structures);
+    triggerCharacterAction('build', result.item, 0.52);
+    playAudio(audioEventForPlacement(true));
+    markSaveDirty();
+    refreshUseButton();
+    hud.flash(`${result.message} · ${placeableName(result.item)} stays ${result.turn !== undefined ? `face ${result.turn + 1}` : 'aligned'}`, 2.8);
+    return true;
   };
 
   const selectStructureForPlacement = (id: string, source: BuildCommandSource = 'debug'): void => {
@@ -4848,7 +4892,7 @@ async function boot(): Promise<void> {
     }),
     craft: (recipeId: string) => craftSelected(recipeId),
     crafting: () => ({ open: craftingOpen, crafted: { ...craftedItems }, recipes: craftingRows(), ledger: packLedger() }),
-    structures: () => ({ items: structures.map((s) => ({ ...s, state: s.state ? { ...s.state } : undefined, turn: structureYawTurn(s.yaw) })), placement: placementDiagnostics(), commands: buildCommandDiagnostics(), crops: cropDiagnostics(), compostBins: compostBinDiagnostics(), rainCisterns: rainCisternDiagnostics(), rootCellars: rootCellarDiagnostics(), caveAnchors: caveAnchorDiagnostics(), waystones: waystoneDiagnostics(), weatherVanes: weatherVaneDiagnostics(), fishTraps: fishTrapDiagnostics(), shoreNets: shoreNetDiagnostics(), storage: { open: openChestId !== null, chestId: openChestId, state: currentChestStorage() }, home: homeScore(structures, geo), renderer: structureRenderer.stats(), lastAction: lastStructureAction }),
+    structures: () => ({ items: structures.map((s) => ({ ...s, state: s.state ? { ...s.state } : undefined, turn: structureYawTurn(s.yaw) })), placement: placementDiagnostics(), commands: buildCommandDiagnostics(), sockets: { houseKit: houseKitSocketCatalog() }, crops: cropDiagnostics(), compostBins: compostBinDiagnostics(), rainCisterns: rainCisternDiagnostics(), rootCellars: rootCellarDiagnostics(), caveAnchors: caveAnchorDiagnostics(), waystones: waystoneDiagnostics(), weatherVanes: weatherVaneDiagnostics(), fishTraps: fishTrapDiagnostics(), shoreNets: shoreNetDiagnostics(), storage: { open: openChestId !== null, chestId: openChestId, state: currentChestStorage() }, home: homeScore(structures, geo), renderer: structureRenderer.stats(), lastAction: lastStructureAction }),
     buildCommands: () => buildCommandDiagnostics(),
     selectStructure: (item: string) => selectStructureForPlacement(item),
     placeStructure: (item: string, tile?: number) => {
@@ -4856,6 +4900,7 @@ async function boot(): Promise<void> {
       const target = tile ?? geo.neighbor(player.tile, 0);
       return placeStructureAt(item, target);
     },
+    relocateStructure: (id: number, tile: number, layer?: number, yaw?: number) => relocateStructureAt(id, tile, layer, yaw),
     useStructure: (id?: number) => useStructure(id),
     dismantleStructure: (id?: number) => tryDismantleStructure(id),
     rotatePlacement: (turns = 1) => rotateBuildFacing(turns),
@@ -5207,6 +5252,7 @@ async function boot(): Promise<void> {
       selected: selectedStructureItem,
       placement: placementDiagnostics(),
       commands: buildCommandDiagnostics(),
+      sockets: { houseKit: houseKitSocketCatalog() },
       yawTurns: structures.map((s) => ({ id: s.id, item: s.item, tile: s.tile, turn: structureYawTurn(s.yaw), yaw: s.yaw })),
       crops: cropDiagnostics(),
       compostBins: compostBinDiagnostics(),

@@ -5,6 +5,7 @@ import {
   interactStructure,
   isPlaceableItemId,
   placeableName,
+  relocateStructure,
   rotateStructure,
   spendPlacedItem,
   STRUCTURE_YAW_STEP,
@@ -14,6 +15,7 @@ import {
   type FishTrapContext,
   type PlaceableItemId,
   type RainCisternContext,
+  type StructureRelocationResult,
   type StructureInteractionResult,
   type StructureSave,
   type StructureTopology,
@@ -21,7 +23,7 @@ import {
   type WeatherVaneContext,
 } from './structures';
 
-export type StructureCommandKind = 'selectPlacement' | 'rotatePlacement' | 'rotatePlaced' | 'place' | 'pack' | 'use';
+export type StructureCommandKind = 'selectPlacement' | 'rotatePlacement' | 'rotatePlaced' | 'place' | 'relocate' | 'pack' | 'use';
 
 export interface StructureCommandResult {
   ok: boolean;
@@ -33,8 +35,13 @@ export interface StructureCommandResult {
   selected?: PlaceableItemId | null;
   turn?: number;
   yaw?: number;
+  fromTile?: number;
+  fromLayer?: number;
+  toTile?: number;
+  toLayer?: number;
   placed?: StructureSave;
   interaction?: StructureInteractionResult;
+  relocation?: StructureRelocationResult;
   mode?: StructureInteractionResult['mode'];
   foodAction?: string;
   navigationAction?: string;
@@ -69,6 +76,16 @@ export interface StructureUseCommandInput {
   rainCisternContext?: RainCisternContext;
   caveAnchorContext?: CaveAnchorContext;
   fishTrapContext?: FishTrapContext;
+}
+
+export interface StructureRelocateCommandInput {
+  structures: StructureSave[];
+  target: StructureSave | null;
+  tile: number;
+  layer: number;
+  yaw?: number;
+  playerTile: number;
+  blocker?: string | null;
 }
 
 export function normalizePlacementTurn(turns: number): number {
@@ -232,6 +249,65 @@ export function placeStructureCommand(input: StructurePlaceCommandInput): Struct
     yaw: placed.yaw,
     message: `${placeableName(item)} placed`,
     action: `${item}:placed:hex face ${turn + 1}:placement face ${placementTurn + 1}`,
+  };
+}
+
+export function relocateStructureCommand(input: StructureRelocateCommandInput): StructureCommandResult {
+  const { target, tile, layer, yaw } = input;
+  if (!target) {
+    return {
+      ok: false,
+      command: 'relocate',
+      message: 'no nearby prop to move',
+      action: 'relocate:none',
+    };
+  }
+  if (Math.trunc(tile) === Math.trunc(input.playerTile)) {
+    return {
+      ok: false,
+      command: 'relocate',
+      item: target.item,
+      id: target.id,
+      fromTile: target.tile,
+      fromLayer: target.layer,
+      toTile: Math.trunc(tile),
+      toLayer: Math.trunc(layer),
+      message: 'step aside before moving here',
+      action: `${target.item}:relocate:blocked:player`,
+      blockers: ['player on snap target'],
+    };
+  }
+  if (input.blocker) {
+    return {
+      ok: false,
+      command: 'relocate',
+      item: target.item,
+      id: target.id,
+      fromTile: target.tile,
+      fromLayer: target.layer,
+      toTile: Math.trunc(tile),
+      toLayer: Math.trunc(layer),
+      message: input.blocker,
+      action: `${target.item}:relocate:blocked:${input.blocker}`,
+      blockers: [input.blocker],
+    };
+  }
+  const result = relocateStructure(input.structures, target.id, { tile, layer, yaw });
+  return {
+    ok: result.ok,
+    command: 'relocate',
+    item: result.item ?? target.item,
+    id: result.id ?? target.id,
+    fromTile: result.fromTile ?? target.tile,
+    fromLayer: result.fromLayer ?? target.layer,
+    toTile: result.toTile,
+    toLayer: result.toLayer,
+    turn: result.turn,
+    yaw: result.yaw,
+    message: result.message,
+    action: `${target.item}:relocate:${result.message}`,
+    blockers: result.blockers,
+    relocation: result,
   };
 }
 

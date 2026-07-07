@@ -118,7 +118,10 @@ Deferred until scale, snap, budget, readability, or animation proof exists:
   `compost-bin`, `root-cellar`. These were generated independently and do not share wall
   heights, opening sizes, wall thickness, or grid units. The game must impose the
   dimensional contract. Cheapest safe path: keep the procedural socket/collider/snap volume
-  as load-bearing and use a GLB only as decoration inside that socket.
+  as load-bearing and use a GLB only as decoration inside that socket. The first code-owned
+  door/window/roof socket contract now lives in `src/sim/structures.ts` and is proved by
+  `npm run proof:c2-c3-building-snap-grid`; raw modular GLBs remain deferred until each
+  asset is normalized to that socket and screenshot-proved.
 - Functional props with warnings or watery placement needs: `workbench`, `rain-cistern`,
   `fish-trap`, `shore-net`, `lantern-post`.
 - Shrines, craters, and trees: defer for blind screenshot readability, world-placement
