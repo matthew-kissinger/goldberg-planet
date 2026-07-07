@@ -2702,6 +2702,9 @@ async function boot(): Promise<void> {
     const shelter = homeScore(structures, geo).shelter;
     const forecast = weatherVaneForecast();
     const chain = currentSeasonChain();
+    const school = currentFishSchool();
+    const traps = fishTrapDiagnostics();
+    const nets = shoreNetDiagnostics();
     return planExpedition({
       signal,
       items: craftedItems,
@@ -2712,6 +2715,12 @@ async function boot(): Promise<void> {
         weatherVane: forecast.ready || currentPentagonSiteThresholdEffect()?.routePrep === 'weather',
         forecastLabel: forecast.label || (currentPentagonSiteThresholdEffect()?.routePrep === 'weather' ? currentPentagonSiteThresholdEffect()?.label : undefined),
         cellarProvisions: rootCellarProvisionCount(structures, geo),
+      },
+      ecology: {
+        fishLabel: school.label,
+        fishStrength: school.strength,
+        fishTrapReady: traps.filter((trap) => trap.ready).length,
+        shoreNetReady: nets.filter((net) => net.ready).length,
       },
       planeCrafted,
       insights: pentagonInsights(),
@@ -3342,15 +3351,20 @@ async function boot(): Promise<void> {
     });
     const candidates = clampRouteFocus(currentSelectableRouteGuides(signal));
     if (!routeFocusActive || candidates.length === 0) return slate;
-    const readyById = new Map(slate.pins.map((pin) => [pin.id, pin.ready]));
-    const pins: RouteSlateView['pins'] = candidates.slice(0, 5).map((guide, index) => ({
-      id: guide.kind,
-      label: guide.label,
-      detail: guide.detail,
-      ready: readyById.get(guide.kind) ?? true,
-      selected: routeFocusActive && index === routeFocusIndex,
-      selectable: true,
-    }));
+    const pinForGuide = (guide: RouteGuide) =>
+      slate.pins.find((pin) => pin.id === guide.kind && pin.label === guide.label)
+      ?? slate.pins.find((pin) => pin.id === guide.kind);
+    const pins: RouteSlateView['pins'] = candidates.slice(0, 5).map((guide, index) => {
+      const sourcePin = pinForGuide(guide);
+      return {
+        id: guide.kind,
+        label: guide.label,
+        detail: sourcePin?.detail ?? guide.detail,
+        ready: sourcePin?.ready ?? true,
+        selected: routeFocusActive && index === routeFocusIndex,
+        selectable: true,
+      };
+    });
     return { ...slate, pins };
   };
 

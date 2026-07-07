@@ -3,6 +3,21 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-07
 
+- Closed the first E4 ecology-to-route balance slice under the DAG/subagent workflow. Ready
+  fish traps and shore nets now contribute capped staged waterline resupply to far or
+  planetary expedition food prep, with active fish runs adding a small confidence bonus.
+  Unready traps/nets still leave packed food missing, so this is not free global food.
+- Fixed a Route Slate readability bug found by the new proof: selectable route-candidate
+  rows now preserve the richer target pin detail, so the visible target row can still show
+  `expedition ready` and the waterline food detail instead of collapsing to only distance
+  and turn.
+- Added `scripts/proof-e4-ecology-route.mjs` and package script
+  `proof:e4-ecology-route`. The browser proof seeds a real Horizon Chart route, compares
+  unready and ready trap/net states, opens Route Slate through keyboard on desktop and the
+  route touch button on phone, asserts visible waterline detail, captures
+  `output/playwright/e4-ecology-route/desktop.png` and `phone-touch.png`, samples pixels,
+  and records no page/console errors in
+  `output/playwright/e4-ecology-route/proof.json`.
 - Closed the first D2 threshold-spaces slice under the DAG/subagent workflow. The First
   Hearth threshold now carves a wider walk-under underpass, Deep Bell now opens a deeper
   resonant chamber, and high-clearance land arches become routeable cave signals instead of

@@ -389,12 +389,20 @@ export interface ExpeditionHomeState {
   cellarProvisions?: number;
 }
 
+export interface ExpeditionEcologyState {
+  fishLabel?: string;
+  fishStrength?: number;
+  fishTrapReady?: number;
+  shoreNetReady?: number;
+}
+
 export interface ExpeditionPlanInput {
   signal: HorizonChartSignal | null;
   items: InventoryItems;
   survival: SurvivalState;
   weather?: WeatherReport;
   home?: ExpeditionHomeState;
+  ecology?: ExpeditionEcologyState;
   planeCrafted?: boolean;
   insights?: ExpeditionInsightState | null;
   seasonChain?: NonNullable<RouteSlateSeasonSignal['chain']> | null;
@@ -844,10 +852,13 @@ export function routeSlate(input: RouteSlateInput): RouteSlate {
     });
   }
   if (input.chart) {
+    const foodDetail = input.plan.checks.find((check) => check.id === 'food')?.detail ?? '';
+    const showFoodDetail = foodDetail.length > 0
+      && (input.plan.missing.includes('packed food') || /waterline|cellar|insight|season chord/.test(foodDetail));
     pins.push({
       id: 'target',
       label: input.chart.target.name,
-      detail: `${input.chart.distanceLabel} ${input.chart.turn} · ${input.plan.prepLabel}`,
+      detail: `${input.chart.distanceLabel} ${input.chart.turn} · ${input.plan.prepLabel}${showFoodDetail ? ` · ${foodDetail}` : ''}`,
       priority: input.plan.ready ? 120 : 100,
       ready: input.plan.ready,
     });
@@ -1314,6 +1325,24 @@ function foodUnits(items: InventoryItems): number {
     + count(items, 'rawFish') * 0.35;
 }
 
+function ecologyRouteResupply(input: ExpeditionEcologyState | undefined, range: ExpeditionPlan['range']): { units: number; detail: string } {
+  if (!input || range === 'near') return { units: 0, detail: '' };
+  const trapReady = Math.max(0, Math.trunc(input.fishTrapReady ?? 0));
+  const netReady = Math.max(0, Math.trunc(input.shoreNetReady ?? 0));
+  if (trapReady + netReady <= 0) return { units: 0, detail: '' };
+  const trapUnits = Math.min(trapReady, 2) * 0.7;
+  const netUnits = Math.min(netReady, 2) * 0.5;
+  const fishStrength = Math.max(0, Math.min(1, input.fishStrength ?? 0));
+  const runBonus = fishStrength >= 0.5 ? 0.2 : 0;
+  const cap = range === 'planetary' ? 1.4 : 1;
+  const units = Math.min(cap, trapUnits + netUnits + runBonus);
+  const parts: string[] = [];
+  if (trapReady > 0) parts.push(`${trapReady} trap${trapReady === 1 ? '' : 's'}`);
+  if (netReady > 0) parts.push(`${netReady} net${netReady === 1 ? '' : 's'}`);
+  if (runBonus > 0) parts.push(input.fishLabel ?? 'fish run');
+  return { units, detail: parts.join(' + ') };
+}
+
 export function planExpedition(input: ExpeditionPlanInput): ExpeditionPlan {
   const signal = input.signal;
   const seasonChain = input.seasonChain?.linked === true ? input.seasonChain : null;
@@ -1343,8 +1372,9 @@ export function planExpedition(input: ExpeditionPlanInput): ExpeditionPlan {
   const seasonFoodDiscount = seasonChain?.fullChord === true && range !== 'near' && foodDiscount === 0 ? 1 : 0;
   const requiredFood = Math.max(1, baseRequiredFood - foodDiscount - seasonFoodDiscount);
   const cellarProvisions = Math.max(0, Math.trunc(input.home?.cellarProvisions ?? 0));
+  const ecologyResupply = ecologyRouteResupply(input.ecology, range);
   const focusMinutes = Math.max(0, Math.trunc(input.survival.trailFocus ?? 0));
-  const units = foodUnits(input.items) + cellarProvisions * 2.4;
+  const units = foodUnits(input.items) + cellarProvisions * 2.4 + ecologyResupply.units;
   const survivalReady = input.survival.stamina >= (range === 'near' ? 40 : 64) && input.survival.exposure <= (range === 'near' ? 65 : 38);
   const homeReady = input.home?.functional === true || (range === 'near' && input.home?.protected === true) || (hearthInsight && input.home?.protected === true);
   const pickReady = hasToolForTarget(input.items, 'rock');
@@ -1378,7 +1408,7 @@ export function planExpedition(input: ExpeditionPlanInput): ExpeditionPlan {
       id: 'food',
       label: 'packed food',
       ready: units >= requiredFood,
-      detail: `${units.toFixed(units % 1 === 0 ? 0 : 1)}/${requiredFood} meal units${cellarProvisions > 0 ? ` · cellar ${cellarProvisions}` : ''}${foodDiscount > 0 ? ' · insight -1' : ''}${seasonFoodDiscount > 0 ? ' · full season chord -1' : ''}`,
+      detail: `${units.toFixed(units % 1 === 0 ? 0 : 1)}/${requiredFood} meal units${cellarProvisions > 0 ? ` · cellar ${cellarProvisions}` : ''}${ecologyResupply.units > 0 ? ` · waterline ${ecologyResupply.units.toFixed(ecologyResupply.units % 1 === 0 ? 0 : 1)} (${ecologyResupply.detail})` : ''}${foodDiscount > 0 ? ' · insight -1' : ''}${seasonFoodDiscount > 0 ? ' · full season chord -1' : ''}`,
     },
     {
       id: 'rest',

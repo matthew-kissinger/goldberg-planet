@@ -14,6 +14,7 @@
     "proof:panel-ownership": "node scripts/proof-panel-ownership.mjs",
     "proof:hearth-contract": "node scripts/proof-hearth-contract.mjs",
     "proof:d2-caves": "node scripts/proof-d2-threshold-spaces.mjs",
+    "proof:e4-ecology-route": "node scripts/proof-e4-ecology-route.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

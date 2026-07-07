@@ -280,6 +280,52 @@ describe('Hearth and Horizon horizon chart navigation', () => {
     expect(plan.checks.find((check) => check.id === 'food')?.detail).toBe('4.8/3 meal units · cellar 2');
   });
 
+  it('counts ready waterline ecology as capped route resupply', () => {
+    const signal = nextHorizonChartSignal(landmarks, new Set([1]), centers, frame, 0, [1, 0, 0], 100)!;
+    const longRoute = { ...signal, distanceM: 1800, distanceLabel: '1.8 km' };
+    const plan = planExpedition({
+      signal: longRoute,
+      items: { campMeal: 1, stonePick: 1, stoneAxe: 1, echoLantern: 1 },
+      survival: { stamina: 92, exposure: 4, mealsEaten: 0 },
+      weather: { kind: 'clear', label: 'clear', intensity: 0, exposureRate: -0.2, staminaRegen: 1 },
+      home: { label: 'shelter alive', protected: true, functional: true },
+      ecology: {
+        fishLabel: 'storm fish run',
+        fishStrength: 0.72,
+        fishTrapReady: 1,
+        shoreNetReady: 1,
+      },
+      planeCrafted: true,
+    });
+
+    expect(plan.ready).toBe(true);
+    expect(plan.missing).not.toContain('packed food');
+    expect(plan.checks.find((check) => check.id === 'food')?.detail).toBe('3.4/3 meal units · waterline 1.4 (1 trap + 1 net + storm fish run)');
+  });
+
+  it('does not count fish runs as route resupply until traps or nets are ready', () => {
+    const signal = nextHorizonChartSignal(landmarks, new Set([1]), centers, frame, 0, [1, 0, 0], 100)!;
+    const longRoute = { ...signal, distanceM: 1800, distanceLabel: '1.8 km' };
+    const plan = planExpedition({
+      signal: longRoute,
+      items: { campMeal: 1, stonePick: 1, stoneAxe: 1, echoLantern: 1 },
+      survival: { stamina: 92, exposure: 4, mealsEaten: 0 },
+      weather: { kind: 'clear', label: 'clear', intensity: 0, exposureRate: -0.2, staminaRegen: 1 },
+      home: { label: 'shelter alive', protected: true, functional: true },
+      ecology: {
+        fishLabel: 'storm fish run',
+        fishStrength: 0.72,
+        fishTrapReady: 0,
+        shoreNetReady: 0,
+      },
+      planeCrafted: true,
+    });
+
+    expect(plan.ready).toBe(false);
+    expect(plan.missing).toContain('packed food');
+    expect(plan.checks.find((check) => check.id === 'food')?.detail).toBe('2/3 meal units');
+  });
+
   it('lets a read weather vane time storms for expedition prep', () => {
     const signal = nextHorizonChartSignal(landmarks, new Set([1]), centers, frame, 0, [1, 0, 0], 100)!;
     const longRoute = { ...signal, distanceM: 1800, distanceLabel: '1.8 km' };
