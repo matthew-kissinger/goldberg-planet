@@ -243,14 +243,14 @@ describe('Hearth and Horizon pentagon landmarks', () => {
       role: 'underpass',
       label: 'hearth arch mouth',
       carveDepthCells: 4,
-      tileSpan: 3,
+      tileSpan: 5,
     });
     expect(pentagonSiteThresholdEffect(bell)).toBeNull();
     expect(pentagonSiteThresholdTerrainSpec(bell)).toBeNull();
     expect(pentagonSiteThresholdTerrainSpec(pentagonSiteThreshold(sites[10], new Set([10])))).toMatchObject({
       role: 'chamber',
-      carveDepthCells: 5,
-      tileSpan: 2,
+      carveDepthCells: 6,
+      tileSpan: 4,
     });
   });
 

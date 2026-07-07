@@ -970,12 +970,13 @@ export function routeSlate(input: RouteSlateInput): RouteSlate {
     const mouth = input.cave.mouth ? 'mouth · ' : '';
     const clearance = input.cave.clearance !== undefined ? ` · clearance ${input.cave.clearance} cells` : '';
     const spring = input.cave.spring ? ' · spring seep' : '';
+    const archReady = input.cave.kind === 'arch' && (input.cave.clearance ?? 0) >= 4;
     pins.push({
       id: 'cave',
       label: input.cave.label ?? caveLabel(input.cave.kind),
       detail: `${mouth}${rings} · depth ${input.cave.depth.toFixed(1)} m${clearance}${input.cave.flooded ? ' · flooded' : ''}${spring}`,
       priority: input.cave.distance === 0 ? 88 : input.cave.distance === 1 ? 72 : 58,
-      ready: input.cave.kind !== 'arch',
+      ready: input.cave.kind !== 'arch' || archReady,
     });
   }
   if (input.caveResonance) {

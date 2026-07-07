@@ -21,6 +21,7 @@ function loadPlaywright() {
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.join(root, 'output', 'playwright', 'hearth-contract');
 const requestedPort = Number(process.env.PROOF_PORT || 0);
+const profileFilter = (process.env.PROOF_PROFILE || '').trim().toLowerCase();
 
 async function getFreePort() {
   if (requestedPort > 0) return requestedPort;
@@ -230,7 +231,7 @@ async function seedHearthContract(page, activateGamepad = false) {
     empty.time = { day: 8, minute: 23 * 60 };
     if (!world.save.import(JSON.stringify(empty))) throw new Error('failed to reset proof save');
     world.spawnAtPentagon(hearthIndex >= 0 ? hearthIndex : 0);
-    if (useGamepad) world.injectGamepad({ use: true }, 2);
+    if (useGamepad) world.injectGamepad({ active: true }, 1);
 
     const playerTile = world.player.tile;
     const used = new Set([playerTile]);
@@ -300,6 +301,9 @@ async function seedHearthContract(page, activateGamepad = false) {
     const completion = world.completeSiteWork(hearthSite.tile);
     if (!completion?.ok) throw new Error(`failed to complete hearth site: ${completion?.message ?? 'no result'}`);
     const complete = snapshot('complete');
+    const thresholdReadResult = world.inspectThresholdChamber();
+    if (!thresholdReadResult?.ok) throw new Error(`failed to read threshold chamber: ${JSON.stringify(thresholdReadResult)}`);
+    const thresholdRead = snapshot('thresholdRead');
 
     placed.rootCellar = place('rootCellar', support);
     if (!world.useStructure(placed.rootCellar.id)) throw new Error('failed to cache root cellar provision');
@@ -312,12 +316,12 @@ async function seedHearthContract(page, activateGamepad = false) {
     if (!world.useStructure(bedroll.id)) throw new Error('failed to rest at functional home');
     await new Promise((resolve) => setTimeout(resolve, 600));
     const rested = snapshot('rested');
-    return { site: hearthSite, placed, completion, transitions: { incomplete, ready, complete, provisioned, rested } };
+    return { site: hearthSite, placed, completion, thresholdReadResult, transitions: { incomplete, ready, complete, thresholdRead, provisioned, rested } };
   }, activateGamepad);
 }
 
 function assertHearthContract(result, name) {
-  const { incomplete, ready, complete, provisioned, rested } = result.transitions;
+  const { incomplete, ready, complete, thresholdRead, provisioned, rested } = result.transitions;
   const missing = incomplete.siteWork?.missing?.map((req) => req.label) ?? [];
   if (!missing.includes('claimed bedroll') || !missing.includes('lit campfire') || !missing.includes('material chest')) {
     throw new Error(`${name}: incomplete site did not report concrete missing requirements ${JSON.stringify(missing)}`);
@@ -346,11 +350,39 @@ function assertHearthContract(result, name) {
   if (!completePin || !String(completePin.detail ?? '').includes('opened: hearth arch')) {
     throw new Error(`${name}: Route Slate did not expose opened hearth arch`);
   }
+  const completeChamberPin = complete.navigation?.slate?.pins?.find((pin) => pin.id === 'thresholdChamber');
+  if (!completeChamberPin || !String(completeChamberPin.detail ?? '').includes('+1 trail ration')) {
+    throw new Error(`${name}: Route Slate did not expose unread threshold chamber ${JSON.stringify(complete.navigation?.slate?.pins ?? [])}`);
+  }
+  const completeNext = complete.journal?.state?.next?.map((entry) => entry.label) ?? [];
+  if (!completeNext.includes('Read the threshold')) {
+    throw new Error(`${name}: Hearth Journal did not ask to read opened threshold ${JSON.stringify(completeNext)}`);
+  }
+  if ((result.thresholdReadResult?.after?.observed ?? 0) <= (result.thresholdReadResult?.before?.observed ?? 0)) {
+    throw new Error(`${name}: threshold chamber read did not save an observation ${JSON.stringify(result.thresholdReadResult)}`);
+  }
+  if ((thresholdRead.landmarks?.thresholdChambers?.observed ?? 0) < 1) {
+    throw new Error(`${name}: threshold chamber diagnostics did not record read`);
+  }
+  const rationBefore = complete.text?.inventory?.crafted?.trailRation ?? 0;
+  const rationAfter = thresholdRead.text?.inventory?.crafted?.trailRation ?? 0;
+  if (rationAfter <= rationBefore) {
+    throw new Error(`${name}: threshold chamber reward not granted ${rationBefore} -> ${rationAfter}`);
+  }
+  const thresholdReadNext = thresholdRead.journal?.state?.next?.map((entry) => entry.label) ?? [];
+  if (thresholdReadNext.includes('Read the threshold')) {
+    throw new Error(`${name}: journal still asks to read threshold after observation ${JSON.stringify(thresholdReadNext)}`);
+  }
+  if (thresholdRead.navigation?.slate?.pins?.some((pin) => pin.id === 'thresholdChamber')) {
+    throw new Error(`${name}: Route Slate still pins observed threshold chamber`);
+  }
   const beforeHome = provisioned.stats.home;
   const afterHome = rested.stats.home;
   const afterText = rested.text;
   const shelter = afterHome.shelter;
-  if (!beforeHome.functional || !afterHome.functional) throw new Error(`${name}: functional home not recognized`);
+  if (!beforeHome.functional || !afterHome.functional) {
+    throw new Error(`${name}: functional home not recognized ${JSON.stringify({ beforeHome, afterHome, placed: result.placed, terrain: result.completion?.terrain })}`);
+  }
   if (afterHome.label !== 'shelter alive') throw new Error(`${name}: expected shelter alive, got ${afterHome.label}`);
   if (!shelter?.protected || !shelter?.functional) throw new Error(`${name}: shelter protection/function missing ${JSON.stringify(shelter)}`);
   if (shelter.roofPieces < 2 || !shelter.hasDoor || !shelter.hasWarmth || !shelter.hasStation || !shelter.hasStorage) {
@@ -418,6 +450,14 @@ async function runViewport(browser, targetUrl, name, viewport, options = {}) {
         thresholdTerrain: seeded.transitions.complete.thresholdTerrain,
         journalNext: seeded.transitions.complete.journal?.state?.next ?? [],
         slatePrimary: seeded.transitions.complete.navigation?.slate?.primary ?? null,
+        thresholdChamberPin: seeded.transitions.complete.navigation?.slate?.pins?.find((pin) => pin.id === 'thresholdChamber') ?? null,
+      },
+      thresholdRead: {
+        result: seeded.thresholdReadResult,
+        observed: seeded.transitions.thresholdRead.landmarks?.thresholdChambers?.observed ?? 0,
+        crafted: seeded.transitions.thresholdRead.text?.inventory?.crafted ?? {},
+        journalNext: seeded.transitions.thresholdRead.journal?.state?.next ?? [],
+        slatePrimary: seeded.transitions.thresholdRead.navigation?.slate?.primary ?? null,
       },
       rested: {
         home: seeded.transitions.rested.stats.home,
@@ -442,12 +482,18 @@ try {
   const { chromium } = loadPlaywright();
   const browser = await chromium.launch({ headless: process.env.HEADED !== '1' });
   const results = [];
+  const profiles = [
+    { name: 'desktop', url: targetUrl, viewport: { width: 1440, height: 900 }, options: {} },
+    { name: 'laptop', url: targetUrl, viewport: { width: 1366, height: 720 }, options: {} },
+    { name: 'tablet-touch', url: touchUrl, viewport: { width: 820, height: 1180 }, options: { touch: true } },
+    { name: 'phone-touch', url: touchUrl, viewport: { width: 390, height: 844 }, options: { touch: true } },
+    { name: 'gamepad', url: targetUrl, viewport: { width: 1440, height: 900 }, options: { gamepad: true } },
+  ].filter((profile) => !profileFilter || profile.name === profileFilter);
+  if (profiles.length === 0) throw new Error(`No hearth-contract profile matched PROOF_PROFILE=${profileFilter}`);
   try {
-    results.push(await runViewport(browser, targetUrl, 'desktop', { width: 1440, height: 900 }));
-    results.push(await runViewport(browser, targetUrl, 'laptop', { width: 1366, height: 720 }));
-    results.push(await runViewport(browser, touchUrl, 'tablet-touch', { width: 820, height: 1180 }, { touch: true }));
-    results.push(await runViewport(browser, touchUrl, 'phone-touch', { width: 390, height: 844 }, { touch: true }));
-    results.push(await runViewport(browser, targetUrl, 'gamepad', { width: 1440, height: 900 }, { gamepad: true }));
+    for (const profile of profiles) {
+      results.push(await runViewport(browser, profile.url, profile.name, profile.viewport, profile.options));
+    }
   } finally {
     await browser.close();
   }
@@ -469,6 +515,7 @@ try {
       name: result.name,
       screenshot: result.screenshot,
       terrainCells: result.completion?.terrain?.changedCells ?? 0,
+      thresholdObserved: result.transitions.thresholdRead.observed,
       journalReady: result.transitions.ready.journalNext.map((entry) => entry.label),
       home: result.transitions.rested.home.label,
       trailFocus: result.transitions.rested.survival?.state?.trailFocus ?? result.transitions.rested.survival?.trailFocus ?? 0,

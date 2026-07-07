@@ -1381,7 +1381,7 @@ export function pentagonSiteThresholdTerrainSpec(threshold: PentagonSiteThreshol
         label: `${threshold.label} mouth`,
         detail: `carves a shallow walk-under mouth through the opened ${threshold.landform}`,
         carveDepthCells: 4,
-        tileSpan: 3,
+        tileSpan: 5,
       };
     case 'underpass':
       return {
@@ -1420,8 +1420,8 @@ export function pentagonSiteThresholdTerrainSpec(threshold: PentagonSiteThreshol
         role: 'chamber',
         label: `${threshold.label} throat`,
         detail: `hollows the first resonant throat of the opened ${threshold.landform}`,
-        carveDepthCells: 5,
-        tileSpan: 2,
+        carveDepthCells: 6,
+        tileSpan: 4,
       };
     case 'springMouth':
       return {

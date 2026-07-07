@@ -13,6 +13,7 @@
     "proof:route-markers": "node scripts/proof-route-marker-readability.mjs",
     "proof:panel-ownership": "node scripts/proof-panel-ownership.mjs",
     "proof:hearth-contract": "node scripts/proof-hearth-contract.mjs",
+    "proof:d2-caves": "node scripts/proof-d2-threshold-spaces.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

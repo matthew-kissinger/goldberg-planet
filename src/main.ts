@@ -1819,6 +1819,15 @@ async function boot(): Promise<void> {
     const startEdge = degree > 0 ? (site.landmark.index * 2 + 2) % degree : 0;
     const neighbors: number[] = [];
     for (let i = 0; i < degree; i++) neighbors.push(geo.neighbor(site.tile, (startEdge + i) % degree));
+    const outer: number[] = [];
+    for (const tile of neighbors) {
+      const outerDegree = geo.degreeOf(tile);
+      for (let i = 0; i < outerDegree; i++) {
+        const next = geo.neighbor(tile, i);
+        if (next === site.tile || neighbors.includes(next) || outer.includes(next)) continue;
+        outer.push(next);
+      }
+    }
     const tiles: number[] = [];
     const add = (tile: number, allowOccupied = false): void => {
       if (tile < 0 || tiles.includes(tile)) return;
@@ -1826,8 +1835,10 @@ async function boot(): Promise<void> {
       tiles.push(tile);
     };
     for (const tile of neighbors) add(tile);
+    for (const tile of outer) add(tile);
     add(site.tile);
     for (const tile of neighbors) add(tile, true);
+    for (const tile of outer) add(tile, true);
     add(site.tile, true);
     return tiles.slice(0, wanted);
   };
@@ -1868,7 +1879,11 @@ async function boot(): Promise<void> {
     return {
       ok: true,
       changedCells,
+      changedTiles: [...changedTiles],
       tiles,
+      role: spec.role,
+      tileSpan: spec.tileSpan,
+      carveDepthCells: spec.carveDepthCells,
       label: spec.label,
       detail: spec.detail,
       message: lastThresholdTerrainAction,
@@ -4411,7 +4426,20 @@ async function boot(): Promise<void> {
     domainResources: () => domainResourceDiagnostics(),
     gatherDomainResource: () => tryDomainResource(),
     thresholdChambers: () => thresholdChamberDiagnostics(),
-    inspectThresholdChamber: () => tryThresholdChamber(),
+    inspectThresholdChamber: () => {
+      const before = thresholdChamberDiagnostics();
+      const used = tryThresholdChamber();
+      return {
+        ok: used,
+        before,
+        after: thresholdChamberDiagnostics(),
+        navigation: currentRouteThresholdChamberSignal(),
+        slate: currentRouteSlate(),
+        journal: currentHearthJournal(),
+        crafted: { ...craftedItems },
+        lastAction: lastThresholdChamberAction,
+      };
+    },
     skyfall: () => skyfallDiagnostics(),
     gatherSkyfall: () => trySkyfall(),
     murmurs: () => murmurDiagnostics(),

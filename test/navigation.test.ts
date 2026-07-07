@@ -579,6 +579,39 @@ describe('Hearth and Horizon horizon chart navigation', () => {
     });
   });
 
+  it('treats high-clearance land arches as routeable cave signals', () => {
+    const cramped = routeSlate({
+      chart: null,
+      beacon: null,
+      plan: planExpedition({
+        signal: null,
+        items: {},
+        survival: { stamina: 80, exposure: 8, mealsEaten: 0 },
+      }),
+      cave: { kind: 'arch', label: 'low land arch', distance: 1, depth: 3.2, flooded: false, clearance: 3 },
+    });
+    expect(cramped.pins.find((pin) => pin.id === 'cave')).toMatchObject({
+      label: 'low land arch',
+      ready: false,
+    });
+
+    const wide = routeSlate({
+      chart: null,
+      beacon: null,
+      plan: planExpedition({
+        signal: null,
+        items: {},
+        survival: { stamina: 80, exposure: 8, mealsEaten: 0 },
+      }),
+      cave: { kind: 'arch', label: 'wide land arch', distance: 1, depth: 4.8, flooded: false, clearance: 5 },
+    });
+    expect(wide.pins.find((pin) => pin.id === 'cave')).toMatchObject({
+      label: 'wide land arch',
+      detail: '1 ring · depth 4.8 m · clearance 5 cells',
+      ready: true,
+    });
+  });
+
   it('pins a route guide into a saved planned path that can own slate and ribbon priority', () => {
     const guide = {
       kind: 'skyfall' as const,

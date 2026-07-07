@@ -3,6 +3,21 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-07
 
+- Closed the first D2 threshold-spaces slice under the DAG/subagent workflow. The First
+  Hearth threshold now carves a wider walk-under underpass, Deep Bell now opens a deeper
+  resonant chamber, and high-clearance land arches become routeable cave signals instead of
+  staying decorative.
+- Added `scripts/proof-d2-threshold-spaces.mjs` and package script `proof:d2-caves`. The
+  browser proof seeds the real First Hearth and Deep Bell sites, opens 20 hearth terrain
+  cells across 5 underpass tiles, opens 24 bell terrain cells across 4 chamber tiles,
+  verifies Route Slate and Hearth Journal threshold-read state, grants the Deep Bell glow
+  crystal reward, captures separate desktop/phone screenshots for both sites, samples
+  pixels, and records no page/console errors in
+  `output/playwright/d2-threshold-spaces/proof.json`.
+- Updated the D2 cycle ledger with the terrain/cave explorer recommendation: keep the
+  global cave generator stable, make named pentagon threshold spaces bigger and proofable
+  first, expose structured terrain/read results, then broaden the same authored-space
+  standard to the remaining pentagons before rewriting cave generation.
 - Closed the B3/C5 Hearth Contract slice recommended by the frontier-review lane. The new
   `npm run proof:hearth-contract` browser gate seeds the real First Hearth site, proves
   concrete missing requirements, builds the functional home, completes site work, opens the
@@ -13,7 +28,7 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   skyfall, or murmurs. Added a crowded-world regression in `test/journal.test.ts`.
 - Tightened the `__world.completeSiteWork()` proof hook so it returns the structured
   threshold terrain carve result alongside the site-work completion. The hearth-contract
-  proof now verifies the first hearth arch opens 12 terrain cells across 3 underpass tiles
+  proof now verifies the first hearth arch opens 20 terrain cells across 5 underpass tiles
   instead of trusting a status string.
 - Added `scripts/proof-hearth-contract.mjs` and package script
   `proof:hearth-contract` as the authoritative B3/C5 browser proof. The proof checks Route
