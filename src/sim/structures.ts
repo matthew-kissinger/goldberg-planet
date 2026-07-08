@@ -6,21 +6,8 @@ export const PLACEABLE_ITEM_IDS = [
   'campfire',
   'chest',
   'bedroll',
-  'cropPlot',
-  'compostBin',
   'rainCistern',
   'rootCellar',
-  'caveAnchor',
-  'floorFoundation',
-  'wallPanel',
-  'wallHalfRail',
-  'wallDoorPanel',
-  'wallWindowPanel',
-  'wallCorner',
-  'roofJoin',
-  'doorKit',
-  'windowFrame',
-  'roofBundle',
   'dockSegment',
   'fishTrap',
   'shoreNet',
@@ -48,11 +35,6 @@ export interface StructureState {
   lit?: boolean;
   home?: boolean;
   rested?: number;
-  crop?: CropKind;
-  growth?: number;
-  fertility?: number;
-  harvests?: number;
-  composts?: number;
   water?: number;
   fills?: number;
   provisions?: number;
@@ -64,15 +46,6 @@ export interface StructureState {
   forecastIntensity?: number;
   waystone?: WaystoneMark;
   markerUses?: number;
-  anchorUses?: number;
-  anchorKind?: CaveAnchorKind;
-  anchorLabel?: string;
-  anchorDepth?: number;
-  anchorDistance?: number;
-  anchorFlooded?: boolean;
-  anchorSpring?: boolean;
-  anchorClearance?: number;
-  anchorTile?: number;
   trapSetDay?: number;
   trapSetMinute?: number;
   trapBaited?: boolean;
@@ -83,8 +56,6 @@ export interface StructureState {
 }
 
 export type WaystoneMark = 'survey' | 'home' | 'cave' | 'shore' | 'forage';
-export type CaveAnchorKind = 'arch' | 'dryCave' | 'seaCave';
-export type CropKind = 'berries' | 'reeds';
 
 export interface WaystoneContext {
   home?: boolean;
@@ -99,68 +70,13 @@ export interface WeatherVaneContext {
   intensity: number;
 }
 
-export interface SpringWaterContext {
-  spring: boolean;
-  label: string;
-  distance?: number;
-}
-
-export interface RainCisternContext extends WeatherVaneContext {
-  spring?: SpringWaterContext | null;
-}
-
-export interface CaveAnchorContext {
-  tile?: number;
-  kind: CaveAnchorKind;
-  label?: string;
-  depth: number;
-  flooded: boolean;
-  spring?: boolean;
-  clearance?: number;
-  distance?: number;
-  mouth?: boolean;
-}
+export type RainCisternContext = WeatherVaneContext;
 
 export interface FishTrapContext {
   day: number;
   minute: number;
   nearWater: boolean;
   school: FishSchoolReport;
-}
-
-export type WaterlineRouteResupplyKind = 'fishTrap' | 'shoreNet';
-
-export interface WaterlineRouteResupplySource {
-  id: number;
-  kind: WaterlineRouteResupplyKind;
-}
-
-export interface WaterlineRouteResupplyConsumption {
-  consumed: number;
-  traps: number;
-  nets: number;
-  sourceIds: number[];
-}
-
-export interface CropPlotEnvironment {
-  watered: boolean;
-  naturalWater?: boolean;
-  cisternWater?: number;
-  sheltered: boolean;
-  protected: boolean;
-  lit: boolean;
-  warm: boolean;
-  cold: boolean;
-  storm: boolean;
-  highAltitude: boolean;
-  label: string;
-}
-
-export interface CropConditionReport {
-  canGrow: boolean;
-  bonusYield: boolean;
-  problems: string[];
-  label: string;
 }
 
 export interface PlaceStructureInput {
@@ -170,7 +86,7 @@ export interface PlaceStructureInput {
   yaw: number;
 }
 
-export type StructureSocketPlacementKind = 'center' | 'edge' | 'floor';
+export type StructureSocketPlacementKind = 'center' | 'edge';
 
 export interface StructureSocketPlacement {
   kind: StructureSocketPlacementKind;
@@ -198,25 +114,11 @@ export interface StructureTopology {
   neighbor(tile: number, edge: number): number;
 }
 
-export interface StructureTraversalBlock {
-  fromTile: number;
-  toTile: number;
-  structureId: number;
-  item: PlaceableItemId;
-  tile: number;
-  edge: number;
-  slot: string;
-  message: string;
-}
+export type ShelterComfortTier = 'none' | 'rough' | 'ready';
 
 export interface ShelterReport {
   centerTile: number | null;
   tiles: number[];
-  enclosure: ShelterEnclosureReport;
-  roofPieces: number;
-  roofNeed: number;
-  hasDoor: boolean;
-  hasWindow: boolean;
   hasWarmth: boolean;
   hasStation: boolean;
   hasStorage: boolean;
@@ -226,58 +128,15 @@ export interface ShelterReport {
   protected: boolean;
   functional: boolean;
   comfort: number;
-  missing: string[];
-  label: string;
-}
-
-export type ShelterComfortTier = 'none' | 'rough' | 'weather-safe' | 'working' | 'lived-in';
-
-export interface ShelterEnclosureReport {
-  footprintMode: 'local-radius' | 'connected-foundation';
-  roomTiles: number[];
-  roomTileCount: number;
-  pentagonRoomTiles: number[];
-  boundaryTiles: number[];
-  boundaryEdges: string[];
-  coveredBoundaryEdges: string[];
-  interiorSeamEdges: string[];
-  wallBoundaryEdges: string[];
-  railBoundaryEdges: string[];
-  openingBoundaryEdges: string[];
-  doorBoundaryEdges: string[];
-  windowBoundaryEdges: string[];
-  supportTiles: number[];
-  foundationTiles: number[];
-  wallTiles: number[];
-  railTiles: number[];
-  cornerTiles: number[];
-  roofTiles: number[];
-  roofJoinTiles: number[];
-  openingTiles: number[];
-  utilityTiles: number[];
-  roofCoverage: number;
-  boundaryCoverage: number;
-  boundaryCoverageMode: 'tile' | 'edge';
-  boundaryCoverageNeed: number;
-  boundaryEdgeCount: number;
-  perimeterCoverage: number;
-  utilityCoverage: number;
-  doorOnBoundary: boolean;
-  warmthInside: boolean;
-  lightInside: boolean;
-  workbenchInside: boolean;
-  storageInside: boolean;
-  cellarInSupport: boolean;
-  enclosed: boolean;
-  serviceReady: boolean;
   comfortTier: ShelterComfortTier;
+  missing: string[];
   label: string;
 }
 
 export interface StructureInteractionResult {
   ok: boolean;
   message: string;
-  mode?: 'lit' | 'unlit' | 'home' | 'deposit' | 'withdraw' | 'plant' | 'plantReeds' | 'tend' | 'harvest' | 'fertilize' | 'irrigate' | 'compost' | 'collectWater' | 'cache' | 'withdrawProvision' | 'cook' | 'preserve' | 'setTrap' | 'checkTrap' | 'collectTrap' | 'setNet' | 'checkNet' | 'collectNet' | 'mark' | 'anchor' | 'forecast' | 'inspect';
+  mode?: 'lit' | 'unlit' | 'home' | 'deposit' | 'withdraw' | 'cook' | 'collectWater' | 'cache' | 'withdrawProvision' | 'preserve' | 'setTrap' | 'checkTrap' | 'collectTrap' | 'setNet' | 'checkNet' | 'collectNet' | 'mark' | 'forecast' | 'inspect';
   moved?: InventoryItems;
 }
 
@@ -320,28 +179,17 @@ export interface StructureRelocationResult {
 }
 
 export type StructureSocketRole =
-  | 'floor'
-  | 'foundation'
-  | 'wall-panel'
-  | 'half-rail'
-  | 'wall-opening'
-  | 'wall-light'
-  | 'wall-corner'
-  | 'roof-cap'
-  | 'roof-join'
-  | 'shore-edge'
-  | 'route-marker'
   | 'crafting-station'
   | 'warmth-station'
   | 'storage-station'
   | 'home-rest'
-  | 'food-plot'
-  | 'food-preserve'
-  | 'compost-station'
   | 'water-cistern'
   | 'provision-cache'
+  | 'shore-edge'
+  | 'food-preserve'
   | 'weather-readback'
-  | 'light-post';
+  | 'light-post'
+  | 'route-marker';
 
 export interface StructureSocketSpec {
   item: PlaceableItemId;
@@ -351,10 +199,8 @@ export interface StructureSocketSpec {
   gridWidth: number;
   gridDepth: number;
   height: number;
-  openingWidth?: number;
-  openingHeight?: number;
-  pivot: 'center' | 'wall-center' | 'shore-center';
-  collider: 'hex-cell' | 'thin-wall' | 'roof-shell' | 'edge-strip';
+  pivot: 'center' | 'shore-center';
+  collider: 'hex-cell' | 'edge-strip';
   snap: string[];
   visualScale: string;
   loadBearing: 'code-socket';
@@ -388,8 +234,7 @@ export interface ChestStorageView {
   rows: ChestStorageRow[];
 }
 
-const HOME_ITEMS: PlaceableItemId[] = ['workbench', 'campfire', 'chest', 'bedroll', 'doorKit', 'roofBundle', 'rootCellar'];
-const ROOF_NEED = 2;
+const HOME_ITEMS: PlaceableItemId[] = ['workbench', 'campfire', 'chest', 'bedroll', 'rootCellar'];
 const CISTERN_CAPACITY = 4;
 const ROOT_CELLAR_CAPACITY = 6;
 const FISH_TRAP_FAST_MINUTES = 180;
@@ -398,7 +243,7 @@ const SHORE_NET_FAST_MINUTES = 90;
 const SHORE_NET_SLOW_MINUTES = 150;
 
 const DEFAULT_SOCKET_SPEC = {
-  role: 'floor' as const,
+  role: 'home-rest' as const,
   modularKit: false,
   gridWidth: 0.8,
   gridDepth: 0.8,
@@ -448,30 +293,12 @@ const STRUCTURE_SOCKET_SPEC_OVERRIDES: Partial<Record<PlaceableItemId, Partial<O
     visualScale: 'normalize approved GLB to one rest/home socket',
     glbPolicy: 'decorative-skin-after-normalization',
   },
-  cropPlot: {
-    role: 'food-plot',
-    gridWidth: 1.32,
-    gridDepth: 0.9,
-    height: 0.3,
-    snap: ['center of one hex', 'crop growth and fertility stay code-owned', 'decorative GLB keeps plant overlays visible'],
-    visualScale: 'normalize approved GLB to one planted food-bed socket',
-    glbPolicy: 'decorative-skin-after-normalization',
-  },
-  compostBin: {
-    role: 'compost-station',
-    gridWidth: 1.08,
-    gridDepth: 1.08,
-    height: 0.92,
-    snap: ['center of one hex', 'compost recipe and fertility state stay code-owned', 'decorative GLB keeps heap, scraps, and steam overlays visible'],
-    visualScale: 'normalize approved GLB to one compost utility socket',
-    glbPolicy: 'decorative-skin-after-normalization',
-  },
   rainCistern: {
     role: 'water-cistern',
     gridWidth: 0.95,
     gridDepth: 0.76,
     height: 1.05,
-    snap: ['center of one hex', 'weather collection and crop irrigation stay code-owned', 'decorative GLB keeps water-fill readback visible'],
+    snap: ['center of one hex', 'weather collection stays code-owned', 'decorative GLB keeps water-fill readback visible'],
     visualScale: 'normalize approved GLB to one water-storage socket',
     glbPolicy: 'decorative-skin-after-normalization',
   },
@@ -480,156 +307,8 @@ const STRUCTURE_SOCKET_SPEC_OVERRIDES: Partial<Record<PlaceableItemId, Partial<O
     gridWidth: 1.28,
     gridDepth: 1.12,
     height: 0.76,
-    snap: ['center of one hex', 'provision storage and route-food accounting stay code-owned', 'decorative GLB keeps hatch, glow, and bundles visible'],
+    snap: ['center of one hex', 'provision storage stays code-owned', 'decorative GLB keeps hatch, glow, and bundles visible'],
     visualScale: 'normalize approved GLB to one provision-cache socket',
-    glbPolicy: 'decorative-skin-after-normalization',
-  },
-  dryingRack: {
-    role: 'food-preserve',
-    gridWidth: 1.2,
-    gridDepth: 0.56,
-    height: 1.05,
-    snap: ['center of one hex', 'preservation state stays code-owned', 'decorative GLB keeps hanging food overlays visible'],
-    visualScale: 'normalize approved GLB to one preservation rack socket',
-    glbPolicy: 'decorative-skin-after-normalization',
-  },
-  weatherVane: {
-    role: 'weather-readback',
-    gridWidth: 0.5,
-    gridDepth: 0.5,
-    height: 1.25,
-    snap: ['center of one hex', 'forecast state stays code-owned', 'decorative GLB keeps needle, ribbon, and storm overlays visible'],
-    visualScale: 'normalize approved GLB to one weather instrument socket',
-    glbPolicy: 'decorative-skin-after-normalization',
-  },
-  lantern: {
-    role: 'light-post',
-    gridWidth: 0.45,
-    gridDepth: 0.45,
-    height: 1.25,
-    snap: ['center of one hex', 'lit state and shelter light accounting stay code-owned', 'decorative GLB keeps lantern glow overlay visible'],
-    visualScale: 'normalize approved GLB to one light-post socket',
-    glbPolicy: 'decorative-skin-after-normalization',
-  },
-  floorFoundation: {
-    role: 'foundation',
-    modularKit: true,
-    gridWidth: 1.08,
-    gridDepth: 1.08,
-    height: 0.16,
-    pivot: 'center',
-    collider: 'hex-cell',
-    snap: ['centered under a house socket', 'levels one hex footprint', 'does not count as weather boundary'],
-    visualScale: 'procedural pad defines floor height and future skin footprint',
-  },
-  wallPanel: {
-    role: 'wall-panel',
-    modularKit: true,
-    gridWidth: 1,
-    gridDepth: 0.2,
-    height: 1.65,
-    pivot: 'wall-center',
-    collider: 'thin-wall',
-    snap: ['front edge on hex face', 'full panel counts as shelter boundary', 'top cap stays under roof socket'],
-    visualScale: 'procedural full wall owns boundary and future skin footprint',
-  },
-  wallHalfRail: {
-    role: 'half-rail',
-    modularKit: true,
-    gridWidth: 1,
-    gridDepth: 0.16,
-    height: 0.82,
-    pivot: 'wall-center',
-    collider: 'thin-wall',
-    snap: ['front edge on hex face', 'porch rail leaves weather gap open', 'does not satisfy full shelter boundary'],
-    visualScale: 'procedural rail stays visibly lower than full walls',
-  },
-  wallDoorPanel: {
-    role: 'wall-opening',
-    modularKit: true,
-    gridWidth: 1,
-    gridDepth: 0.22,
-    height: 1.75,
-    openingWidth: 0.72,
-    openingHeight: 1.55,
-    pivot: 'wall-center',
-    collider: 'thin-wall',
-    snap: ['front edge on hex face', 'full wall panel counts as shelter boundary', 'integrated doorway satisfies door access'],
-    visualScale: 'procedural full wall and doorway own boundary until shared-scale skins exist',
-  },
-  wallWindowPanel: {
-    role: 'wall-light',
-    modularKit: true,
-    gridWidth: 1,
-    gridDepth: 0.2,
-    height: 1.65,
-    openingWidth: 0.58,
-    openingHeight: 0.52,
-    pivot: 'wall-center',
-    collider: 'thin-wall',
-    snap: ['front edge on hex face', 'full wall panel counts as shelter boundary', 'integrated window satisfies shelter light/readability'],
-    visualScale: 'procedural full wall and window opening own boundary until shared-scale skins exist',
-  },
-  wallCorner: {
-    role: 'wall-corner',
-    modularKit: true,
-    gridWidth: 0.72,
-    gridDepth: 0.72,
-    height: 1.65,
-    pivot: 'wall-center',
-    collider: 'thin-wall',
-    snap: ['centered as a temporary corner join', 'counts as shelter boundary', 'future edge sockets will split this into two faces'],
-    visualScale: 'procedural corner placeholder bridges two wall directions without owning final edge math',
-  },
-  roofJoin: {
-    role: 'roof-join',
-    modularKit: true,
-    gridWidth: 1.12,
-    gridDepth: 0.3,
-    height: 0.5,
-    pivot: 'wall-center',
-    collider: 'roof-shell',
-    snap: ['front edge on roof span', 'counts toward roof coverage', 'future shared-scale skins can replace the join cap'],
-    visualScale: 'procedural roof join reads as ridge/eave support without changing shelter footprint',
-  },
-  doorKit: {
-    role: 'wall-opening',
-    modularKit: true,
-    gridWidth: 1,
-    gridDepth: 0.22,
-    height: 1.9,
-    openingWidth: 0.72,
-    openingHeight: 1.55,
-    pivot: 'wall-center',
-    collider: 'thin-wall',
-    snap: ['front edge on hex face', 'hinge side follows yaw turn', 'opening remains inside one hex edge'],
-    visualScale: 'normalize decorative GLB to one hex edge and keep opening centered',
-    glbPolicy: 'decorative-skin-after-normalization',
-  },
-  windowFrame: {
-    role: 'wall-light',
-    modularKit: true,
-    gridWidth: 0.92,
-    gridDepth: 0.18,
-    height: 1.45,
-    openingWidth: 0.58,
-    openingHeight: 0.52,
-    pivot: 'wall-center',
-    collider: 'thin-wall',
-    snap: ['front edge on hex face', 'sill floats above floor socket', 'opening remains centered'],
-    visualScale: 'normalize decorative GLB to one hex edge with sill above waist height',
-    glbPolicy: 'decorative-skin-after-normalization',
-  },
-  roofBundle: {
-    role: 'roof-cap',
-    modularKit: true,
-    gridWidth: 1.12,
-    gridDepth: 1.12,
-    height: 0.62,
-    pivot: 'center',
-    collider: 'roof-shell',
-    snap: ['centered over one occupied shelter hex', 'eaves may overhang but collider stays in socket'],
-    visualScale: 'normalize decorative GLB to cap one hex without changing shelter footprint',
     glbPolicy: 'decorative-skin-after-normalization',
   },
   dockSegment: {
@@ -665,13 +344,31 @@ const STRUCTURE_SOCKET_SPEC_OVERRIDES: Partial<Record<PlaceableItemId, Partial<O
     visualScale: 'normalize approved GLB along one waterline edge with a 90-degree visual correction',
     glbPolicy: 'decorative-skin-after-normalization',
   },
-  caveAnchor: {
-    role: 'route-marker',
-    gridWidth: 0.55,
-    gridDepth: 0.55,
-    height: 1.15,
-    snap: ['centered near a real cave mouth', 'decorative GLB marker keeps glyph, rope pulse, flood, spring, and active glow overlays visible'],
-    visualScale: 'fit approved GLB as marker skin, not a fake cave entrance',
+  dryingRack: {
+    role: 'food-preserve',
+    gridWidth: 1.2,
+    gridDepth: 0.56,
+    height: 1.05,
+    snap: ['center of one hex', 'preservation state stays code-owned', 'decorative GLB keeps hanging food overlays visible'],
+    visualScale: 'normalize approved GLB to one preservation rack socket',
+    glbPolicy: 'decorative-skin-after-normalization',
+  },
+  weatherVane: {
+    role: 'weather-readback',
+    gridWidth: 0.5,
+    gridDepth: 0.5,
+    height: 1.25,
+    snap: ['center of one hex', 'forecast state stays code-owned', 'decorative GLB keeps needle, ribbon, and storm overlays visible'],
+    visualScale: 'normalize approved GLB to one weather instrument socket',
+    glbPolicy: 'decorative-skin-after-normalization',
+  },
+  lantern: {
+    role: 'light-post',
+    gridWidth: 0.45,
+    gridDepth: 0.45,
+    height: 1.25,
+    snap: ['center of one hex', 'lit state and shelter light accounting stay code-owned', 'decorative GLB keeps lantern glow overlay visible'],
+    visualScale: 'normalize approved GLB to one light-post socket',
     glbPolicy: 'decorative-skin-after-normalization',
   },
   waystone: {
@@ -707,18 +404,6 @@ export function structureSocketCatalog(items: readonly PlaceableItemId[] = PLACE
   return items.map((item) => structureSocketSpec(item));
 }
 
-export function houseKitSocketCatalog(): StructureSocketSpec[] {
-  return structureSocketCatalog(['doorKit', 'windowFrame', 'roofBundle']);
-}
-
-export function wallShellSocketCatalog(): StructureSocketSpec[] {
-  return structureSocketCatalog(['floorFoundation', 'wallPanel', 'wallDoorPanel', 'wallWindowPanel', 'wallCorner', 'wallHalfRail', 'roofJoin']);
-}
-
-export function k4UtilitySocketCatalog(): StructureSocketSpec[] {
-  return structureSocketCatalog(['compostBin', 'rainCistern', 'rootCellar', 'dockSegment', 'fishTrap', 'shoreNet', 'lantern']);
-}
-
 export function normalizeStructureYaw(yaw: number): number {
   if (!Number.isFinite(yaw)) return 0;
   const tau = Math.PI * 2;
@@ -740,35 +425,11 @@ function edgeFromSlot(slot: string): number | null {
   return match ? Math.trunc(Number(match[1])) : null;
 }
 
-function sharedEdge(topology: StructureTopology | undefined, fromTile: number, toTile: number): number | null {
-  if (!topology || fromTile === toTile) return null;
-  const degree = Math.max(0, Math.trunc(topology.degreeOf(fromTile)));
-  for (let edge = 0; edge < degree; edge++) {
-    if (topology.neighbor(fromTile, edge) === toTile) return edge;
-  }
-  return null;
-}
-
 function isEdgeAddressedSocket(item: PlaceableItemId): boolean {
-  const spec = structureSocketSpec(item);
-  return spec.pivot === 'wall-center' || spec.collider === 'edge-strip' || spec.role === 'roof-join';
-}
-
-function blocksPlayerTraversal(item: PlaceableItemId): boolean {
-  return item === 'wallPanel'
-    || item === 'wallWindowPanel'
-    || item === 'wallCorner';
+  return structureSocketSpec(item).collider === 'edge-strip';
 }
 
 export function structureSocketPlacementFor(item: PlaceableItemId, yaw: number): StructureSocketPlacement {
-  if (item === 'floorFoundation') {
-    return {
-      kind: 'floor',
-      key: 'floor',
-      occupies: ['floor'],
-      label: 'floor hex',
-    };
-  }
   if (!isEdgeAddressedSocket(item)) {
     return {
       kind: 'center',
@@ -778,15 +439,12 @@ export function structureSocketPlacementFor(item: PlaceableItemId, yaw: number):
     };
   }
   const edge = structureYawTurn(yaw);
-  const occupies = item === 'wallCorner'
-    ? [edgeSlot(edge), edgeSlot(edge + 1)]
-    : [edgeSlot(edge)];
   return {
     kind: 'edge',
     edge,
-    key: occupies.join('+'),
-    occupies,
-    label: item === 'wallCorner' ? `hex edges ${edge + 1}/${((edge + 1) % 6) + 1}` : `hex edge ${edge + 1}`,
+    key: edgeSlot(edge),
+    occupies: [edgeSlot(edge)],
+    label: `hex edge ${edge + 1}`,
   };
 }
 
@@ -828,47 +486,7 @@ export function structurePlacementBlocker(
     if (entry.tile !== tile) continue;
     const occupied = structureSocketPlacement(entry);
     if (occupied.occupies.some((slot) => wanted.has(slot))) {
-      return placement.kind === 'edge'
-        ? 'occupied edge socket'
-        : placement.kind === 'floor'
-        ? 'occupied floor socket'
-        : 'occupied snap target';
-    }
-  }
-  return null;
-}
-
-export function structureTraversalBlocker(
-  structures: readonly StructureSave[],
-  topology: StructureTopology | undefined,
-  fromTile: number,
-  toTile: number,
-): StructureTraversalBlock | null {
-  const from = Math.trunc(fromTile);
-  const to = Math.trunc(toTile);
-  if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) return null;
-
-  const candidates: Array<{ tile: number; edge: number | null }> = [
-    { tile: from, edge: sharedEdge(topology, from, to) },
-    { tile: to, edge: sharedEdge(topology, to, from) },
-  ];
-  for (const candidate of candidates) {
-    if (candidate.edge === null) continue;
-    const slot = edgeSlot(candidate.edge);
-    for (const structure of structures) {
-      if (structure.tile !== candidate.tile || !blocksPlayerTraversal(structure.item)) continue;
-      const occupancy = structureSocketPlacement(structure);
-      if (!occupancy.occupies.includes(slot)) continue;
-      return {
-        fromTile: from,
-        toTile: to,
-        structureId: structure.id,
-        item: structure.item,
-        tile: structure.tile,
-        edge: candidate.edge,
-        slot,
-        message: `${placeableName(structure.item).toLowerCase()} blocks that edge`,
-      };
+      return placement.kind === 'edge' ? 'occupied edge socket' : 'occupied snap target';
     }
   }
   return null;
@@ -885,19 +503,6 @@ function isWeatherVaneKind(value: unknown): value is WeatherVaneContext['kind'] 
     || value === 'storm'
     || value === 'cold'
     || value === 'soaked';
-}
-
-function isCaveAnchorKind(value: unknown): value is CaveAnchorKind {
-  return value === 'arch' || value === 'dryCave' || value === 'seaCave';
-}
-
-export function caveAnchorKindLabel(kind: CaveAnchorKind | undefined): string {
-  switch (kind) {
-    case 'dryCave': return 'dry cave';
-    case 'seaCave': return 'sea cave';
-    case 'arch':
-    default: return 'natural arch';
-  }
 }
 
 export function waystoneMarkLabel(mark: WaystoneMark | undefined): string {
@@ -967,15 +572,6 @@ function normalizeState(item: PlaceableItemId, raw: unknown): StructureState | u
     if (value.home === true) state.home = true;
     if (Number.isFinite(value.rested) && value.rested! > 0) state.rested = Math.trunc(value.rested!);
   }
-  if (item === 'cropPlot') {
-    if (value.crop === 'berries' || value.crop === 'reeds') state.crop = value.crop;
-    if (Number.isFinite(value.growth) && value.growth! > 0) state.growth = Math.max(0, Math.min(3, Math.trunc(value.growth!)));
-    if (Number.isFinite(value.fertility) && value.fertility! > 0) state.fertility = Math.max(0, Math.min(3, Math.trunc(value.fertility!)));
-    if (Number.isFinite(value.harvests) && value.harvests! > 0) state.harvests = Math.trunc(value.harvests!);
-  }
-  if (item === 'compostBin') {
-    if (Number.isFinite(value.composts) && value.composts! > 0) state.composts = Math.trunc(value.composts!);
-  }
   if (item === 'rainCistern') {
     if (Number.isFinite(value.water) && value.water! > 0) state.water = Math.max(0, Math.min(CISTERN_CAPACITY, Math.trunc(value.water!)));
     if (Number.isFinite(value.fills) && value.fills! > 0) state.fills = Math.trunc(value.fills!);
@@ -983,19 +579,6 @@ function normalizeState(item: PlaceableItemId, raw: unknown): StructureState | u
   if (item === 'rootCellar') {
     if (Number.isFinite(value.provisions) && value.provisions! > 0) state.provisions = Math.max(0, Math.min(ROOT_CELLAR_CAPACITY, Math.trunc(value.provisions!)));
     if (Number.isFinite(value.caches) && value.caches! > 0) state.caches = Math.trunc(value.caches!);
-  }
-  if (item === 'caveAnchor') {
-    if (Number.isFinite(value.anchorUses) && value.anchorUses! > 0) state.anchorUses = Math.trunc(value.anchorUses!);
-    if (isCaveAnchorKind(value.anchorKind)) state.anchorKind = value.anchorKind;
-    if (typeof value.anchorLabel === 'string' && value.anchorLabel.trim().length > 0) {
-      state.anchorLabel = value.anchorLabel.trim().slice(0, 64);
-    }
-    if (Number.isFinite(value.anchorDepth)) state.anchorDepth = Math.max(0, Math.min(128, value.anchorDepth!));
-    if (Number.isFinite(value.anchorDistance)) state.anchorDistance = Math.max(0, Math.min(12, Math.trunc(value.anchorDistance!)));
-    if (typeof value.anchorFlooded === 'boolean') state.anchorFlooded = value.anchorFlooded;
-    if (typeof value.anchorSpring === 'boolean') state.anchorSpring = value.anchorSpring;
-    if (Number.isFinite(value.anchorClearance)) state.anchorClearance = Math.max(0, Math.min(64, Math.trunc(value.anchorClearance!)));
-    if (Number.isFinite(value.anchorTile) && value.anchorTile! >= 0) state.anchorTile = Math.trunc(value.anchorTile!);
   }
   if (item === 'dryingRack') {
     if (Number.isFinite(value.preserves) && value.preserves! > 0) state.preserves = Math.trunc(value.preserves!);
@@ -1234,13 +817,11 @@ export function structureDismantleBlockers(structure: StructureSave): string[] {
   if (!state) return [];
   const blockers: string[] = [];
   if (structure.item === 'chest' && storageTotal(state.storage) > 0) blockers.push('empty chest first');
-  if (structure.item === 'cropPlot' && state.crop) blockers.push('clear crop first');
   if (structure.item === 'rainCistern' && Math.max(0, Math.trunc(state.water ?? 0)) > 0) blockers.push('empty water first');
   if (structure.item === 'rootCellar' && Math.max(0, Math.trunc(state.provisions ?? 0)) > 0) blockers.push('empty provisions first');
   if ((structure.item === 'campfire' || structure.item === 'lantern') && state.lit === true) blockers.push('douse light first');
   if (structure.item === 'bedroll' && state.home === true) blockers.push('home bedroll is set');
   if (structure.item === 'waystone' && state.waystone) blockers.push('waystone is attuned');
-  if (structure.item === 'caveAnchor' && state.anchorKind) blockers.push('cave anchor is set');
   if (structure.item === 'fishTrap' && state.trapSetDay !== undefined) blockers.push('fish trap is set');
   if (structure.item === 'shoreNet' && state.netSetDay !== undefined) blockers.push('shore net is set');
   return blockers;
@@ -1381,427 +962,6 @@ function tilesWithin(topology: StructureTopology | undefined, center: number, ri
   return [...seen];
 }
 
-function homeSupportTiles(structures: readonly StructureSave[], topology?: StructureTopology, rings = 2): number[] {
-  const home = structures.find((s) => s.item === 'bedroll' && s.state?.home === true) ?? null;
-  return home ? tilesWithin(topology, home.tile, Math.max(0, Math.trunc(rings))) : [];
-}
-
-function emptyShelterEnclosure(): ShelterEnclosureReport {
-  return {
-    footprintMode: 'local-radius',
-    roomTiles: [],
-    roomTileCount: 0,
-    pentagonRoomTiles: [],
-    boundaryTiles: [],
-    boundaryEdges: [],
-    coveredBoundaryEdges: [],
-    interiorSeamEdges: [],
-    wallBoundaryEdges: [],
-    railBoundaryEdges: [],
-    openingBoundaryEdges: [],
-    doorBoundaryEdges: [],
-    windowBoundaryEdges: [],
-    supportTiles: [],
-    foundationTiles: [],
-    wallTiles: [],
-    railTiles: [],
-    cornerTiles: [],
-    roofTiles: [],
-    roofJoinTiles: [],
-    openingTiles: [],
-    utilityTiles: [],
-    roofCoverage: 0,
-    boundaryCoverage: 0,
-    boundaryCoverageMode: 'tile',
-    boundaryCoverageNeed: 0,
-    boundaryEdgeCount: 0,
-    perimeterCoverage: 0,
-    utilityCoverage: 0,
-    doorOnBoundary: false,
-    warmthInside: false,
-    lightInside: false,
-    workbenchInside: false,
-    storageInside: false,
-    cellarInSupport: false,
-    enclosed: false,
-    serviceReady: false,
-    comfortTier: 'none',
-    label: 'no room',
-  };
-}
-
-function shelterComfortTier(functional: boolean, weatherSafe: boolean, home: boolean, comfort: number): ShelterComfortTier {
-  if (functional && comfort >= 6) return 'lived-in';
-  if (functional) return 'working';
-  if (weatherSafe) return 'weather-safe';
-  if (home) return 'rough';
-  return 'none';
-}
-
-function isWallBoundaryItem(item: PlaceableItemId): boolean {
-  return item === 'wallPanel'
-    || item === 'wallDoorPanel'
-    || item === 'wallWindowPanel'
-    || item === 'wallCorner';
-}
-
-function isDoorItem(item: PlaceableItemId): boolean {
-  return item === 'doorKit' || item === 'wallDoorPanel';
-}
-
-function isWindowItem(item: PlaceableItemId): boolean {
-  return item === 'windowFrame' || item === 'wallWindowPanel';
-}
-
-function isRoofItem(item: PlaceableItemId): boolean {
-  return item === 'roofBundle' || item === 'roofJoin';
-}
-
-function isOpeningItem(item: PlaceableItemId): boolean {
-  return isDoorItem(item) || isWindowItem(item);
-}
-
-interface ShelterBoundaryEdge {
-  key: string;
-  homeTile: number;
-  homeEdge: number;
-  neighborTile: number;
-  neighborEdge: number | null;
-}
-
-interface ShelterFootprint {
-  roomTiles: number[];
-  boundaryTiles: number[];
-  boundaryEdges: ShelterBoundaryEdge[];
-  expanded: boolean;
-}
-
-function sortedTiles(tiles: Iterable<number>): number[] {
-  return [...tiles].sort((a, b) => a - b);
-}
-
-function connectedFoundationRoomTiles(structures: readonly StructureSave[], topology: StructureTopology | undefined, homeTile: number): number[] {
-  if (!topology) return [];
-  const foundationTiles = new Set(structures.filter((s) => s.item === 'floorFoundation').map((s) => s.tile));
-  if (foundationTiles.size < 2) return [];
-  const seen = new Set<number>([homeTile]);
-  const queue = [homeTile];
-  for (let i = 0; i < queue.length; i++) {
-    const tile = queue[i];
-    const degree = Math.max(0, Math.trunc(topology.degreeOf(tile)));
-    for (let edge = 0; edge < degree; edge++) {
-      const next = topology.neighbor(tile, edge);
-      if (!foundationTiles.has(next) || seen.has(next)) continue;
-      seen.add(next);
-      queue.push(next);
-    }
-  }
-  const connectedFoundations = [...seen].filter((tile) => tile !== homeTile);
-  return connectedFoundations.length >= 2 ? sortedTiles(seen) : [];
-}
-
-function shelterFootprint(structures: readonly StructureSave[], topology: StructureTopology | undefined, homeTile: number, rings: number): ShelterFootprint {
-  const expandedRoomTiles = connectedFoundationRoomTiles(structures, topology, homeTile);
-  if (!topology || expandedRoomTiles.length === 0) {
-    const tiles = tilesWithin(topology, homeTile, rings);
-    const boundaryTiles = tiles.filter((tile) => tile !== homeTile);
-    return {
-      roomTiles: tiles,
-      boundaryTiles,
-      boundaryEdges: shelterBoundaryEdgesFromRoom(topology, [homeTile], new Set(boundaryTiles), false),
-      expanded: false,
-    };
-  }
-  const room = new Set(expandedRoomTiles);
-  const boundary = new Set<number>();
-  for (const tile of expandedRoomTiles) {
-    const degree = Math.max(0, Math.trunc(topology.degreeOf(tile)));
-    for (let edge = 0; edge < degree; edge++) {
-      const neighbor = topology.neighbor(tile, edge);
-      if (neighbor === tile || room.has(neighbor)) continue;
-      boundary.add(neighbor);
-    }
-  }
-  return {
-    roomTiles: expandedRoomTiles,
-    boundaryTiles: sortedTiles(boundary),
-    boundaryEdges: shelterBoundaryEdgesFromRoom(topology, expandedRoomTiles, room, true),
-    expanded: true,
-  };
-}
-
-function shelterBoundaryEdgesFromRoom(
-  topology: StructureTopology | undefined,
-  roomTiles: readonly number[],
-  roomOrBoundary: ReadonlySet<number>,
-  expanded: boolean,
-): ShelterBoundaryEdge[] {
-  if (!topology) return [];
-  const edges: ShelterBoundaryEdge[] = [];
-  for (const tile of roomTiles) {
-    const degree = Math.max(0, Math.trunc(topology.degreeOf(tile)));
-    for (let edge = 0; edge < degree; edge++) {
-      const neighbor = topology.neighbor(tile, edge);
-      if (neighbor === tile) continue;
-      if (expanded ? roomOrBoundary.has(neighbor) : !roomOrBoundary.has(neighbor)) continue;
-      edges.push({
-        key: `${tile}:${edgeSlot(edge)}`,
-        homeTile: tile,
-        homeEdge: edge,
-        neighborTile: neighbor,
-        neighborEdge: sharedEdge(topology, neighbor, tile),
-      });
-    }
-  }
-  return edges.sort((a, b) => a.homeTile - b.homeTile || a.homeEdge - b.homeEdge);
-}
-
-function shelterInteriorSeamEdges(topology: StructureTopology | undefined, roomTiles: readonly number[]): string[] {
-  if (!topology) return [];
-  const room = new Set(roomTiles);
-  const edges: string[] = [];
-  for (const tile of roomTiles) {
-    const degree = Math.max(0, Math.trunc(topology.degreeOf(tile)));
-    for (let edge = 0; edge < degree; edge++) {
-      const neighbor = topology.neighbor(tile, edge);
-      if (neighbor !== tile && room.has(neighbor)) edges.push(`${tile}:${edgeSlot(edge)}`);
-    }
-  }
-  return edges.sort();
-}
-
-function structureBoundaryEdgeKeys(structure: StructureSave, edges: readonly ShelterBoundaryEdge[]): string[] {
-  if (edges.length === 0) return [];
-  const occupancy = structureSocketPlacement(structure);
-  if (occupancy.kind !== 'edge') return [];
-  const keys: string[] = [];
-  for (const edge of edges) {
-    if (structure.tile === edge.homeTile && occupancy.occupies.includes(edgeSlot(edge.homeEdge))) {
-      keys.push(edge.key);
-    } else if (
-      structure.tile === edge.neighborTile
-      && edge.neighborEdge !== null
-      && occupancy.occupies.includes(edgeSlot(edge.neighborEdge))
-    ) {
-      keys.push(edge.key);
-    }
-  }
-  return keys;
-}
-
-export function shelterReport(structures: readonly StructureSave[], topology?: StructureTopology, rings = 1): ShelterReport {
-  const home = structures.find((s) => s.item === 'bedroll' && s.state?.home === true) ?? null;
-  if (!home) {
-    return {
-      centerTile: null,
-      tiles: [],
-      enclosure: emptyShelterEnclosure(),
-      roofPieces: 0,
-      roofNeed: ROOF_NEED,
-      hasDoor: false,
-      hasWindow: false,
-      hasWarmth: false,
-      hasStation: false,
-      hasStorage: false,
-      hasCellar: false,
-      hasLight: false,
-      cellarProvisions: 0,
-      protected: false,
-      functional: false,
-      comfort: 0,
-      missing: ['home bedroll'],
-      label: 'no home bedroll',
-    };
-  }
-
-  const footprint = shelterFootprint(structures, topology, home.tile, Math.max(0, Math.trunc(rings)));
-  const tiles = footprint.roomTiles;
-  const pentagonRoomTiles = topology ? tiles.filter((tile) => Math.max(0, Math.trunc(topology.degreeOf(tile))) === 5).sort((a, b) => a - b) : [];
-  const local = new Set(footprint.expanded ? [...footprint.roomTiles, ...footprint.boundaryTiles] : footprint.roomTiles);
-  const room = new Set(footprint.roomTiles);
-  const boundaryTiles = footprint.boundaryTiles;
-  const boundary = new Set(boundaryTiles);
-  const boundaryEdgeRecords = footprint.boundaryEdges;
-  const supportTiles = tilesWithin(topology, home.tile, 2);
-  const support = new Set(supportTiles);
-  const nearby = structures.filter((s) => local.has(s.tile));
-  const roomStructures = footprint.expanded ? structures.filter((s) => room.has(s.tile)) : nearby;
-  const foundationTiles = (footprint.expanded ? roomStructures : nearby).filter((s) => s.item === 'floorFoundation').map((s) => s.tile);
-  const wallTiles = nearby.filter((s) => isWallBoundaryItem(s.item)).map((s) => s.tile);
-  const railTiles = nearby.filter((s) => s.item === 'wallHalfRail').map((s) => s.tile);
-  const cornerTiles = nearby.filter((s) => s.item === 'wallCorner').map((s) => s.tile);
-  const roofTiles = roomStructures.filter((s) => isRoofItem(s.item)).map((s) => s.tile);
-  const roofJoinTiles = roomStructures.filter((s) => s.item === 'roofJoin').map((s) => s.tile);
-  const openingTiles = nearby.filter((s) => isOpeningItem(s.item)).map((s) => s.tile);
-  const utilityTiles = roomStructures.filter((s) => s.item === 'campfire' || s.item === 'lantern' || s.item === 'workbench' || s.item === 'chest').map((s) => s.tile);
-  const roofPieces = roomStructures.filter((s) => isRoofItem(s.item)).length;
-  const hasDoor = nearby.some((s) => isDoorItem(s.item));
-  const hasWindow = nearby.some((s) => isWindowItem(s.item));
-  const doorOnBoundary = nearby.some((s) => isDoorItem(s.item) && boundary.has(s.tile));
-  const hasWarmth = roomStructures.some((s) => s.item === 'campfire' && s.state?.lit === true);
-  const hasStation = roomStructures.some((s) => s.item === 'workbench');
-  const hasStorage = roomStructures.some((s) => s.item === 'chest');
-  const supportStructures = structures.filter((s) => support.has(s.tile));
-  const cellarProvisions = supportStructures.reduce((sum, s) => s.item === 'rootCellar' ? sum + rootCellarProvisionCount([s], undefined, false) : sum, 0);
-  const hasCellar = supportStructures.some((s) => s.item === 'rootCellar');
-  const hasLight = hasWarmth || roomStructures.some((s) => s.item === 'lantern' && s.state?.lit === true);
-  const comfort = (hasWindow ? 1 : 0) + (hasLight ? 1 : 0) + (hasStation ? 1 : 0) + (hasStorage ? 1 : 0) + (hasCellar ? 1 : 0) + (foundationTiles.length > 0 ? 1 : 0) + Math.min(2, roofPieces);
-  const shellBoundaryAttempt = wallTiles.length > 0 || railTiles.length > 0;
-  const boundaryNeed = footprint.expanded && boundaryEdgeRecords.length > 0
-    ? boundaryEdgeRecords.length
-    : Math.max(1, Math.min(4, boundaryEdgeRecords.length || boundaryTiles.length || 1));
-  const edgeKeysFor = (predicate: (s: StructureSave) => boolean): string[] => {
-    const keys = new Set<string>();
-    for (const structure of nearby) {
-      if (!predicate(structure)) continue;
-      for (const key of structureBoundaryEdgeKeys(structure, boundaryEdgeRecords)) keys.add(key);
-    }
-    return [...keys].sort();
-  };
-  const wallBoundaryEdges = edgeKeysFor((s) => isWallBoundaryItem(s.item));
-  const railBoundaryEdges = edgeKeysFor((s) => s.item === 'wallHalfRail');
-  const openingBoundaryEdges = edgeKeysFor((s) => isOpeningItem(s.item));
-  const doorBoundaryEdges = edgeKeysFor((s) => isDoorItem(s.item));
-  const windowBoundaryEdges = edgeKeysFor((s) => isWindowItem(s.item));
-  const boundaryContributorTiles = shellBoundaryAttempt ? [...wallTiles, ...openingTiles] : [...roofTiles, ...openingTiles];
-  const boundaryContributorSet = new Set(boundaryContributorTiles.filter((tile) => boundary.has(tile)));
-  const edgeBoundaryContributorSet = new Set([...wallBoundaryEdges, ...openingBoundaryEdges]);
-  const boundaryCoverageMode = shellBoundaryAttempt && boundaryEdgeRecords.length > 0 ? 'edge' as const : 'tile' as const;
-  const coveredBoundaryEdges = boundaryCoverageMode === 'edge'
-    ? [...edgeBoundaryContributorSet].sort()
-    : [];
-  const boundaryEdgeCount = boundaryEdgeRecords.length;
-  const boundaryCoverage = boundaryCoverageMode === 'edge'
-    ? Math.min(1, coveredBoundaryEdges.length / boundaryNeed)
-    : Math.min(1, boundaryContributorSet.size / boundaryNeed);
-  const perimeterCoverage = boundaryCoverageMode === 'edge' && boundaryEdgeCount > 0
-    ? Math.min(1, coveredBoundaryEdges.length / boundaryEdgeCount)
-    : boundaryCoverage;
-  const utilityCoverage = Math.min(1, (Number(hasWarmth) + Number(hasStation) + Number(hasStorage)) / 3);
-  const effectiveDoorOnBoundary = boundaryCoverageMode === 'edge' ? doorBoundaryEdges.length > 0 : doorOnBoundary;
-  const boundaryReady = footprint.expanded ? perimeterCoverage >= 1 : boundaryCoverage >= 0.75;
-  const spatiallyEnclosed = roofPieces >= ROOF_NEED && boundaryReady && effectiveDoorOnBoundary;
-  const weatherSafe = spatiallyEnclosed && hasWarmth;
-  const serviceReady = hasWarmth && hasStation && hasStorage;
-  const functional = weatherSafe && serviceReady;
-  const missing: string[] = [];
-  if (roofPieces < ROOF_NEED) missing.push(`roof ${roofPieces}/${ROOF_NEED}`);
-  if (!hasDoor) missing.push('door');
-  else if (!effectiveDoorOnBoundary) missing.push('door on room edge');
-  if (hasDoor && roofPieces >= ROOF_NEED && !boundaryReady) missing.push('room boundary');
-  if (!hasWarmth) missing.push('lit campfire');
-  if (!hasStation) missing.push('workbench');
-  if (!hasStorage) missing.push('chest');
-  const tier = shelterComfortTier(functional, weatherSafe, true, comfort);
-  const enclosure: ShelterEnclosureReport = {
-    footprintMode: footprint.expanded ? 'connected-foundation' : 'local-radius',
-    roomTiles: tiles,
-    roomTileCount: tiles.length,
-    pentagonRoomTiles,
-    boundaryTiles,
-    boundaryEdges: boundaryEdgeRecords.map((edge) => edge.key),
-    coveredBoundaryEdges,
-    interiorSeamEdges: shelterInteriorSeamEdges(topology, tiles),
-    wallBoundaryEdges,
-    railBoundaryEdges,
-    openingBoundaryEdges,
-    doorBoundaryEdges,
-    windowBoundaryEdges,
-    supportTiles,
-    foundationTiles,
-    wallTiles,
-    railTiles,
-    cornerTiles,
-    roofTiles,
-    roofJoinTiles,
-    openingTiles,
-    utilityTiles,
-    roofCoverage: Math.min(1, roofPieces / ROOF_NEED),
-    boundaryCoverage,
-    boundaryCoverageMode,
-    boundaryCoverageNeed: boundaryNeed,
-    boundaryEdgeCount,
-    perimeterCoverage,
-    utilityCoverage,
-    doorOnBoundary: effectiveDoorOnBoundary,
-    warmthInside: hasWarmth,
-    lightInside: hasLight,
-    workbenchInside: hasStation,
-    storageInside: hasStorage,
-    cellarInSupport: hasCellar,
-    enclosed: spatiallyEnclosed,
-    serviceReady,
-    comfortTier: tier,
-    label: functional
-      ? tier === 'lived-in' ? 'lived-in shelter room' : 'working shelter room'
-      : weatherSafe
-      ? 'weather-safe room'
-      : `open room needs ${missing[0] ?? 'more shelter'}`,
-  };
-  return {
-    centerTile: home.tile,
-    tiles,
-    enclosure,
-    roofPieces,
-    roofNeed: ROOF_NEED,
-    hasDoor,
-    hasWindow,
-    hasWarmth,
-    hasStation,
-    hasStorage,
-    hasCellar,
-    hasLight,
-    cellarProvisions,
-    protected: weatherSafe,
-    functional,
-    comfort,
-    missing,
-    label: functional
-      ? 'shelter alive'
-      : weatherSafe
-      ? 'weather safe'
-      : missing.length > 0
-      ? `shelter needs ${missing[0]}`
-      : 'shelter started',
-  };
-}
-
-export function homeScore(structures: readonly StructureSave[], topology?: StructureTopology): HomeScore {
-  const placed = new Set(structures.map((s) => s.item));
-  let score = 0;
-  for (const item of HOME_ITEMS) if (placed.has(item)) score++;
-  const litCampfire = structures.some((s) => s.item === 'campfire' && s.state?.lit === true);
-  const homeBedroll = structures.some((s) => s.item === 'bedroll' && s.state?.home === true);
-  const storedItems = structures.reduce((sum, s) => sum + (s.item === 'chest' ? storageTotal(s.state?.storage) : 0), 0);
-  const hasHearth = placed.has('campfire') && placed.has('bedroll') && score >= 4;
-  const shelter = shelterReport(structures, topology);
-  const cellarProvisions = rootCellarProvisionCount(structures, topology);
-  const functional = topology ? shelter.functional : hasHearth && litCampfire && homeBedroll;
-  const label = topology && homeBedroll
-    ? shelter.label
-    : functional
-    ? 'hearth alive'
-    : hasHearth
-    ? 'hearth ready'
-    : score > 0
-    ? `home ${score}/${HOME_ITEMS.length}`
-    : 'no home';
-  return { score, max: HOME_ITEMS.length, label, hasHearth, functional, litCampfire, homeBedroll, storedItems, cellarProvisions, shelter };
-}
-
-export function spendPlacedItem(items: InventoryItems, item: PlaceableItemId): boolean {
-  const count = Math.max(0, Math.trunc(items[item] ?? 0));
-  if (count <= 0) return false;
-  if (count === 1) delete items[item];
-  else items[item] = count - 1;
-  return true;
-}
-
-function addInventoryItem(items: InventoryItems, item: ItemId, amount: number): void {
-  if (amount <= 0) return;
-  items[item] = Math.max(0, Math.trunc(items[item] ?? 0) + amount);
-}
-
 function craftedCount(items: InventoryItems | undefined, item: CraftedItemId): number {
   return Math.max(0, Math.trunc(items?.[item] ?? 0));
 }
@@ -1837,111 +997,94 @@ function setOnlyHomeBedroll(structures: StructureSave[], id: number): void {
   }
 }
 
-function cisternWater(cistern: StructureSave | undefined | null): number {
-  return Math.max(0, Math.min(CISTERN_CAPACITY, Math.trunc(cistern?.state?.water ?? 0)));
-}
-
-function rootCellarProvisions(cellar: StructureSave | undefined | null): number {
-  return Math.max(0, Math.min(ROOT_CELLAR_CAPACITY, Math.trunc(cellar?.state?.provisions ?? 0)));
-}
-
-export function rootCellarProvisionCapacity(): number {
-  return ROOT_CELLAR_CAPACITY;
-}
-
-export function rootCellarProvisionCount(
-  structures: readonly StructureSave[],
-  topology?: StructureTopology,
-  homeOnly = true,
-): number {
-  const localTiles = new Set(homeOnly ? homeSupportTiles(structures, topology, 2) : []);
-  const requireLocal = homeOnly && localTiles.size > 0;
-  return structures.reduce((sum, s) =>
-    s.item === 'rootCellar' && (!requireLocal || localTiles.has(s.tile))
-      ? sum + rootCellarProvisions(s)
-      : sum,
-    0,
-  );
-}
-
-export function spendRootCellarProvision(
-  structures: StructureSave[],
-  topology?: StructureTopology,
-  homeOnly = true,
-): RootCellarSpendResult {
-  const localTiles = new Set(homeOnly ? homeSupportTiles(structures, topology, 2) : []);
-  const requireLocal = homeOnly && localTiles.size > 0;
-  let best: StructureSave | null = null;
-  let bestProvisions = 0;
-  for (const s of structures) {
-    if (s.item !== 'rootCellar') continue;
-    if (requireLocal && !localTiles.has(s.tile)) continue;
-    const provisions = rootCellarProvisions(s);
-    if (provisions <= bestProvisions) continue;
-    best = s;
-    bestProvisions = provisions;
-  }
-  if (!best) {
-    return { ok: false, remaining: rootCellarProvisionCount(structures, topology, homeOnly) };
-  }
-  const next = bestProvisions - 1;
-  best.state = {
-    ...best.state,
-    provisions: next > 0 ? next : undefined,
-  };
-  if (best.state.provisions === undefined) delete best.state.provisions;
-  if (Object.keys(best.state).length === 0) delete best.state;
-  return {
-    ok: true,
-    cellarId: best.id,
-    remaining: rootCellarProvisionCount(structures, topology, homeOnly),
-  };
-}
-
-function localCisternWithWater(
-  structures: readonly StructureSave[],
-  plot: StructureSave,
-  topology?: StructureTopology,
-): StructureSave | null {
-  const tiles = new Set(tilesWithin(topology, plot.tile, 1));
-  let best: StructureSave | null = null;
-  let bestWater = 0;
-  for (const s of structures) {
-    if (s.item !== 'rainCistern' || !tiles.has(s.tile)) continue;
-    const water = cisternWater(s);
-    if (water <= bestWater) continue;
-    best = s;
-    bestWater = water;
-  }
-  return best;
-}
-
-export function cropConditionReport(env?: CropPlotEnvironment, fertility = 0, crop: CropKind = 'berries'): CropConditionReport {
-  if (!env) {
+export function shelterReport(structures: readonly StructureSave[], topology?: StructureTopology, rings = 1): ShelterReport {
+  const home = structures.find((s) => s.item === 'bedroll' && s.state?.home === true) ?? null;
+  if (!home) {
     return {
-      canGrow: true,
-      bonusYield: fertility > 0,
-      problems: [],
-      label: crop === 'reeds' ? 'reed bed' : fertility > 0 ? 'fertile garden' : 'temperate garden',
+      centerTile: null,
+      tiles: [],
+      hasWarmth: false,
+      hasStation: false,
+      hasStorage: false,
+      hasCellar: false,
+      hasLight: false,
+      cellarProvisions: 0,
+      protected: false,
+      functional: false,
+      comfort: 0,
+      comfortTier: 'none',
+      missing: ['home bedroll'],
+      label: 'no home bedroll',
     };
   }
-  const fertile = Math.max(0, Math.trunc(fertility)) > 0;
-  const problems: string[] = [];
-  if (!env.watered && (crop === 'reeds' || !fertile)) problems.push(crop === 'reeds' ? 'needs standing water' : 'needs nearby water');
-  if (!env.lit) problems.push('needs light');
-  if (crop !== 'reeds' && env.cold && !env.warm) problems.push(env.highAltitude ? 'needs ridge warmth' : 'needs warmth');
-  if (crop !== 'reeds' && env.storm && !env.protected) problems.push('needs storm cover');
-  const baseLabel = env.label.trim() || (problems.length > 0 ? problems[0] : 'garden ready');
-  const cropLabel = crop === 'reeds' ? `${baseLabel} · reed bed` : baseLabel;
-  const label = fertile && problems.length === 0 ? `${cropLabel} · composted` : cropLabel;
+  const tiles = tilesWithin(topology, home.tile, Math.max(0, Math.trunc(rings)));
+  const local = new Set(tiles);
+  const nearby = structures.filter((s) => local.has(s.tile));
+  const hasWarmth = nearby.some((s) => s.item === 'campfire' && s.state?.lit === true);
+  const hasStation = nearby.some((s) => s.item === 'workbench');
+  const hasStorage = nearby.some((s) => s.item === 'chest');
+  const hasCellar = nearby.some((s) => s.item === 'rootCellar');
+  const cellarProvisions = nearby.reduce((sum, s) => sum + (s.item === 'rootCellar' ? rootCellarProvisions(s) : 0), 0);
+  const hasLight = hasWarmth || nearby.some((s) => s.item === 'lantern' && s.state?.lit === true);
+  const comfort = Number(hasWarmth) + Number(hasStation) + Number(hasStorage) + Number(hasCellar);
+  const functional = hasWarmth && hasStation && hasStorage;
+  const missing: string[] = [];
+  if (!hasWarmth) missing.push('lit campfire');
+  if (!hasStation) missing.push('workbench');
+  if (!hasStorage) missing.push('chest');
+  const comfortTier: ShelterComfortTier = functional ? 'ready' : hasWarmth ? 'rough' : 'none';
   return {
-    canGrow: problems.length === 0,
-    bonusYield: crop === 'reeds'
-      ? env.watered && env.lit && (env.naturalWater || env.storm || fertile)
-      : (env.watered || fertile) && env.lit && (env.protected || env.sheltered || env.warm || fertile),
-    problems,
-    label,
+    centerTile: home.tile,
+    tiles,
+    hasWarmth,
+    hasStation,
+    hasStorage,
+    hasCellar,
+    hasLight,
+    cellarProvisions,
+    protected: hasWarmth,
+    functional,
+    comfort,
+    comfortTier,
+    missing,
+    label: functional
+      ? 'camp ready'
+      : hasWarmth
+      ? 'warm camp'
+      : missing.length > 0
+      ? `camp needs ${missing[0]}`
+      : 'camp started',
   };
+}
+
+export function homeScore(structures: readonly StructureSave[], topology?: StructureTopology): HomeScore {
+  const placed = new Set(structures.map((s) => s.item));
+  let score = 0;
+  for (const item of HOME_ITEMS) if (placed.has(item)) score++;
+  const litCampfire = structures.some((s) => s.item === 'campfire' && s.state?.lit === true);
+  const homeBedroll = structures.some((s) => s.item === 'bedroll' && s.state?.home === true);
+  const storedItems = structures.reduce((sum, s) => sum + (s.item === 'chest' ? storageTotal(s.state?.storage) : 0), 0);
+  const hasHearth = placed.has('campfire') && placed.has('bedroll') && score >= 4;
+  const shelter = shelterReport(structures, topology);
+  const functional = topology ? shelter.functional : hasHearth && litCampfire && homeBedroll;
+  const label = topology && homeBedroll
+    ? shelter.label
+    : functional
+    ? 'hearth alive'
+    : hasHearth
+    ? 'hearth ready'
+    : score > 0
+    ? `home ${score}/${HOME_ITEMS.length}`
+    : 'no home';
+  return { score, max: HOME_ITEMS.length, label, hasHearth, functional, litCampfire, homeBedroll, storedItems, cellarProvisions: shelter.cellarProvisions, shelter };
+}
+
+export function spendPlacedItem(items: InventoryItems, item: PlaceableItemId): boolean {
+  const count = Math.max(0, Math.trunc(items[item] ?? 0));
+  if (count <= 0) return false;
+  if (count === 1) delete items[item];
+  else items[item] = count - 1;
+  return true;
 }
 
 function toggleChest(chest: StructureSave, materialCounts: number[]): StructureInteractionResult {
@@ -1955,7 +1098,8 @@ function toggleChest(chest: StructureSave, materialCounts: number[]): StructureI
       if (count <= 0) continue;
       const slot = MATERIAL_ITEM_IDS.indexOf(id);
       materialCounts[slot] = Math.max(0, Math.trunc(materialCounts[slot] ?? 0) + count);
-      addInventoryItem(moved, id, count);
+      const amount = count;
+      moved[id] = Math.max(0, Math.trunc(moved[id] ?? 0) + amount);
     }
     chest.state.storage = undefined;
     const text = formatMoved(moved);
@@ -1967,161 +1111,107 @@ function toggleChest(chest: StructureSave, materialCounts: number[]): StructureI
     const amount = Math.min(20, Math.floor(have / 2));
     if (amount <= 0) continue;
     materialCounts[slot] = have - amount;
-    addInventoryItem(storage, id, amount);
-    addInventoryItem(moved, id, amount);
+    storage[id] = Math.max(0, Math.trunc(storage[id] ?? 0) + amount);
+    moved[id] = Math.max(0, Math.trunc(moved[id] ?? 0) + amount);
   }
   chest.state.storage = storageTotal(storage) > 0 ? storage : undefined;
   const text = formatMoved(moved);
   return { ok: text.length > 0, mode: 'deposit', moved, message: text ? `stashed ${text}` : 'nothing to stash' };
 }
 
-function tendCropPlot(
-  plot: StructureSave,
-  craftedItems?: InventoryItems,
-  env?: CropPlotEnvironment,
-  structures: readonly StructureSave[] = [],
-  topology?: StructureTopology,
-): StructureInteractionResult {
-  plot.state = plot.state ?? {};
-  const fertility = Math.max(0, Math.min(3, Math.trunc(plot.state.fertility ?? 0)));
-  const currentCrop = plot.state.crop ?? (env?.naturalWater && craftedCount(craftedItems, 'reeds') > 0 ? 'reeds' : 'berries');
-  const report = cropConditionReport(env, fertility, currentCrop);
-  const irrigationCistern = env && !env.naturalWater && (env.cisternWater ?? 0) > 0
-    ? localCisternWithWater(structures, plot, topology)
+function cookAtCampfire(campfire: StructureSave, craftedItems?: InventoryItems): StructureInteractionResult | null {
+  if (!craftedItems || campfire.state?.lit !== true) return null;
+  const stewSeasoning: CraftedItemId | null = craftedCount(craftedItems, 'caveMushroom') > 0
+    ? 'caveMushroom'
+    : craftedCount(craftedItems, 'snowHerb') > 0
+    ? 'snowHerb'
     : null;
-  if (!plot.state.crop) {
-    if (currentCrop === 'reeds') {
-      spendCraftedItem(craftedItems, 'reeds', 1);
-      plot.state.crop = 'reeds';
-      plot.state.growth = 1;
-      return {
-        ok: true,
-        mode: 'plantReeds',
-        message: env ? `planted reed slips · ${report.label}` : 'planted reed slips',
-      };
-    }
-    const spentSeeds = spendCraftedItem(craftedItems, 'seeds', 1);
-    plot.state.crop = 'berries';
-    plot.state.growth = 1;
-    const base = spentSeeds ? 'planted berry seeds' : 'planted wild berry starts';
+  if (craftedCount(craftedItems, 'campMeal') > 0 && craftedCount(craftedItems, 'trailRation') > 0 && stewSeasoning) {
+    spendCraftedItem(craftedItems, 'campMeal', 1);
+    spendCraftedItem(craftedItems, 'trailRation', 1);
+    spendCraftedItem(craftedItems, stewSeasoning, 1);
+    addCraftedItem(craftedItems, 'expeditionStew', 1);
     return {
       ok: true,
-      mode: 'plant',
-      message: env ? `${base} · ${report.label}` : base,
+      mode: 'cook',
+      moved: { expeditionStew: 1 },
+      message: `cooked expedition stew · ${ITEM_DEFS[stewSeasoning].name.toLowerCase()}`,
     };
   }
-  const growth = Math.max(0, Math.trunc(plot.state.growth ?? 0));
-  if (growth >= 3) {
-    if (plot.state.crop === 'reeds') {
-      const reeds = 3 + (report.bonusYield ? 1 : 0) + fertility;
-      const bait = report.bonusYield ? 1 : 0;
-      addCraftedItem(craftedItems, 'reeds', reeds);
-      if (bait > 0) addCraftedItem(craftedItems, 'bait', bait);
-      plot.state.growth = 1;
-      const nextFertility = Math.max(0, fertility - 1);
-      if (nextFertility > 0) plot.state.fertility = nextFertility;
-      else delete plot.state.fertility;
-      plot.state.harvests = Math.max(0, Math.trunc(plot.state.harvests ?? 0)) + 1;
-      return {
-        ok: true,
-        mode: 'harvest',
-        moved: bait > 0 ? { reeds, bait } : { reeds },
-        message: `cut reeds ${reeds}${bait > 0 ? ` · bait ${bait}` : ''}${env ? ` · ${report.label}` : ''}`,
-      };
-    }
-    const berries = 3 + (report.bonusYield ? 1 : 0) + fertility;
-    const seeds = 1 + (env?.protected && env.watered ? 1 : 0) + (fertility >= 2 ? 1 : 0);
-    addCraftedItem(craftedItems, 'berries', berries);
-    addCraftedItem(craftedItems, 'seeds', seeds);
-    plot.state.growth = 1;
-    const nextFertility = Math.max(0, fertility - 1);
-    if (nextFertility > 0) plot.state.fertility = nextFertility;
-    else delete plot.state.fertility;
-    plot.state.harvests = Math.max(0, Math.trunc(plot.state.harvests ?? 0)) + 1;
-    return {
-      ok: true,
-      mode: 'harvest',
-      moved: { berries, seeds },
-      message: `harvested berries ${berries} · seeds ${seeds}${env ? ` · ${report.label}` : ''}`,
-    };
+  if (craftedCount(craftedItems, 'cookedFish') > 0 && craftedCount(craftedItems, 'berries') > 0) {
+    spendCraftedItem(craftedItems, 'cookedFish', 1);
+    spendCraftedItem(craftedItems, 'berries', 1);
+    addCraftedItem(craftedItems, 'campMeal', 1);
+    return { ok: true, mode: 'cook', moved: { campMeal: 1 }, message: 'cooked camp meal' };
   }
-  if (craftedCount(craftedItems, 'compost') > 0 && fertility < 2) {
-    spendCraftedItem(craftedItems, 'compost', 1);
-    plot.state.fertility = fertility + 1;
-    return {
-      ok: true,
-      mode: 'fertilize',
-      moved: { compost: 1 },
-      message: `fed compost to ${plot.state.crop === 'reeds' ? 'reed bed' : 'berry plot'} · fertility ${plot.state.fertility}/2`,
-    };
+  if (craftedCount(craftedItems, 'rawFish') > 0) {
+    spendCraftedItem(craftedItems, 'rawFish', 1);
+    addCraftedItem(craftedItems, 'cookedFish', 1);
+    return { ok: true, mode: 'cook', moved: { cookedFish: 1 }, message: 'cooked fish' };
   }
-  if (!report.canGrow) {
-    return {
-      ok: true,
-      mode: 'tend',
-      message: `${plot.state.crop === 'reeds' ? 'reed bed' : 'berry plot'} waits: ${report.problems.slice(0, 2).join(' + ')} · ${report.label}`,
-    };
-  }
-  const growthStep = fertility > 0 ? 2 : 1;
-  plot.state.growth = Math.min(3, growth + growthStep);
-  let irrigated = false;
-  if (irrigationCistern) {
-    const next = Math.max(0, cisternWater(irrigationCistern) - 1);
-    irrigationCistern.state = {
-      ...irrigationCistern.state,
-      water: next > 0 ? next : undefined,
-    };
-    if (irrigationCistern.state.water === undefined) delete irrigationCistern.state.water;
-    irrigated = true;
-  }
-  return {
-    ok: true,
-    mode: irrigated ? 'irrigate' : 'tend',
-    message: plot.state.growth >= 3
-      ? `${plot.state.crop === 'reeds' ? 'reed bed' : 'berry plot'} ready to harvest${env ? ` · ${report.label}` : ''}${irrigationCistern ? ` · cistern water ${cisternWater(irrigationCistern)}/${CISTERN_CAPACITY}` : ''}`
-      : `tended ${plot.state.crop === 'reeds' ? 'reed bed' : 'berry plot'} ${plot.state.growth}/3${env ? ` · ${report.label}` : ''}${irrigationCistern ? ` · cistern water ${cisternWater(irrigationCistern)}/${CISTERN_CAPACITY}` : ''}`,
-  };
+  return null;
 }
 
-function makeCompost(bin: StructureSave, craftedItems?: InventoryItems): StructureInteractionResult {
-  if (!craftedItems) return { ok: false, message: 'compost bin needs food inventory' };
-  const scrap: CraftedItemId | null = craftedCount(craftedItems, 'kelp') > 0
-    ? 'kelp'
-    : craftedCount(craftedItems, 'reeds') > 0
-    ? 'reeds'
-    : craftedCount(craftedItems, 'berries') > 0
-    ? 'berries'
-    : craftedCount(craftedItems, 'caveMushroom') > 0
-    ? 'caveMushroom'
-    : craftedCount(craftedItems, 'rawFish') > 0
-    ? 'rawFish'
-    : null;
-  if (!scrap) return { ok: false, mode: 'inspect', message: 'compost bin needs kelp, reeds, berries, mushrooms, or raw fish scraps' };
-  spendCraftedItem(craftedItems, scrap, 1);
-  addCraftedItem(craftedItems, 'compost', 2);
-  bin.state = {
-    ...bin.state,
-    composts: Math.max(1, Math.trunc(bin.state?.composts ?? 0) + 1),
+function cisternWater(cistern: StructureSave | undefined | null): number {
+  return Math.max(0, Math.min(CISTERN_CAPACITY, Math.trunc(cistern?.state?.water ?? 0)));
+}
+
+function rootCellarProvisions(cellar: StructureSave | undefined | null): number {
+  return Math.max(0, Math.min(ROOT_CELLAR_CAPACITY, Math.trunc(cellar?.state?.provisions ?? 0)));
+}
+
+export function rainCisternWaterCapacity(): number {
+  return CISTERN_CAPACITY;
+}
+
+export function rootCellarProvisionCapacity(): number {
+  return ROOT_CELLAR_CAPACITY;
+}
+
+export function rootCellarProvisionCount(structures: readonly StructureSave[], topology?: StructureTopology): number {
+  return shelterReport(structures, topology).cellarProvisions;
+}
+
+export function spendRootCellarProvision(structures: StructureSave[], topology?: StructureTopology): RootCellarSpendResult {
+  const shelter = shelterReport(structures, topology);
+  const localTiles = new Set(shelter.tiles);
+  let best: StructureSave | null = null;
+  let bestProvisions = 0;
+  for (const s of structures) {
+    if (s.item !== 'rootCellar') continue;
+    if (localTiles.size > 0 && !localTiles.has(s.tile)) continue;
+    const provisions = rootCellarProvisions(s);
+    if (provisions <= bestProvisions) continue;
+    best = s;
+    bestProvisions = provisions;
+  }
+  if (!best) {
+    return { ok: false, remaining: shelter.cellarProvisions };
+  }
+  const next = bestProvisions - 1;
+  best.state = {
+    ...best.state,
+    provisions: next > 0 ? next : undefined,
   };
+  if (best.state.provisions === undefined) delete best.state.provisions;
+  if (Object.keys(best.state).length === 0) delete best.state;
   return {
     ok: true,
-    mode: 'compost',
-    moved: { compost: 2 },
-    message: `turned ${ITEM_DEFS[scrap].name.toLowerCase()} into compost 2`,
+    cellarId: best.id,
+    remaining: rootCellarProvisionCount(structures, topology),
   };
 }
 
 function useRainCistern(cistern: StructureSave, ctx?: RainCisternContext): StructureInteractionResult {
   const current = cisternWater(cistern);
   const wet = ctx?.kind === 'rain' || ctx?.kind === 'storm' || ctx?.kind === 'soaked' || ctx?.kind === 'mist';
-  const spring = ctx?.spring?.spring === true ? ctx.spring : null;
-  if (!ctx || (!wet && !spring)) {
+  if (!ctx || !wet) {
     return {
       ok: true,
       mode: 'inspect',
       message: current > 0
         ? `rain cistern holds water ${current}/${CISTERN_CAPACITY}`
-        : 'rain cistern dry · wait for rain, storm, or a cave spring',
+        : 'rain cistern dry · wait for rain, storm, or mist',
     };
   }
   const amount = ctx.kind === 'storm' || ctx.kind === 'soaked' ? 2 : 1;
@@ -2131,15 +1221,6 @@ function useRainCistern(cistern: StructureSave, ctx?: RainCisternContext): Struc
     water: next,
     fills: Math.max(0, Math.trunc(cistern.state?.fills ?? 0)) + (next > current ? 1 : 0),
   };
-  if (!wet && spring) {
-    return {
-      ok: true,
-      mode: 'collectWater',
-      message: next > current
-        ? `rain cistern tapped ${spring.label.toLowerCase()} · water ${next}/${CISTERN_CAPACITY}`
-        : `rain cistern full · water ${next}/${CISTERN_CAPACITY}`,
-    };
-  }
   return {
     ok: true,
     mode: 'collectWater',
@@ -2147,10 +1228,6 @@ function useRainCistern(cistern: StructureSave, ctx?: RainCisternContext): Struc
       ? `rain cistern caught ${ctx.label.toLowerCase()} water · water ${next}/${CISTERN_CAPACITY}`
       : `rain cistern full · water ${next}/${CISTERN_CAPACITY}`,
   };
-}
-
-export function rainCisternWaterCapacity(): number {
-  return CISTERN_CAPACITY;
 }
 
 function cellarProvisionCandidate(items: InventoryItems | undefined): { item: CraftedItemId; spend: number; label: string } | null {
@@ -2205,52 +1282,7 @@ function useRootCellar(cellar: StructureSave, craftedItems?: InventoryItems): St
     mode: 'inspect',
     message: current >= ROOT_CELLAR_CAPACITY
       ? `root cellar stocked ${current}/${ROOT_CELLAR_CAPACITY}`
-      : `root cellar empty · cache trail rations or cave forage ${current}/${ROOT_CELLAR_CAPACITY}`,
-  };
-}
-
-function useCaveAnchor(anchor: StructureSave, ctx?: CaveAnchorContext): StructureInteractionResult {
-  if (!ctx) {
-    if (anchor.state?.anchorKind) {
-      const label = anchor.state.anchorLabel || caveAnchorKindLabel(anchor.state.anchorKind);
-      const depth = Number.isFinite(anchor.state.anchorDepth) ? ` · depth ${anchor.state.anchorDepth!.toFixed(1)} m` : '';
-      const flooded = anchor.state.anchorFlooded ? ' · flooded' : '';
-      const spring = anchor.state.anchorSpring ? ' · spring seep' : '';
-      return {
-        ok: true,
-        mode: 'inspect',
-        message: `cave anchor holds ${label}${depth}${flooded}${spring}`,
-      };
-    }
-    return {
-      ok: false,
-      mode: 'inspect',
-      message: 'cave anchor needs a nearby cave mouth or arch',
-    };
-  }
-  const distance = Math.max(0, Math.trunc(ctx.distance ?? 0));
-  const label = (ctx.label?.trim() || caveAnchorKindLabel(ctx.kind)).slice(0, 64);
-  const targetTile = Number.isFinite(ctx.tile) && ctx.tile! >= 0 ? Math.trunc(ctx.tile!) : anchor.tile;
-  anchor.state = {
-    ...anchor.state,
-    anchorUses: Math.max(0, Math.trunc(anchor.state?.anchorUses ?? 0)) + 1,
-    anchorKind: ctx.kind,
-    anchorLabel: label,
-    anchorDepth: Math.max(0, Math.min(128, ctx.depth)),
-    anchorDistance: distance,
-    anchorFlooded: ctx.flooded,
-    anchorSpring: ctx.spring === true,
-    anchorTile: targetTile,
-  };
-  if (ctx.clearance !== undefined) anchor.state.anchorClearance = Math.max(0, Math.min(64, Math.trunc(ctx.clearance)));
-  else delete anchor.state.anchorClearance;
-  const rings = distance === 0 ? 'here' : `${distance} ring${distance === 1 ? '' : 's'} away`;
-  const clearance = ctx.clearance !== undefined ? ` · clearance ${Math.trunc(ctx.clearance)} cells` : '';
-  const spring = ctx.spring ? ' · spring seep' : '';
-  return {
-    ok: true,
-    mode: 'anchor',
-    message: `cave anchor set · ${label} ${rings} · depth ${ctx.depth.toFixed(1)} m${clearance}${ctx.flooded ? ' · flooded' : ''}${spring}`,
+      : `root cellar empty · cache trail rations or forage ${current}/${ROOT_CELLAR_CAPACITY}`,
   };
 }
 
@@ -2307,39 +1339,6 @@ function readWeatherVane(vane: StructureSave, ctx?: WeatherVaneContext): Structu
     mode: 'forecast',
     message: `weather vane reads ${label} · ${timing}`,
   };
-}
-
-function cookAtCampfire(campfire: StructureSave, craftedItems?: InventoryItems): StructureInteractionResult | null {
-  if (!craftedItems || campfire.state?.lit !== true) return null;
-  const stewSeasoning: CraftedItemId | null = craftedCount(craftedItems, 'caveMushroom') > 0
-    ? 'caveMushroom'
-    : craftedCount(craftedItems, 'snowHerb') > 0
-    ? 'snowHerb'
-    : null;
-  if (craftedCount(craftedItems, 'campMeal') > 0 && craftedCount(craftedItems, 'trailRation') > 0 && stewSeasoning) {
-    spendCraftedItem(craftedItems, 'campMeal', 1);
-    spendCraftedItem(craftedItems, 'trailRation', 1);
-    spendCraftedItem(craftedItems, stewSeasoning, 1);
-    addCraftedItem(craftedItems, 'expeditionStew', 1);
-    return {
-      ok: true,
-      mode: 'cook',
-      moved: { expeditionStew: 1 },
-      message: `cooked expedition stew · ${ITEM_DEFS[stewSeasoning].name.toLowerCase()}`,
-    };
-  }
-  if (craftedCount(craftedItems, 'cookedFish') > 0 && craftedCount(craftedItems, 'berries') > 0) {
-    spendCraftedItem(craftedItems, 'cookedFish', 1);
-    spendCraftedItem(craftedItems, 'berries', 1);
-    addCraftedItem(craftedItems, 'campMeal', 1);
-    return { ok: true, mode: 'cook', moved: { campMeal: 1 }, message: 'cooked camp meal' };
-  }
-  if (craftedCount(craftedItems, 'rawFish') > 0) {
-    spendCraftedItem(craftedItems, 'rawFish', 1);
-    addCraftedItem(craftedItems, 'cookedFish', 1);
-    return { ok: true, mode: 'cook', moved: { cookedFish: 1 }, message: 'cooked fish' };
-  }
-  return null;
 }
 
 function preserveAtDryingRack(rack: StructureSave, craftedItems?: InventoryItems): StructureInteractionResult {
@@ -2491,46 +1490,6 @@ function clearNetSetState(net: StructureSave): void {
   net.state = Object.keys(next).length > 0 ? next : undefined;
 }
 
-export function consumeWaterlineRouteResupply(
-  structures: StructureSave[],
-  sources: readonly WaterlineRouteResupplySource[],
-): WaterlineRouteResupplyConsumption {
-  const trapIds = new Set<number>();
-  const netIds = new Set<number>();
-  for (const source of sources) {
-    const id = Math.max(0, Math.trunc(source.id));
-    if (id <= 0) continue;
-    if (source.kind === 'fishTrap') trapIds.add(id);
-    else if (source.kind === 'shoreNet') netIds.add(id);
-  }
-
-  const consumedIds: number[] = [];
-  let traps = 0;
-  let nets = 0;
-  for (const structure of structures) {
-    if (structure.item === 'fishTrap' && trapIds.has(structure.id) && structure.state?.trapSetDay !== undefined) {
-      const checks = Math.max(0, Math.trunc(structure.state?.trapChecks ?? 0)) + 1;
-      clearTrapSetState(structure);
-      structure.state = { ...structure.state, trapChecks: checks };
-      consumedIds.push(structure.id);
-      traps++;
-    } else if (structure.item === 'shoreNet' && netIds.has(structure.id) && structure.state?.netSetDay !== undefined) {
-      const checks = Math.max(0, Math.trunc(structure.state?.netChecks ?? 0)) + 1;
-      clearNetSetState(structure);
-      structure.state = { ...structure.state, netChecks: checks };
-      consumedIds.push(structure.id);
-      nets++;
-    }
-  }
-
-  return {
-    consumed: traps + nets,
-    traps,
-    nets,
-    sourceIds: consumedIds,
-  };
-}
-
 function useShoreNet(net: StructureSave, craftedItems?: InventoryItems, ctx?: FishTrapContext): StructureInteractionResult {
   if (!ctx) return { ok: false, mode: 'inspect', message: 'shore net needs local water reading' };
   const set = net.state?.netSetDay !== undefined;
@@ -2587,20 +1546,15 @@ export function interactStructure(
   materialCounts: number[],
   craftedItems?: InventoryItems,
   topology?: StructureTopology,
-  cropEnvironment?: CropPlotEnvironment,
   waystoneContext?: WaystoneContext,
   weatherVaneContext?: WeatherVaneContext,
   rainCisternContext?: RainCisternContext,
-  caveAnchorContext?: CaveAnchorContext,
   fishTrapContext?: FishTrapContext,
 ): StructureInteractionResult {
   const s = structures.find((entry) => entry.id === id);
   if (!s) return { ok: false, message: 'no structure' };
-  if (s.item === 'cropPlot') return tendCropPlot(s, craftedItems, cropEnvironment, structures, topology);
-  if (s.item === 'compostBin') return makeCompost(s, craftedItems);
   if (s.item === 'rainCistern') return useRainCistern(s, rainCisternContext);
   if (s.item === 'rootCellar') return useRootCellar(s, craftedItems);
-  if (s.item === 'caveAnchor') return useCaveAnchor(s, caveAnchorContext);
   if (s.item === 'waystone') return attuneWaystone(s, waystoneContext);
   if (s.item === 'weatherVane') return readWeatherVane(s, weatherVaneContext);
   if (s.item === 'fishTrap') return useFishTrap(s, craftedItems, fishTrapContext);

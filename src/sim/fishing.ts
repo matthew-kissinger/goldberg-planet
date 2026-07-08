@@ -1,7 +1,6 @@
 import type { InventoryItems, ItemId } from './crafting';
 import type { WeatherReport } from './survival';
 import type { NaturalVoidKind } from '../world/caves';
-import type { PentagonInsightEffect } from './landmarks';
 
 export type FishSchoolKind = 'none' | 'shore' | 'dock' | 'run' | 'storm' | 'cave';
 
@@ -14,10 +13,6 @@ export interface FishSchoolContext {
   bait: number;
   weatherKind?: WeatherReport['kind'];
   caveKind?: NaturalVoidKind | null;
-  domainEffect?: PentagonInsightEffect | null;
-  domainIntensity?: number;
-  thresholdFishBoost?: number;
-  thresholdLabel?: string;
 }
 
 export interface FishSchoolReport {
@@ -93,19 +88,7 @@ export function fishSchoolAt(ctx: FishSchoolContext): FishSchoolReport {
   const weatherBoost = ctx.weatherKind === 'storm' ? 0.28 : ctx.weatherKind === 'rain' ? 0.16 : ctx.weatherKind === 'mist' ? 0.08 : 0;
   const caveBoost = ctx.caveKind === 'seaCave' ? 0.34 : 0;
   const dockBoost = ctx.dock ? 0.18 : 0;
-  const domainIntensity = clamp(ctx.domainIntensity ?? 0, 0, 1);
-  const domainBoost = ctx.domainEffect === 'tide'
-    ? 0.24 * domainIntensity
-    : ctx.domainEffect === 'water'
-    ? 0.18 * domainIntensity
-    : ctx.domainEffect === 'storm'
-    ? 0.16 * domainIntensity
-    : ctx.domainEffect === 'cave' && ctx.caveKind === 'seaCave'
-    ? 0.12 * domainIntensity
-    : 0;
-  const thresholdBoost = clamp(ctx.thresholdFishBoost ?? 0, 0, 0.35);
-  const thresholdLabel = ctx.thresholdLabel ?? 'threshold';
-  const strength = clamp(0.5 + 0.5 * timeWave + weatherBoost + caveBoost + dockBoost + domainBoost + thresholdBoost, 0, 1);
+  const strength = clamp(0.5 + 0.5 * timeWave + weatherBoost + caveBoost + dockBoost, 0, 1);
   const baitUseful = ctx.bait > 0;
 
   if (!ctx.nearWater && !ctx.dock && ctx.caveKind !== 'seaCave') {
@@ -143,32 +126,6 @@ export function fishSchoolAt(ctx: FishSchoolContext): FishSchoolReport {
       baitUseful: true,
       usesBait,
       message: usesBait ? 'baited storm fish run' : 'storm fish run',
-    };
-  }
-
-  if ((ctx.domainEffect === 'tide' || ctx.domainEffect === 'water') && ctx.nearWater && strength >= 0.42) {
-    const usesBait = baitUseful;
-    return {
-      kind: 'run',
-      label: ctx.domainEffect === 'tide' ? 'salt-tide fish run' : 'reed-water fish run',
-      strength,
-      catchCount: usesBait ? 3 : 2,
-      baitUseful: true,
-      usesBait,
-      message: usesBait ? 'baited landmark fish run' : 'landmark fish run',
-    };
-  }
-
-  if (thresholdBoost > 0 && (ctx.nearWater || ctx.dock) && strength >= 0.24) {
-    const usesBait = baitUseful;
-    return {
-      kind: 'run',
-      label: `${thresholdLabel} fish run`,
-      strength,
-      catchCount: usesBait ? 3 : 2,
-      baitUseful: true,
-      usesBait,
-      message: usesBait ? 'baited threshold fish run' : 'threshold fish run',
     };
   }
 

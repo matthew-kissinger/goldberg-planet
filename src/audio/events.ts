@@ -8,7 +8,6 @@ export type AudioAssetId =
   | 'structurePlace'
   | 'gatherSoft'
   | 'routeSlate'
-  | 'skyfallGather'
   | 'fishingCatch'
   | 'hearthRest'
   | 'caveRead'
@@ -37,7 +36,6 @@ export const AUDIO_ASSETS: Record<AudioAssetId, AudioAssetDef> = {
   structurePlace: { id: 'structurePlace', url: audioUrl('audio/sfx/structure-place.mp3'), group: 'sfx', volume: 0.5 },
   gatherSoft: { id: 'gatherSoft', url: audioUrl('audio/sfx/gather-soft.mp3'), group: 'sfx', volume: 0.42 },
   routeSlate: { id: 'routeSlate', url: audioUrl('audio/sfx/route-slate.mp3'), group: 'sfx', volume: 0.48 },
-  skyfallGather: { id: 'skyfallGather', url: audioUrl('audio/sfx/skyfall-gather.mp3'), group: 'sfx', volume: 0.58 },
   fishingCatch: { id: 'fishingCatch', url: audioUrl('audio/sfx/fishing-catch.mp3'), group: 'sfx', volume: 0.5 },
   hearthRest: { id: 'hearthRest', url: audioUrl('audio/sfx/hearth-rest.mp3'), group: 'sfx', volume: 0.5 },
   caveRead: { id: 'caveRead', url: audioUrl('audio/sfx/cave-read.mp3'), group: 'sfx', volume: 0.48 },
@@ -54,7 +52,6 @@ export type AudioEventId =
   | 'structurePlace'
   | 'gatherSoft'
   | 'routeSlate'
-  | 'skyfallGather'
   | 'fishingCatch'
   | 'hearthRest'
   | 'caveRead'
@@ -75,7 +72,6 @@ export const AUDIO_EVENT_CUES: Record<AudioEventId, AudioCue> = {
   structurePlace: { asset: 'structurePlace', cooldownMs: 140 },
   gatherSoft: { asset: 'gatherSoft', cooldownMs: 120 },
   routeSlate: { asset: 'routeSlate', cooldownMs: 350 },
-  skyfallGather: { asset: 'skyfallGather', cooldownMs: 400 },
   fishingCatch: { asset: 'fishingCatch', cooldownMs: 300 },
   hearthRest: { asset: 'hearthRest', cooldownMs: 500 },
   caveRead: { asset: 'caveRead', cooldownMs: 320 },
@@ -95,13 +91,11 @@ export function audioEventForStructure(item: string, mode?: string, ok = true): 
   if (!ok) return 'uiDeny';
   if (mode === 'home' || item === 'bedroll') return 'hearthRest';
   if (item === 'campfire' || item === 'lantern' || mode === 'lit' || mode === 'unlit' || mode === 'cook') return 'hearthRest';
-  if (item === 'rainCistern' || mode === 'collectWater' || mode === 'irrigate') return 'waterCatch';
-  if (item === 'caveAnchor' || mode === 'anchor') return 'caveRead';
+  if (item === 'rainCistern' || mode === 'collectWater') return 'waterCatch';
   if (item === 'weatherVane' || item === 'waystone' || mode === 'forecast' || mode === 'mark') return 'routeSlate';
   if (item === 'dockSegment') return 'fishingCatch';
   if (item === 'fishTrap' || mode === 'setTrap' || mode === 'checkTrap' || mode === 'collectTrap') return mode === 'collectTrap' ? 'fishingCatch' : 'gatherSoft';
   if (item === 'shoreNet' || mode === 'setNet' || mode === 'checkNet' || mode === 'collectNet') return mode === 'collectNet' ? 'fishingCatch' : 'gatherSoft';
-  if (mode === 'plant' || mode === 'tend' || mode === 'harvest' || mode === 'fertilize' || mode === 'compost') return 'gatherSoft';
   if (mode === 'preserve' || mode === 'cache' || mode === 'withdrawProvision') return 'craftConfirm';
   if (mode === 'deposit' || mode === 'withdraw') return 'structurePlace';
   return 'uiConfirm';

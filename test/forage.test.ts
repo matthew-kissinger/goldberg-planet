@@ -44,7 +44,7 @@ describe('Hearth and Horizon forage ecology', () => {
     expect(report.item).toBe('snowHerb');
   });
 
-  it('cuts reeds from water and tide-domain shorelines', () => {
+  it('cuts reeds from shallow shorelines', () => {
     const report = forageAt({
       tile: 0,
       day: 0,
@@ -53,14 +53,12 @@ describe('Hearth and Horizon forage ecology', () => {
       nearWater: true,
       weatherKind: 'clear',
       caveKind: null,
-      domainEffect: 'tide',
-      domainIntensity: 1,
     });
 
     expect(report).toMatchObject({
       kind: 'reeds',
       item: 'reeds',
-      label: 'salt-tide reeds',
+      label: 'shore reeds',
     });
     expect(report.count).toBeGreaterThanOrEqual(2);
   });
@@ -92,26 +90,6 @@ describe('Hearth and Horizon forage ecology', () => {
       caveKind: null,
     });
     expect(applyForage(items, empty)).toMatchObject({ ok: false, message: 'nothing useful to forage here' });
-  });
-
-  it('lets root domains create seed-pod forage pockets', () => {
-    const report = forageAt({
-      tile: 0,
-      day: 0,
-      minute: 18 * 60,
-      height: 12,
-      nearWater: false,
-      weatherKind: 'clear',
-      caveKind: null,
-      domainEffect: 'root',
-      domainIntensity: 1,
-    });
-
-    expect(report).toMatchObject({
-      kind: 'seedPods',
-      item: 'seeds',
-      label: 'root-vault seed pods',
-    });
   });
 
   it('lets opened threshold effects improve local forage', () => {

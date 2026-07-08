@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   advanceTime,
   eatBestFood,
+  isExposureCritical,
+  isExposureWarning,
   isHazardWeather,
   normalizeSurvivalState,
   normalizeTimeState,
@@ -9,7 +11,6 @@ import {
   prepareHearthSupper,
   recoverFromCollapse,
   restAtShelter,
-  shouldCollapse,
   survivalReport,
   updateSurvival,
   waitForWeatherWindow,
@@ -35,15 +36,6 @@ describe('Hearth and Horizon survival pressure', () => {
     expect(time.minute).toBeCloseTo(119, 5);
     expect(weatherAt(time, weather, 4, 80, 0).kind).toBe('cold');
     expect(weatherAt(time, weather, 4, 10, 1).kind).toBe('soaked');
-  });
-
-  it('lets pentagon domains bias local weather signatures', () => {
-    const time = normalizeTimeState({ day: 0, minute: 12 * 60 });
-    const weather = normalizeWeatherState({ phase: 0.1 });
-
-    expect(weatherAt(time, weather, 8, 8, 0, { effect: 'storm', intensity: 1 }).label).toBe('storm-seat squall');
-    expect(weatherAt(time, weather, 6, 20, 0, { effect: 'cold', intensity: 1 }).label).toBe('snow-dial cold');
-    expect(weatherAt(time, normalizeWeatherState({ phase: 0.75 }), 0, 6, 0, { effect: 'hearth', intensity: 1 }).label).toBe('warm clear');
   });
 
   it('drains stamina and raises exposure outside, then recovers in a warm shelter', () => {
@@ -199,11 +191,10 @@ describe('Hearth and Horizon survival pressure', () => {
     expect(blocked).toMatchObject({ ok: false, message: 'hearth supper needs cellar provisions' });
   });
 
-  it('uses trail focus to soften cave and flight pressure', () => {
+  it('uses trail focus to soften flight pressure', () => {
     const plainState: SurvivalState = { stamina: 60, exposure: 20, mealsEaten: 0, collapseCount: 0 };
     const focusState: SurvivalState = { stamina: 60, exposure: 20, mealsEaten: 0, collapseCount: 0, trailFocus: 120 };
     const storm: WeatherReport = { kind: 'storm', label: 'storm front', intensity: 1, exposureRate: 1.6, staminaRegen: 0.45 };
-    const cave = { active: true, label: 'dark dry cave', exposureRate: 1.4, staminaRegen: 0.6, light: 'dark' as const, message: 'dark dry cave pressure' };
 
     const ctx = {
       dt: 5,
@@ -216,7 +207,6 @@ describe('Hearth and Horizon survival pressure', () => {
       functionalShelter: false,
       nearWarmth: false,
       weather: storm,
-      cavePressure: cave,
     };
     updateSurvival(plainState, ctx);
     updateSurvival(focusState, ctx);
@@ -300,16 +290,57 @@ describe('Hearth and Horizon survival pressure', () => {
     expect(safeTime.minute).toBe(360);
   });
 
-  it('collapses only at maximum exposure and recovers better at a complete home', () => {
+  it('flags the exposure warning band well before exposure maxes out, and critical only at the ceiling', () => {
+    expect(isExposureWarning({ stamina: 60, exposure: 81.9, mealsEaten: 0, collapseCount: 0 })).toBe(false);
+    expect(isExposureWarning({ stamina: 60, exposure: 82, mealsEaten: 0, collapseCount: 0 })).toBe(true);
+    expect(isExposureWarning({ stamina: 60, exposure: 99.9, mealsEaten: 0, collapseCount: 0 })).toBe(true);
+
+    expect(isExposureCritical({ stamina: 0, exposure: 99.9, mealsEaten: 0, collapseCount: 0 })).toBe(false);
+    expect(isExposureCritical({ stamina: 0, exposure: 100, mealsEaten: 0, collapseCount: 0 })).toBe(true);
+  });
+
+  it('applies an ongoing stamina-drain penalty once exposure is maxed, instead of any relocation', () => {
+    const cold: WeatherReport = { kind: 'cold', label: 'cold wind', intensity: 0.6, exposureRate: 1.2, staminaRegen: 0.65 };
+    const wornState: SurvivalState = { stamina: 60, exposure: 81, mealsEaten: 0, collapseCount: 0 };
+    const maxedState: SurvivalState = { stamina: 60, exposure: 100, mealsEaten: 0, collapseCount: 0 };
+    const ctx = {
+      dt: 2,
+      moving: false,
+      sprinting: false,
+      swimming: false,
+      sheltered: false,
+      functionalShelter: false,
+      nearWarmth: false,
+      weather: cold,
+    };
+
+    updateSurvival(wornState, ctx);
+    updateSurvival(maxedState, ctx);
+
+    // the maxed-out tile takes a harsher stamina hit than the merely-worn one, purely as a
+    // pressure valve — no positions changed, no relocation occurred.
+    expect(maxedState.stamina).toBeLessThan(wornState.stamina);
+    expect(maxedState.exposure).toBe(100);
+    expect(maxedState.collapseCount).toBe(0);
+
+    // the penalty eases the instant shelter/warmth pulls exposure back off the ceiling
+    const shelteredState: SurvivalState = { stamina: 60, exposure: 100, mealsEaten: 0, collapseCount: 0 };
+    updateSurvival(shelteredState, { ...ctx, sheltered: true, functionalShelter: true, nearWarmth: true });
+    expect(shelteredState.exposure).toBeLessThan(100);
+    const recoveredStamina = shelteredState.stamina;
+    updateSurvival(shelteredState, { ...ctx, sheltered: true, functionalShelter: true, nearWarmth: true });
+    // once below the critical ceiling, the harsh penalty tier no longer applies, so the
+    // second tick (still sheltered) keeps recovering rather than draining further.
+    expect(shelteredState.stamina).toBeGreaterThan(recoveredStamina);
+  });
+
+  it('keeps recoverFromCollapse available as an explicit rescue (e.g. a debug hook), not an automatic mechanic', () => {
     const homeState: SurvivalState = { stamina: 0, exposure: 100, mealsEaten: 0, collapseCount: 0 };
     const spawnState: SurvivalState = { stamina: 0, exposure: 100, mealsEaten: 0, collapseCount: 2 };
     const homeTime = normalizeTimeState({ day: 1, minute: 22 * 60 });
     const spawnTime = normalizeTimeState({ day: 1, minute: 22 * 60 });
     const homeWeather = normalizeWeatherState({ phase: 0.25 });
     const spawnWeather = normalizeWeatherState({ phase: 0.25 });
-
-    expect(shouldCollapse({ ...homeState, exposure: 99.9 })).toBe(false);
-    expect(shouldCollapse(homeState)).toBe(true);
 
     const home = recoverFromCollapse(homeState, homeTime, homeWeather, {
       hasHome: true,

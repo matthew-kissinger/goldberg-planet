@@ -42,14 +42,8 @@ describe('Hearth and Horizon audio events', () => {
     expect(audioEventForPlacement(true)).toBe('structurePlace');
     expect(audioEventForStructure('campfire', 'lit', true)).toBe('hearthRest');
     expect(audioEventForStructure('bedroll', 'home', true)).toBe('hearthRest');
-    expect(audioEventForStructure('rainCistern', 'collectWater', true)).toBe('waterCatch');
-    expect(audioEventForStructure('cropPlot', 'harvest', true)).toBe('gatherSoft');
-    expect(audioEventForStructure('caveAnchor', 'anchor', true)).toBe('caveRead');
-    expect(audioEventForStructure('weatherVane', 'forecast', true)).toBe('routeSlate');
-    expect(audioEventForStructure('fishTrap', 'setTrap', true)).toBe('gatherSoft');
-    expect(audioEventForStructure('fishTrap', 'collectTrap', true)).toBe('fishingCatch');
-    expect(audioEventForStructure('shoreNet', 'setNet', true)).toBe('gatherSoft');
-    expect(audioEventForStructure('shoreNet', 'collectNet', true)).toBe('fishingCatch');
+    expect(audioEventForStructure('chest', 'deposit', true)).toBe('structurePlace');
+    expect(audioEventForStructure('chest', 'withdraw', true)).toBe('structurePlace');
     expect(audioEventForStructure('campfire', 'inspect', false)).toBe('uiDeny');
     expect(audioEventForFoodAction('fish', true)).toBe('fishingCatch');
     expect(audioEventForFoodAction('forage', true)).toBe('gatherSoft');
@@ -59,14 +53,14 @@ describe('Hearth and Horizon audio events', () => {
   it('records events even before browser audio unlocks', () => {
     const audio = new GameAudio();
     expect(audio.state().unlocked).toBe(false);
-    expect(audio.playEvent('skyfallGather')).toBe(false);
+    expect(audio.playEvent('fishingCatch')).toBe(false);
     expect(audio.playEvent('routeSlate')).toBe(false);
     const state = audio.state();
     expect(state.lastEvent).toBe('routeSlate');
     expect(state.lastAsset).toBe('routeSlate');
     expect(state.pendingEvents).toBeGreaterThanOrEqual(2);
-    expect(state.playCounts.skyfallGather).toBe(1);
-    expect(state.assetPlayCounts.skyfallGather).toBe(1);
+    expect(state.playCounts.fishingCatch).toBe(1);
+    expect(state.assetPlayCounts.fishingCatch).toBe(1);
   });
 
   it('keeps mute state and group volumes in diagnostics', () => {

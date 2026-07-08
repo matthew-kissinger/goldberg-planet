@@ -80,48 +80,6 @@ describe('Hearth and Horizon fishing ecology', () => {
     expect(items).toEqual({ rawFish: 2 });
   });
 
-  it('lets tide and reed-water domains pull stronger shore runs', () => {
-    const tide = fishSchoolAt({
-      tile: 0,
-      day: 0,
-      minute: 12 * 60,
-      nearWater: true,
-      bait: 0,
-      weatherKind: 'clear',
-      caveKind: null,
-      domainEffect: 'tide',
-      domainIntensity: 1,
-    });
-
-    expect(tide).toMatchObject({
-      kind: 'run',
-      label: 'salt-tide fish run',
-      catchCount: 2,
-      baitUseful: true,
-    });
-  });
-
-  it('lets opened threshold effects pull local fish runs', () => {
-    const school = fishSchoolAt({
-      tile: 0,
-      day: 0,
-      minute: 18 * 60,
-      nearWater: true,
-      bait: 0,
-      weatherKind: 'clear',
-      caveKind: null,
-      thresholdFishBoost: 0.24,
-      thresholdLabel: 'tide underpass run',
-    });
-
-    expect(school).toMatchObject({
-      kind: 'run',
-      label: 'tide underpass run fish run',
-      catchCount: 2,
-      baitUseful: true,
-    });
-  });
-
   it('formats compact player-facing fishing cues without changing catch math', () => {
     const storm = fishSchoolAt({
       tile: 8,

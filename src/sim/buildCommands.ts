@@ -15,8 +15,6 @@ import {
   structureSocketPlacementFor,
   structureSocketSpec,
   structureYawTurn,
-  type CaveAnchorContext,
-  type CropPlotEnvironment,
   type FishTrapContext,
   type PlaceableItemId,
   type RainCisternContext,
@@ -95,11 +93,9 @@ export interface StructureUseCommandInput {
   materialCounts: number[];
   craftedItems?: InventoryItems;
   topology?: StructureTopology;
-  cropEnvironment?: CropPlotEnvironment;
   waystoneContext?: WaystoneContext;
   weatherVaneContext?: WeatherVaneContext;
   rainCisternContext?: RainCisternContext;
-  caveAnchorContext?: CaveAnchorContext;
   fishTrapContext?: FishTrapContext;
 }
 
@@ -509,28 +505,7 @@ export function packStructureCommand(
 }
 
 export function structureModeTouchesFood(mode?: StructureInteractionResult['mode']): boolean {
-  return mode === 'plant'
-    || mode === 'plantReeds'
-    || mode === 'tend'
-    || mode === 'harvest'
-    || mode === 'fertilize'
-    || mode === 'irrigate'
-    || mode === 'compost'
-    || mode === 'collectWater'
-    || mode === 'cache'
-    || mode === 'withdrawProvision'
-    || mode === 'cook'
-    || mode === 'preserve'
-    || mode === 'setTrap'
-    || mode === 'checkTrap'
-    || mode === 'collectTrap'
-    || mode === 'setNet'
-    || mode === 'checkNet'
-    || mode === 'collectNet';
-}
-
-export function structureModeTouchesNavigation(mode?: StructureInteractionResult['mode']): boolean {
-  return mode === 'forecast' || mode === 'anchor';
+  return mode === 'cook';
 }
 
 export function useStructureInteractionCommand(input: StructureUseCommandInput): StructureCommandResult {
@@ -549,11 +524,9 @@ export function useStructureInteractionCommand(input: StructureUseCommandInput):
     input.materialCounts,
     input.craftedItems,
     input.topology,
-    input.cropEnvironment,
     input.waystoneContext,
     input.weatherVaneContext,
     input.rainCisternContext,
-    input.caveAnchorContext,
     input.fishTrapContext,
   );
   const action = `${target.item}:${interaction.mode ?? 'none'}:${interaction.message}`;
@@ -567,7 +540,5 @@ export function useStructureInteractionCommand(input: StructureUseCommandInput):
     mode: interaction.mode,
     interaction,
     foodAction: structureModeTouchesFood(interaction.mode) ? action : undefined,
-    navigationAction: structureModeTouchesNavigation(interaction.mode) ? action : undefined,
-    caveAction: interaction.mode === 'anchor' ? action : undefined,
   };
 }

@@ -13,29 +13,19 @@ import { buildGeodesic } from './render/geodesic';
 import { Sky } from './render/sky';
 import { Character } from './render/character';
 import { StructureRenderer } from './render/structures';
-import { KilnRuntimeAssets, type KilnFishSkinSlug } from './render/kilnAssets';
 import { LandmarkRenderer } from './render/landmarks';
-import { DomainResourceRenderer } from './render/domainResources';
-import { SkyfallRenderer } from './render/skyfall';
-import { CaveMouthRenderer } from './render/caveMouths';
-import { RouteRenderer } from './render/routes';
-import { MurmurRenderer } from './render/murmurs';
-import { SeasonAfterglowRenderer } from './render/seasonAfterglow';
 import { ResourceDropRenderer } from './render/resourceDrops';
-import { TreeAssetRenderer } from './render/treeAssets';
-import { NativeLifeRenderer } from './render/nativeLife';
-import { FishSchoolRenderer, kilnFishSkinForSchool, type FishSchoolVisualSite } from './render/fishSchools';
-import { SkyLifeRenderer } from './render/skyLife';
+import { FishSchoolRenderer, kilnFishSkinForSchool, type FishSchoolVisualSite, type KilnFishSkinSlug } from './render/fishSchools';
 import { Player } from './player/player';
 import { Input } from './player/input';
 import { TouchControls } from './player/touch';
 import { GamepadControls, type GamepadFrame } from './player/gamepad';
 import { UxManager, type UxInputMode, type UxProfile } from './player/ux';
 import { panelOwnershipSnapshot, type PanelOwnershipSnapshot } from './player/panelOwnership';
-import { pick, pickNativeCreature, pickTree, type NativeCreaturePick, type PickResult, type TreePick } from './edit/pick';
+import { pick, pickTree, type PickResult, type TreePick } from './edit/pick';
 import { Metrics } from './demo/metrics';
 import { Autopilot, OrbitDemo } from './demo/autopilot';
-import { Hud, splash, hideSplash, type ChestStoragePanelView, type CraftingRecipeView, type RouteSlateView } from './demo/hud';
+import { Hud, splash, hideSplash, type ChestStoragePanelView, type CraftingRecipeView } from './demo/hud';
 import { GameAudio } from './audio/gameAudio';
 import {
   audioEventForCraft,
@@ -61,40 +51,19 @@ import { ITEM_DEFS, allRecipeStatuses, craftRecipe, itemCount, normalizeInventor
 import {
   ageResourceDrops,
   collectReadyResourceDrops,
+  despawnAgedResourceDrops,
   nextResourceDropId,
   normalizeResourceDrops,
   spawnItemDrops,
   spawnMinedItemDrops,
   spawnTreeWoodDrops,
+  RESOURCE_DROP_DESPAWN_AGE,
   type ResourceDropSave,
   type ResourceDropSource,
 } from './sim/resourceDrops';
-import {
-  nativeCreatureAt,
-  nativeCreatureSitesAround,
-  nearestNativeCreatureSite,
-  normalizeNativeCreatureTends,
-  normalizeNativeCreatureWards,
-  tendNativeCreature,
-  wardNativeCreature,
-  withNativeCreatureRoaming,
-  type NativeCreatureAlertSource,
-  type NativeCreatureKind,
-  type NativeCreatureSite,
-} from './sim/nativeLife';
 import { buildInventoryLedger, packBurdenForInventory, packCapacityBonusForInventory } from './sim/inventoryLedger';
-import { cavePressureAt } from './sim/cavePressure';
-import { applyFishingCatch, fishingCueForSchool, fishSchoolAt, type FishSchoolReport } from './sim/fishing';
+import { applyFishingCatch, fishingCueForSchool, fishSchoolAt } from './sim/fishing';
 import { applyForage, forageAt } from './sim/forage';
-import { skyLifeSitesAround, type SkyLifeCandidate, type SkyLifeSite } from './sim/skyLife';
-import { caveResourceAt } from './sim/caveResources';
-import {
-  caveResonanceNotebook,
-  caveResonanceSite,
-  normalizeCaveResonanceObservations,
-  observeCaveResonance,
-} from './sim/caveResonance';
-import { caveMouthSignals, nearestCaveMouthSignal, type CaveMouthTile } from './sim/caveMouths';
 import {
   packStructureCommand,
   placeStructureCommand,
@@ -111,126 +80,41 @@ import {
 import {
   PLACEABLE_ITEM_IDS,
   STRUCTURE_YAW_STEP,
-  caveAnchorKindLabel,
   chestStorageView,
-  consumeWaterlineRouteResupply,
-  houseKitSocketCatalog,
   homeScore,
   isPlaceableItemId,
-  k4UtilitySocketCatalog,
   nearestStructureOnTiles,
   normalizeStructureSaves,
   placeableName,
-  rootCellarProvisionCount,
   spendRootCellarProvision,
   structureDismantleBlockers,
+  structureSocketCatalog,
   structureSocketOccupancy,
-  structureTraversalBlocker,
   structureYawTurn,
   structureStationInventory,
   transferChestMaterial,
-  wallShellSocketCatalog,
   type ChestTransferAction,
-  waystoneMarkLabel,
-  type CropPlotEnvironment,
-  type CaveAnchorContext,
   type FishTrapContext,
   type PlaceableItemId,
+  type RainCisternContext,
   type StructureSave,
-  type StructureTraversalBlock,
-  type WaterlineRouteResupplySource,
-  type WeatherVaneContext,
   type WaystoneContext,
+  type WeatherVaneContext,
 } from './sim/structures';
 import {
   allPentagonLandmarks,
-  completePentagonSiteWork,
   discoverPentagon,
-  evaluatePentagonSiteWork,
   nearestPentagonOnTiles,
-  nearestThresholdChamberSite,
   normalizePentagonDiscoveries,
-  normalizePentagonSiteCompletions,
-  normalizeThresholdChamberObservations,
-  observeThresholdChamber,
-  pentagonDomainAt,
-  pentagonExpeditionSiteAt,
-  pentagonExpeditionSites,
-  pentagonInsightReport,
-  pentagonInsightRewardText,
   pentagonLandmark,
-  pentagonLandscapeProfiles,
   pentagonProgress,
-  pentagonSiteThreshold,
-  pentagonSiteThresholdEffect,
-  pentagonSiteThresholdTerrainSpec,
-  pentagonSiteThresholds,
-  pentagonThresholdChambers,
   pentagonTileIds,
-  type PentagonExpeditionSiteReport,
-  type PentagonSiteWorkStatus,
-  type PentagonSiteThresholdReport,
-  type PentagonThresholdChamberSite,
 } from './sim/landmarks';
-import {
-  domainResourceSites,
-  harvestDomainResource,
-  nearestDomainResourceSite,
-  normalizeDomainHarvests,
-} from './sim/domainResources';
-import {
-  harvestSkyfall,
-  nearestSkyfallSite,
-  normalizeSkyfallHarvests,
-  skyfallSites,
-} from './sim/skyfall';
-import {
-  murmurSites,
-  murmurNotebook,
-  nearestMurmurSite,
-  normalizeMurmurObservations,
-  observeMurmur,
-  type MurmurSite,
-} from './sim/murmurs';
-import {
-  normalizeSeasonAfterglowReadings,
-  readSeasonAfterglow,
-  seasonAfterglowForWindow,
-  strangerSeasonForecast,
-  type StrangerSeasonAfterglow,
-  type StrangerSeasonWindow,
-} from './sim/eventSeasons';
-import { buildHearthJournal } from './sim/journal';
-import {
-  addRoutePlanLeg,
-  chartBearingDegrees,
-  chartTurnLabel,
-  createRoutePlanFromGuides,
-  formatChartDistance,
-  greatCircleDistanceMeters,
-  hearthBeaconSignal,
-  markRoutePlanLegReached,
-  nextHorizonChartSignal,
-  normalizeRoutePlan,
-  planExpedition,
-  deferActiveRoutePlanLeg,
-  removeActiveRoutePlanLeg,
-  routeAdjacentTile,
-  routeEcologyForExpedition,
-  routeGuide,
-  routeGuideCandidates,
-  routePlanItineraryStatus,
-  routePlanSignal,
-  routeSlate,
-  type RouteGuide,
-  type RouteSlateNativeLifeSignal,
-} from './sim/navigation';
 import {
   backPropsForInventory,
   characterActionForLocomotion,
   defaultHeldProp,
   miningPropForMaterial,
-  nativeDefenseActionForProp,
   pickupPropForItem,
   propForStructureInteraction,
   type CharacterAction,
@@ -238,9 +122,7 @@ import {
   type CharacterVisualState,
 } from './sim/equipment';
 import {
-  bestToolForDefense,
   bestToolForMaterial,
-  bestToolForRangedDefense,
   bestToolForTree,
   maxReachBonus,
   normalizeToolWear,
@@ -252,20 +134,24 @@ import {
 import {
   advanceTime as advanceSurvivalTime,
   eatBestFood,
+  isExposureCritical,
+  isExposureWarning,
   normalizeSurvivalState,
   normalizeTimeState,
   normalizeWeatherState,
   prepareHearthSupper,
   recoverFromCollapse,
   restAtShelter,
-  shouldCollapse,
-  isHazardWeather,
   survivalReport,
   updateSurvival,
-  waitForWeatherWindow,
   weatherProtectionForInventory,
   weatherAt,
 } from './sim/survival';
+
+interface TileRingEntry {
+  tile: number;
+  ring: number;
+}
 
 const params = new URLSearchParams(location.search);
 const SEED = params.get('seed') ?? 'GP192-01';
@@ -297,17 +183,16 @@ const STORAGE_FOCUS_ACTIONS: ChestTransferAction[] = ['depositOne', 'depositAll'
 
 const KEYBOARD_HELP = `WASD move · space jump · shift sprint · wheel zoom
 LMB mine + chop trees · RMB build · Z/X rotate build/prop · 1-5 pick block · Q eat
-Plane: chop 2 trees for 12 wood · B craft · R use/open chest/farm/fish/forage · Shift+R pack prop · V/Shift+E move prop · M chart · P itinerary · Shift+P clear · J journal · E board/stow
-Route Slate: Arrow keys choose/drop/move stops · Enter pin · Esc close
+Plane: chop 2 trees for 12 wood · B craft · R use/open chest/farm/fish/forage · Shift+R pack prop · V/Shift+E move prop · E board/stow
 F free-flight · F3 stats · H help`;
 
 const TOUCH_HELP = `Touch: left stick move · drag to look · pinch zoom
 Tap terrain to mine/chop · hold terrain to build/drop moved prop · move grabs/drops nearby prop · hold use packs prop
-Craft opens recipes/pack · route panel buttons pin/later/drop/clear itinerary stops · plane boards/stows · log opens the Hearth Journal`;
+Craft opens recipes/pack · plane boards/stows`;
 
 const GAMEPAD_HELP = `Gamepad: LS move · RS look · full stick/RB sprint · LB+RS zoom
 A jump/swim · LT descend · X mine/chop · RT build · D-pad hotbar
-B use · LB+B pack prop · LB+RT move/drop prop · Y craft · Back route slate · D-pad edits open itinerary · LB+D-pad rotates selected build/move or pins/clears routes · Start board/stow`;
+B use · LB+B pack prop · LB+RT move/drop prop · Y craft · LB+D-pad rotates selected build/move · Start board/stow`;
 
 function inputHelpText(mode: UxInputMode): string {
   if (mode === 'gamepad' || mode === 'hybrid') return GAMEPAD_HELP;
@@ -315,10 +200,10 @@ function inputHelpText(mode: UxInputMode): string {
   return KEYBOARD_HELP;
 }
 
-function hudLabelsForInput(mode: UxInputMode): { craft: string; route: string; hotbar: string[] } {
-  if (mode === 'gamepad' || mode === 'hybrid') return { craft: 'Y', route: 'Back', hotbar: ['1', '2', '3', '4', '5'] };
-  if (mode === 'touch') return { craft: 'craft', route: 'route', hotbar: ['1', '2', '3', '4', '5'] };
-  return { craft: 'B', route: 'M', hotbar: ['1', '2', '3', '4', '5'] };
+function hudLabelsForInput(mode: UxInputMode): { craft: string; hotbar: string[] } {
+  if (mode === 'gamepad' || mode === 'hybrid') return { craft: 'Y', hotbar: ['1', '2', '3', '4', '5'] };
+  if (mode === 'touch') return { craft: 'craft', hotbar: ['1', '2', '3', '4', '5'] };
+  return { craft: 'B', hotbar: ['1', '2', '3', '4', '5'] };
 }
 
 /** which hotbar slot a mined cell's material feeds (grass crumbles to dirt, etc.) */
@@ -357,6 +242,13 @@ async function boot(): Promise<void> {
   const layers = buildLayers();
   const terrain = new Terrain(SEED);
   const columns = new Columns(geo, layers, terrain);
+
+  // World-space radius of the ground surface at a tile, right now. Used to cache a
+  // resource drop's rest height once at spawn (or once on load, for legacy saves) —
+  // never on every render frame — so later terrain edits nearby don't make it snap.
+  const groundRadiusAt = (tile: number): number => layers.topRadius(columns.groundLayerBelow(tile, layers.bounds[0]));
+  const backfillDropGroundRadius = (drops: readonly ResourceDropSave[]): ResourceDropSave[] =>
+    drops.map((drop) => (drop.groundRadius > 0 ? drop : { ...drop, groundRadius: groundRadiusAt(drop.tile) }));
 
   // --- renderer: WebGPU first, WebGL fallback ---
   splash('starting renderer…', 0.18);
@@ -406,7 +298,7 @@ async function boot(): Promise<void> {
     applyTreeChopProgress(trees, loadedSave.treeChopProgress, geo.count);
   }
   const mining = new MineProgress(normalizeMineProgress(loadedSave?.mineProgress, geo.count, layers.L, (tile, layer) => columns.solidAt(tile, layer)));
-  let resourceDrops: ResourceDropSave[] = normalizeResourceDrops(loadedSave?.drops, geo.count);
+  let resourceDrops: ResourceDropSave[] = backfillDropGroundRadius(normalizeResourceDrops(loadedSave?.drops, geo.count));
   let nextDropId = nextResourceDropId(resourceDrops);
   const streamer = new Streamer(geo, layers, columns, scene, chunkMaterial, trees, mining);
 
@@ -523,50 +415,9 @@ async function boot(): Promise<void> {
 
   // --- player + input + demos ---
   const player = new Player(geo, layers, columns);
-  const SPAWN_CLEAR_RINGS = 1;
-  const FRESH_SPAWN_NATIVE_HAZARD_GRACE_SECONDS = 12;
-  const spawnTileEntriesAround = (centerTile: number, rings = 1): CaveMouthTile[] => {
-    const center = Math.max(0, Math.min(geo.count - 1, Math.trunc(centerTile)));
-    const seen = new Set<number>([center]);
-    const queue: CaveMouthTile[] = [{ tile: center, ring: 0 }];
-    for (let i = 0; i < queue.length; i++) {
-      const entry = queue[i];
-      if (entry.ring >= rings) continue;
-      const deg = geo.degreeOf(entry.tile);
-      for (let k = 0; k < deg; k++) {
-        const n = geo.neighbor(entry.tile, k);
-        if (seen.has(n)) continue;
-        seen.add(n);
-        queue.push({ tile: n, ring: entry.ring + 1 });
-      }
-    }
-    return queue;
-  };
-
-  const spawnSafetyDiagnostics = (tile: number, rings = SPAWN_CLEAR_RINGS) => {
-    const clearRings = Math.max(1, Math.trunc(rings));
-    const clearTiles = spawnTileEntriesAround(tile, clearRings);
-    const caveMouths = caveMouthSignals(columns, clearTiles, 16);
-    const nativeThreats = clearTiles
-      .map((entry) => {
-        const site = nativeCreatureAt(SEED, geo, columns, terrain, entry.tile);
-        return site?.pressure && site.temperament !== 'harmless'
-          ? { tile: entry.tile, ring: entry.ring, kind: site.kind, label: site.label, pressure: site.pressure.label }
-          : null;
-      })
-      .filter((site): site is { tile: number; ring: number; kind: NativeCreatureKind; label: string; pressure: string } => site !== null);
-    return {
-      clearRings,
-      caveMouths: caveMouths.map((mouth) => ({ tile: mouth.tile, ring: mouth.ring, kind: mouth.kind, label: mouth.label })),
-      nativeThreats,
-      safe: caveMouths.length === 0 && nativeThreats.length === 0,
-    };
-  };
 
   // spawn on land near pentagon 0: BFS outward for comfortable grass altitude, preferring
   // a clearing at the edge of a wood so the survival loop (chop -> craft) is in view.
-  // Keep direct cave/native pressure off the spawn tile while preserving the authored
-  // first vista near the woods, plane loop, and nearby cave hint.
   const spawnTile = (() => {
     const seen = new Set<number>([0]);
     const queue = [0];
@@ -585,10 +436,7 @@ async function boot(): Promise<void> {
             if (trees.hasTree(geo.neighbor(nb, q)) && ++near >= 2) break outer;
           }
         }
-        if (near >= 2 && !trees.hasTree(t)) {
-          if (fallback < 0) fallback = t;
-          if (spawnSafetyDiagnostics(t).safe) return t;
-        }
+        if (near >= 2 && !trees.hasTree(t)) return t;
       }
       const deg = geo.degreeOf(t);
       for (let k = 0; k < deg; k++) {
@@ -625,33 +473,13 @@ async function boot(): Promise<void> {
   const orbitDemo = new OrbitDemo(metrics, (msg) => hud.flash(msg, 10));
   const character = new Character(scene);
   const structures: StructureSave[] = normalizeStructureSaves(loadedSave?.structures, geo.count, layers.L);
-  const kilnAssets = new KilnRuntimeAssets();
-  const structureRenderer = new StructureRenderer(scene, kilnAssets);
+  const structureRenderer = new StructureRenderer(scene);
   structureRenderer.setStructures(structures);
   const discoveredPentagons = new Set(normalizePentagonDiscoveries(loadedSave?.progression?.pentagons, pentagonTiles));
-  const completedPentagonSites = new Set(normalizePentagonSiteCompletions(loadedSave?.progression?.siteCompletions, pentagonTiles));
-  const harvestedDomainResources = new Set(normalizeDomainHarvests(loadedSave?.progression?.domainHarvests));
-  const harvestedSkyfalls = new Set(normalizeSkyfallHarvests(loadedSave?.progression?.skyfallHarvests));
-  const observedMurmurs = new Set(normalizeMurmurObservations(loadedSave?.progression?.murmurObservations));
-  const seasonAfterglowReadings = new Set(normalizeSeasonAfterglowReadings(loadedSave?.progression?.seasonAfterglowReadings));
-  const observedThresholdChambers = new Set(normalizeThresholdChamberObservations(loadedSave?.progression?.thresholdChamberObservations));
-  const observedCaveResonances = new Set(normalizeCaveResonanceObservations(loadedSave?.progression?.caveResonanceObservations));
-  const tendedNativeCreatures = new Set(normalizeNativeCreatureTends(loadedSave?.progression?.nativeCreatureTends));
-  const wardedNativeCreatures = new Set(normalizeNativeCreatureWards(loadedSave?.progression?.nativeCreatureWards));
-  const landmarkRenderer = new LandmarkRenderer(scene, pentagonTiles, kilnAssets);
-  const domainResourceRenderer = new DomainResourceRenderer(scene, kilnAssets);
-  const skyfallRenderer = new SkyfallRenderer(scene, kilnAssets);
-  const caveMouthRenderer = new CaveMouthRenderer(scene, kilnAssets);
-  const routeRenderer = new RouteRenderer(scene);
-  const murmurRenderer = new MurmurRenderer(scene);
-  const seasonAfterglowRenderer = new SeasonAfterglowRenderer(scene);
-  const resourceDropRenderer = new ResourceDropRenderer(scene, kilnAssets);
-  const treeAssetRenderer = new TreeAssetRenderer(scene, kilnAssets);
-  const nativeLifeRenderer = new NativeLifeRenderer(scene, kilnAssets);
-  const fishSchoolRenderer = new FishSchoolRenderer(scene, kilnAssets);
-  const skyLifeRenderer = new SkyLifeRenderer(scene, kilnAssets);
+  const landmarkRenderer = new LandmarkRenderer(scene, pentagonTiles);
+  const resourceDropRenderer = new ResourceDropRenderer(scene);
+  const fishSchoolRenderer = new FishSchoolRenderer(scene);
   resourceDropRenderer.setDrops(resourceDrops);
-  let treeAssetSyncNeeded = true;
   let fishVisualOverride: FishSchoolVisualSite | null = null;
 
   // --- highlight (Line with an explicit closing vertex; LineLoop is unsupported on WebGPURenderer) ---
@@ -717,13 +545,9 @@ async function boot(): Promise<void> {
   let craftingOpen = false;
   let craftingFocusIndex = 0;
   let craftingFocusAction: 'craft' | 'place' = 'craft';
-  let journalOpen = false;
   let openChestId: number | null = null;
   let storageFocusIndex = 0;
   let storageFocusAction: ChestTransferAction = 'depositOne';
-  let routeFocusIndex = 0;
-  let routeFocusDirty = false;
-  let routeFocusActive = false;
   let selectedStructureItem: PlaceableItemId | null = null;
   let placementYawTurns = 0;
   let relocationCursor: {
@@ -735,7 +559,6 @@ async function boot(): Promise<void> {
     source: BuildCommandSource;
   } | null = null;
   let lastStructureAction = '';
-  let lastStructureCollisionBlock: StructureTraversalBlock | null = null;
   type BuildCommandSource = 'keyboard' | 'pointer' | 'touch' | 'gamepad' | 'debug';
   type BuildCommandVerb = 'select' | 'rotate' | 'place' | 'relocate' | 'use' | 'pack';
   type BuildCommandTarget = 'placement' | 'structure' | 'none';
@@ -764,20 +587,13 @@ async function boot(): Promise<void> {
   const buildCommandLog: RuntimeBuildCommandRecord[] = [];
   let lastFoodAction = '';
   let lastLandmarkAction = '';
-  let lastThresholdTerrainAction = '';
-  let lastThresholdChamberAction = '';
-  let lastDomainResourceAction = '';
-  let lastSkyfallAction = '';
-  let lastMurmurAction = '';
-  let lastSeasonAfterglowAction = '';
-  let lastNativeLifeAction = '';
-  let lastNavigationAction = '';
   let lastToolAction = '';
   let lastCaveAction = '';
   let lastSurvivalAction = '';
+  let exposureWarningActive = false;
+  let exposureCriticalActive = false;
   let lastPickupAction = '';
   let toolWear: ToolWear = normalizeToolWear(loadedSave?.progression?.toolWear);
-  let activeRoutePlan = normalizeRoutePlan(loadedSave?.progression?.routePlan, geo.count);
   const timeState = normalizeTimeState(loadedSave?.time);
   const weatherState = normalizeWeatherState(loadedSave?.weather);
   const survivalState = normalizeSurvivalState(loadedSave?.survival);
@@ -789,7 +605,6 @@ async function boot(): Promise<void> {
   };
   let lastPick: PickResult | null = null;
   let treePick: TreePick | null = null;
-  let nativePick: NativeCreaturePick | null = null;
   let debugPickHoldUntil = 0;
   let mineTimer = 0;
   let nextMineCooldown = 0.17;
@@ -799,28 +614,12 @@ async function boot(): Promise<void> {
   let saveDirty = !loadedSave && saveEnabled;
   let saveTimer = 0;
   let lastSaveMs = 0;
-  let nativeHazardCooldown = loadedSave ? 0 : FRESH_SPAWN_NATIVE_HAZARD_GRACE_SECONDS;
-  let nativeLifeSeconds = 0;
-  let nativeLifeTimeOverride: number | null = null;
-  let nativeLifeAlertSource: NativeCreatureAlertSource = 'player';
-  let nativeLifeAlertSourceUntil = 0;
 
   const markSaveDirty = (): void => {
     if (saveEnabled) saveDirty = true;
   };
 
   const hasInventoryItem = (id: ItemId): boolean => itemCount(counts, craftedItems, id) > 0;
-  const spendCraftedItem = (id: ItemId, amount = 1): boolean => {
-    if (creativeActive) return true;
-    const spend = Math.max(1, Math.trunc(amount));
-    const have = itemCount(counts, craftedItems, id);
-    if (have < spend) return false;
-    const next = have - spend;
-    if (next > 0) craftedItems[id] = next;
-    else delete craftedItems[id];
-    markSaveDirty();
-    return true;
-  };
 
   const packCapacityBonus = () => packCapacityBonusForInventory(craftedItems);
   const packBurden = () => packBurdenForInventory(counts, craftedItems, { creative: creativeActive, capacityBonus: packCapacityBonus() });
@@ -907,6 +706,7 @@ async function boot(): Promise<void> {
       return totals;
     }, {} as Partial<Record<ItemId, number>>),
     ready: resourceDrops.filter((drop) => drop.age >= 0.9).length,
+    despawnAge: RESOURCE_DROP_DESPAWN_AGE,
     lastPickup: lastPickupAction,
     items: resourceDrops.slice(0, 12).map((drop) => ({
       id: drop.id,
@@ -914,6 +714,7 @@ async function boot(): Promise<void> {
       count: drop.count,
       tile: drop.tile,
       age: Math.round(drop.age * 100) / 100,
+      groundRadius: Math.round(drop.groundRadius * 100) / 100,
       source: drop.source,
     })),
     renderer: resourceDropRenderer.stats(),
@@ -921,7 +722,6 @@ async function boot(): Promise<void> {
 
   const treeAssetDiagnostics = () => ({
     proceduralChunkTrees: streamer.proceduralTreesActive(),
-    renderer: treeAssetRenderer.stats(),
     chop: {
       active: trees.chopProgress.size,
       target: treePick ? {
@@ -989,8 +789,18 @@ async function boot(): Promise<void> {
   const tickResourceDrops = (dt: number): void => {
     if (resourceDrops.length === 0) return;
     resourceDrops = ageResourceDrops(resourceDrops, dt);
+    // Uncollected drops disappear after RESOURCE_DROP_DESPAWN_AGE so the world doesn't
+    // accumulate infinite ground clutter from unpicked wood, ore chips, forage, etc.
+    const despawn = despawnAgedResourceDrops(resourceDrops);
+    if (despawn.despawned.length > 0) {
+      resourceDrops = despawn.remaining;
+      markSaveDirty();
+    }
     const result = collectReadyResourceDrops(resourceDrops, tileSetAround(player.tile, 1));
-    if (result.collected.length === 0) return;
+    if (result.collected.length === 0) {
+      if (despawn.despawned.length > 0) resourceDropRenderer.setDrops(resourceDrops);
+      return;
+    }
     resourceDrops = result.remaining;
     for (const drop of result.collected) addResourceDropToInventory(drop);
     resourceDropRenderer.setDrops(resourceDrops);
@@ -1037,7 +847,7 @@ async function boot(): Promise<void> {
       craftedItems,
       drops: resourceDrops,
       structures,
-      progression: { pentagons: [...discoveredPentagons], siteCompletions: [...completedPentagonSites], domainHarvests: [...harvestedDomainResources], skyfallHarvests: [...harvestedSkyfalls], murmurObservations: [...observedMurmurs], seasonAfterglowReadings: [...seasonAfterglowReadings], thresholdChamberObservations: [...observedThresholdChambers], caveResonanceObservations: [...observedCaveResonances], nativeCreatureTends: [...tendedNativeCreatures], nativeCreatureWards: [...wardedNativeCreatures], routePlan: activeRoutePlan, toolWear },
+      progression: { pentagons: [...discoveredPentagons], toolWear },
       time: timeState,
       weather: weatherState,
       survival: survivalState,
@@ -1083,15 +893,7 @@ async function boot(): Promise<void> {
   };
 
   const spawnTreeDrops = (tile: number): ResourceDropSave[] => {
-    const spawned = spawnTreeWoodDrops(tile, nextDropId, WOOD_PER_TREE);
-    nextDropId = spawned.nextId;
-    resourceDrops = [...resourceDrops, ...spawned.drops];
-    resourceDropRenderer.setDrops(resourceDrops);
-    return spawned.drops;
-  };
-
-  const spawnNativeLifeDrops = (site: NativeCreatureSite): ResourceDropSave[] => {
-    const spawned = spawnItemDrops(site.tile, nextDropId, site.reward.item, site.reward.count, 'creature', 1);
+    const spawned = spawnTreeWoodDrops(tile, nextDropId, groundRadiusAt(tile), WOOD_PER_TREE);
     nextDropId = spawned.nextId;
     resourceDrops = [...resourceDrops, ...spawned.drops];
     resourceDropRenderer.setDrops(resourceDrops);
@@ -1099,115 +901,11 @@ async function boot(): Promise<void> {
   };
 
   const spawnMineDrops = (tile: number, item: ItemId, count = 1): ResourceDropSave[] => {
-    const spawned = spawnMinedItemDrops(tile, nextDropId, item, count);
+    const spawned = spawnMinedItemDrops(tile, nextDropId, groundRadiusAt(tile), item, count);
     nextDropId = spawned.nextId;
     resourceDrops = [...resourceDrops, ...spawned.drops];
     resourceDropRenderer.setDrops(resourceDrops);
     return spawned.drops;
-  };
-
-  const nativeWardReadiness = (site?: NativeCreatureSite | null): { prepared: boolean; label: string; prop: CharacterPropId; tool?: ToolEffect } => {
-    if (site?.kind === 'caveBelljaw') {
-      if (itemCount(counts, craftedItems, 'echoLantern') > 0) return { prepared: true, label: 'echo lantern', prop: 'echoLantern' };
-      if (itemCount(counts, craftedItems, 'lantern') > 0) return { prepared: true, label: 'lantern', prop: 'lantern' };
-      const blade = bestToolForDefense(craftedItems, toolWear);
-      if (blade.tool) return { prepared: true, label: blade.name.toLowerCase(), prop: blade.tool, tool: blade };
-      return { prepared: false, label: 'hands', prop: 'hands' };
-    }
-    if (site?.kind === 'screeSnapper') {
-      const blade = bestToolForDefense(craftedItems, toolWear);
-      if (blade.tool) return { prepared: true, label: blade.name.toLowerCase(), prop: blade.tool, tool: blade };
-      const axe = bestToolForTree(craftedItems, toolWear);
-      if (axe.tool) return { prepared: true, label: axe.name.toLowerCase(), prop: axe.tool, tool: axe };
-      return { prepared: false, label: 'hands', prop: 'hands' };
-    }
-    if (site?.kind === 'stormBurr') {
-      if (itemCount(counts, craftedItems, 'stormCloak') > 0) return { prepared: true, label: 'storm cloak brace', prop: 'stormCloak' };
-      const blade = bestToolForDefense(craftedItems, toolWear);
-      if (blade.tool) return { prepared: true, label: blade.name.toLowerCase(), prop: blade.tool, tool: blade };
-      const axe = bestToolForTree(craftedItems, toolWear);
-      if (axe.tool) return { prepared: true, label: axe.name.toLowerCase(), prop: axe.tool, tool: axe };
-      return { prepared: false, label: 'hands', prop: 'hands' };
-    }
-    if (site?.kind === 'tideLurker') {
-      if (itemCount(counts, craftedItems, 'echoLantern') > 0) return { prepared: true, label: 'echo lantern', prop: 'echoLantern' };
-      if (itemCount(counts, craftedItems, 'lantern') > 0) return { prepared: true, label: 'lantern', prop: 'lantern' };
-      const blade = bestToolForDefense(craftedItems, toolWear);
-      if (blade.tool) return { prepared: true, label: blade.name.toLowerCase(), prop: blade.tool, tool: blade };
-      const axe = bestToolForTree(craftedItems, toolWear);
-      if (axe.tool) return { prepared: true, label: axe.name.toLowerCase(), prop: axe.tool, tool: axe };
-      return { prepared: false, label: 'hands', prop: 'hands' };
-    }
-    const blade = bestToolForDefense(craftedItems, toolWear);
-    if (blade.tool) return { prepared: true, label: blade.name.toLowerCase(), prop: blade.tool, tool: blade };
-    const axe = bestToolForTree(craftedItems, toolWear);
-    if (axe.tool) return { prepared: true, label: axe.name.toLowerCase(), prop: axe.tool, tool: axe };
-    if (itemCount(counts, craftedItems, 'echoLantern') > 0) return { prepared: true, label: 'echo lantern', prop: 'echoLantern' };
-    if (itemCount(counts, craftedItems, 'lantern') > 0) return { prepared: true, label: 'lantern', prop: 'lantern' };
-    if (itemCount(counts, craftedItems, 'stormCloak') > 0) return { prepared: true, label: 'storm cloak', prop: 'stormCloak' };
-    return { prepared: false, label: 'hands', prop: 'hands' };
-  };
-
-  const nativeAlertSourceForPressure = (reason: string): NativeCreatureAlertSource =>
-    reason === 'mining noise'
-      ? 'miningNoise'
-      : reason === 'fishing splash'
-      ? 'fishingSplash'
-      : reason === 'ward failed'
-      ? 'wardFailed'
-      : 'player';
-
-  const currentNativeAlertSource = (): NativeCreatureAlertSource =>
-    nativeLifeAlertSourceUntil > nativeLifeSeconds ? nativeLifeAlertSource : 'player';
-
-  const markNativeAlertSource = (source: NativeCreatureAlertSource): void => {
-    nativeLifeAlertSource = source;
-    nativeLifeAlertSourceUntil = nativeLifeSeconds + 3.2;
-  };
-
-  const applyNativeHazardPressure = (site: NativeCreatureSite, reason = 'crowded'): void => {
-    markNativeAlertSource(nativeAlertSourceForPressure(reason));
-    const pressure = site.pressure;
-    const staminaLoss = Math.max(1, Math.trunc(pressure?.stamina ?? 8));
-    const exposureGain = Math.max(1, Math.trunc(pressure?.exposure ?? 4));
-    survivalState.stamina = Math.max(0, survivalState.stamina - staminaLoss);
-    survivalState.exposure = Math.min(100, survivalState.exposure + exposureGain);
-    const pressureVerb = site.kind === 'caveBelljaw'
-      ? reason === 'ward failed' ? 'snaps shut' : 'claps too close'
-      : site.kind === 'screeSnapper'
-      ? reason === 'mining noise' ? 'launches from loose scree' : reason === 'ward failed' ? 'snaps through your guard' : 'winds up and snaps'
-      : site.kind === 'stormBurr'
-      ? reason === 'ward failed' ? 'bursts through your guard' : reason === 'weather gust' ? 'tumbles in on the gust' : 'rolls its burr spines too close'
-      : site.kind === 'tideLurker'
-      ? reason === 'fishing splash' ? 'surges from the cave tide' : reason === 'ward failed' ? 'snaps through the splash' : 'lunges from tidewater'
-      : reason === 'ward failed' ? 'lashes out' : 'rattles too close';
-    const message = `${site.label} ${pressureVerb} · -${staminaLoss} stamina · +${exposureGain} exposure`;
-    lastNativeLifeAction = message;
-    lastSurvivalAction = `native hazard:${message}`;
-    triggerCharacterAction('stagger', reason === 'fishing splash' ? 'fishingRod' : 'hands', 0.52);
-    playAudio('uiDeny');
-    hud.flash(message, 3);
-    markSaveDirty();
-    refreshUseButton();
-  };
-
-  const triggerNativeMiningNoise = (tile: number, material: MaterialItemId): void => {
-    if (creativeActive || player.mode !== 'walk' || material !== 'rock') return;
-    const site = nearestNativeCreatureSite(SEED, geo, columns, terrain, tile, 2, tendedNativeCreatures, wardedNativeCreatures, 'screeSnapper');
-    if (!site || site.warded) return;
-    nativeHazardCooldown = Math.max(nativeHazardCooldown, site.pressure?.interval ?? 2.35);
-    applyNativeHazardPressure(site, 'mining noise');
-    nativeLifeRenderer.setSites(currentNativeCreatureSites());
-  };
-
-  const triggerNativeFishingSplash = (school: FishSchoolReport): boolean => {
-    if (creativeActive || player.mode !== 'walk' || school.kind !== 'cave') return false;
-    const site = nearestNativeCreatureSite(SEED, geo, columns, terrain, player.tile, 2, tendedNativeCreatures, wardedNativeCreatures, 'tideLurker');
-    if (!site || site.warded) return false;
-    nativeHazardCooldown = Math.max(nativeHazardCooldown, site.pressure?.interval ?? 2.55);
-    applyNativeHazardPressure(site, 'fishing splash');
-    nativeLifeRenderer.setSites(currentNativeCreatureSites());
-    return true;
   };
 
   const nearestTreeTileAround = (centerTile = player.tile, rings = 5): number | null => {
@@ -1258,7 +956,6 @@ async function boot(): Promise<void> {
     player.mode = 'walk';
     player.vx = 0; player.vy = 0; player.vz = 0;
     streamer.refreshDesired(...player.up(), player.altitudeAGL());
-    treeAssetSyncNeeded = true;
     updatePicks(player.fwdX, player.fwdY, player.fwdZ);
     return {
       treeTile: target,
@@ -1278,7 +975,6 @@ async function boot(): Promise<void> {
     triggerCharacterAction('chop', tool.tool ?? 'hands', toolPoseDuration(tool, tool.cooldown + 0.28));
     applyToolUse(tool, 'chop');
     rebuildAround(tile);
-    treeAssetSyncNeeded = true;
     markSaveDirty();
     if (result.felled) {
       const drops = spawnTreeDrops(tile);
@@ -1310,12 +1006,6 @@ async function boot(): Promise<void> {
       lastPick = null;
     }
     treePick = pickTree(geo, layers, columns, trees, camWorld.x, camWorld.y, camWorld.z, dirx, diry, dirz, reach + camDist);
-    const nativeSites = currentNativeCreatureSites();
-    nativePick = pickNativeCreature(geo, layers, columns, nativeSites, camWorld.x, camWorld.y, camWorld.z, dirx, diry, dirz, reach + camDist);
-    if (!nativePick && lastPick) {
-      const site = nativeCreatureOnTile(lastPick.hitTile);
-      if (site) nativePick = { site, tile: site.tile, dist: Math.max(0, lastPick.dist - 0.05) };
-    }
   };
 
   const strikeMineCell = (tile: number, layer: number) => {
@@ -1341,7 +1031,6 @@ async function boot(): Promise<void> {
       hud.flash(`${ITEM_DEFS[materialItem].name.toLowerCase()} cracking · ${remaining} more hit${remaining === 1 ? '' : 's'}`, 1.5);
       return { ok: true, tile: targetTile, layer: targetLayer, materialItem, strike, mined: false, mineProgress: mineProgressDiagnostics(), resourceDrops: resourceDropDiagnostics() };
     }
-    const caveDrop = caveResourceAt(columns, targetTile, targetLayer, materialItem);
     const mined = columns.mine(targetTile, targetLayer);
     if (!mined) {
       mining.clear(targetTile, targetLayer);
@@ -1349,30 +1038,15 @@ async function boot(): Promise<void> {
     }
     const slot = yieldSlot(mat);
     const materialDrops = slot >= 0 ? spawnMineDrops(targetTile, materialItem, 1) : [];
-    if (caveDrop) {
-      spawnMineDrops(targetTile, caveDrop.item, caveDrop.amount);
-      lastCaveAction = `mined loose ${caveDrop.label}`;
-      playAudio('caveRead');
-      hud.flash(`${caveDrop.caveKind === 'dryCave' ? 'dry cave' : 'sea cave'} crystal chips dropped`, 3);
-    } else {
-      playAudio('gatherSoft');
-      if (materialDrops.length > 0) hud.flash(`${ITEM_DEFS[materialItem].name.toLowerCase()} chip dropped`, 1.6);
-    }
+    playAudio('gatherSoft');
+    if (materialDrops.length > 0) hud.flash(`${ITEM_DEFS[materialItem].name.toLowerCase()} chip dropped`, 1.6);
     edits++;
-    triggerNativeMiningNoise(targetTile, materialItem);
     rebuildAround(targetTile);
-    treeAssetSyncNeeded = true;
-    return { ok: true, tile: targetTile, layer: targetLayer, materialItem, strike, mined: true, caveDrop, resourceDrops: resourceDropDiagnostics(), mineProgress: mineProgressDiagnostics() };
+    return { ok: true, tile: targetTile, layer: targetLayer, materialItem, strike, mined: true, resourceDrops: resourceDropDiagnostics(), mineProgress: mineProgressDiagnostics() };
   };
 
   const tryMine = (): void => {
     nextMineCooldown = 0.17;
-    const nativeTarget = nativePick?.site ?? (lastPick ? nativeCreatureOnTile(lastPick.hitTile) : null);
-    if (nativeTarget) {
-      tryTargetNativeCreature(nativeTarget);
-      nativePick = null;
-      return;
-    }
     // a tree in front of the terrain hit gets chopped instead
     if (treePick && (!lastPick || treePick.dist < lastPick.dist)) {
       strikeTreeTile(treePick.tile);
@@ -1391,13 +1065,6 @@ async function boot(): Promise<void> {
       const feetK = layers.layerOfRadius(player.radius() + 0.05);
       const headK = Math.max(0, layers.layerOfRadius(player.radius() + 1.75));
       if (lastPick.prevLayer >= headK && lastPick.prevLayer <= feetK) return;
-    }
-    const nativeBlocker = nativePlacementBlocker(lastPick.prevTile);
-    if (nativeBlocker) {
-      lastNativeLifeAction = `placement blocked: ${nativeBlocker}`;
-      playAudio('uiDeny');
-      hud.flash(nativeBlocker, 2.4);
-      return;
     }
     if (counts[hotbarSel] <= 0) {
       playAudio('uiDeny');
@@ -1422,7 +1089,7 @@ async function boot(): Promise<void> {
     syncHudUx(currentUxProfile);
   });
 
-  let fWas = false, gWas = false, oWas = false, eWas = false, vWas = false, bWas = false, rWas = false, qWas = false, mWas = false, pWas = false, nWas = false, jWas = false, zWas = false, xWas = false, escWas = false, f3Was = false, hWas = false;
+  let fWas = false, gWas = false, oWas = false, eWas = false, vWas = false, bWas = false, rWas = false, qWas = false, nWas = false, zWas = false, xWas = false, escWas = false, f3Was = false, hWas = false;
   let showDiag = params.get('debug') === '1';
   let prevSel = -1;
   let lockHinted = false;
@@ -1475,214 +1142,6 @@ async function boot(): Promise<void> {
 
   const stationItems = (): InventoryItems => structureStationInventory(structures);
   const progressionState = () => pentagonProgress(discoveredPentagons, pentagonTiles);
-  const pentagonInsights = () => pentagonInsightReport(pentagonTiles, discoveredPentagons);
-  const pentagonDomainForTile = (tile: number, radius = 2) => pentagonDomainAt(tile, geo, pentagonTiles, discoveredPentagons, radius);
-  const currentPentagonDomain = () => pentagonDomainForTile(player.tile, 2);
-  const FISHING_DOMAIN_RADIUS = 16;
-  let fishingDomainCacheTile = -1;
-  let fishingDomainCache: ReturnType<typeof pentagonDomainForTile> = null;
-  const currentFishingDomain = () => {
-    if (fishingDomainCacheTile !== player.tile) {
-      fishingDomainCacheTile = player.tile;
-      fishingDomainCache = pentagonDomainForTile(player.tile, FISHING_DOMAIN_RADIUS);
-    }
-    return fishingDomainCache;
-  };
-  const pentagonSiteForTile = (tile: number, radius = 2) => pentagonExpeditionSiteAt(tile, geo, pentagonTiles, discoveredPentagons, radius);
-  const currentPentagonSite = () => pentagonSiteForTile(player.tile, 2);
-  const currentDomainResourceSites = () => domainResourceSites(pentagonTiles, geo, discoveredPentagons, harvestedDomainResources);
-  const nearbyDomainResource = () => nearestDomainResourceSite(nearbyTiles(1), currentDomainResourceSites());
-  const currentRouteResourceSignal = () => {
-    const site = nearbyDomainResource();
-    return site ? {
-      label: site.label,
-      dormantLabel: site.dormantLabel,
-      detail: site.detail,
-      rewardLabel: site.reward.label,
-      rewardCount: site.reward.count,
-      discovered: site.discovered,
-      harvested: site.harvested,
-      hint: site.hint,
-    } : null;
-  };
-  const domainResourceDiagnostics = () => {
-    const sites = currentDomainResourceSites();
-    return {
-      total: sites.length,
-      discovered: sites.filter((site) => site.discovered).length,
-      harvested: sites.filter((site) => site.harvested).length,
-      nearby: nearbyDomainResource(),
-      renderer: domainResourceRenderer.stats(),
-      lastAction: lastDomainResourceAction,
-    };
-  };
-  const debugRevealDomainResources = (limit = pentagonTiles.length) => {
-    const max = Math.max(0, Math.min(pentagonTiles.length, Math.trunc(Number.isFinite(limit) ? limit : pentagonTiles.length)));
-    let added = 0;
-    for (let i = 0; i < max; i += 1) {
-      const tile = pentagonTiles[i];
-      if (!discoveredPentagons.has(tile)) {
-        discoveredPentagons.add(tile);
-        added += 1;
-      }
-    }
-    domainResourceRenderer.setSites(currentDomainResourceSites());
-    lastDomainResourceAction = added > 0 ? `debug revealed ${added} domain landmarks` : 'debug domain resources already revealed';
-    markSaveDirty();
-    refreshUseButton();
-    return domainResourceDiagnostics();
-  };
-  const currentSkyfallSites = () => skyfallSites(SEED, timeState.day, timeState.minute, geo.count, harvestedSkyfalls);
-  const currentSkyfall = () => currentSkyfallSites()[0] ?? null;
-  const nearbySkyfall = () => nearestSkyfallSite(nearbyTiles(1), currentSkyfallSites());
-  const currentRouteSkyfallSignal = () => {
-    const site = currentSkyfall();
-    if (!site || !site.active || site.harvested) return null;
-    const distanceM = greatCircleDistanceMeters(geo.centers, player.tile, site.tile, PLANET_RADIUS);
-    const bearingDeg = chartBearingDegrees(geo.centers, geo.frameOf(player.tile), player.tile, [player.fwdX, player.fwdY, player.fwdZ], site.tile);
-    return {
-      tile: site.tile,
-      kind: site.kind,
-      label: site.label,
-      detail: site.detail,
-      omenLabel: site.omen.label,
-      omenDetail: site.omen.detail,
-      rewardLabel: site.reward.label,
-      rewardCount: site.reward.count,
-      distanceM,
-      distanceLabel: formatChartDistance(distanceM),
-      turn: chartTurnLabel(bearingDeg),
-      minutesRemaining: site.minutesRemaining,
-      active: site.active,
-      harvested: site.harvested,
-    };
-  };
-  const skyfallDiagnostics = () => {
-    const sites = currentSkyfallSites();
-    return {
-      total: sites.length,
-      active: sites.filter((site) => site.active && !site.harvested).length,
-      harvested: sites.filter((site) => site.harvested).length,
-      current: currentSkyfall(),
-      nearby: nearbySkyfall(),
-      renderer: skyfallRenderer.stats(),
-      lastAction: lastSkyfallAction,
-    };
-  };
-  const currentMurmurSites = () => murmurSites(SEED, timeState.day, timeState.minute, geo.count, observedMurmurs);
-  const nearbyMurmur = () => nearestMurmurSite(nearbyTiles(1), currentMurmurSites());
-  const currentRouteMurmurSignal = () => {
-    let best: (MurmurSite & { distanceM: number; bearingDeg: number }) | null = null;
-    for (const site of currentMurmurSites()) {
-      if (!site.active || site.observed) continue;
-      const distanceM = greatCircleDistanceMeters(geo.centers, player.tile, site.tile, PLANET_RADIUS);
-      if (best && distanceM >= best.distanceM) continue;
-      const bearingDeg = chartBearingDegrees(geo.centers, geo.frameOf(player.tile), player.tile, [player.fwdX, player.fwdY, player.fwdZ], site.tile);
-      best = { ...site, distanceM, bearingDeg };
-    }
-    return best ? {
-      tile: best.tile,
-      kind: best.kind,
-      label: best.label,
-      detail: best.detail,
-      note: best.note,
-      distanceM: best.distanceM,
-      distanceLabel: formatChartDistance(best.distanceM),
-      turn: chartTurnLabel(best.bearingDeg),
-      minutesRemaining: best.minutesRemaining,
-      active: best.active,
-      observed: best.observed,
-    } : null;
-  };
-  const murmurDiagnostics = () => {
-    const sites = currentMurmurSites();
-    return {
-      total: sites.length,
-      active: sites.filter((site) => site.active && !site.observed).length,
-      observed: observedMurmurs.size,
-      windowObserved: sites.filter((site) => site.observed).length,
-      nearby: nearbyMurmur(),
-      route: currentRouteMurmurSignal(),
-      renderer: murmurRenderer.stats(),
-      lastAction: lastMurmurAction,
-    };
-  };
-  const nativeCreatureSitesNear = (
-    rings = 7,
-    maxSites = 7,
-    kind: NativeCreatureKind | 'any' = 'any',
-  ): NativeCreatureSite[] =>
-    nativeCreatureSitesAround(SEED, geo, columns, terrain, player.tile, rings, tendedNativeCreatures, wardedNativeCreatures, maxSites, kind, nativeLifeSeconds, { playerTile: player.tile, alertSource: currentNativeAlertSource() });
-  const currentNativeCreatureSites = (): NativeCreatureSite[] => nativeCreatureSitesNear(7, 7);
-  const nativeCreatureOnTile = (tile: number): NativeCreatureSite | null => {
-    if (!Number.isFinite(tile)) return null;
-    const target = Math.max(0, Math.min(geo.count - 1, Math.trunc(tile)));
-    return currentNativeCreatureSites().find((site) => site.tile === target || site.motion?.currentTile === target) ?? null;
-  };
-  const nativePlacementBlocker = (tile: number): string | null => {
-    const site = nativeCreatureOnTile(tile);
-    return site ? `native life on snap target: ${site.label}` : null;
-  };
-  const nativeCreatureKinds = new Set<NativeCreatureKind>([
-    'mossPuff',
-    'shellSkitter',
-    'reedbackGrazer',
-    'caveBlinker',
-    'tideLurker',
-    'caveBelljaw',
-    'screeSnapper',
-    'stormBurr',
-    'brambleback',
-  ]);
-  const normalizeNativeCreatureKind = (kind: unknown): NativeCreatureKind | null =>
-    typeof kind === 'string' && nativeCreatureKinds.has(kind as NativeCreatureKind)
-      ? kind as NativeCreatureKind
-      : null;
-  const nativeLifeRoutePriority = (site: Pick<NativeCreatureSite, 'temperament' | 'tended' | 'warded'>): number =>
-    site.temperament !== 'harmless' && !site.warded
-      ? site.temperament === 'combative' ? 95 : 91
-      : site.temperament === 'harmless' && !site.tended
-      ? 86
-      : 29;
-  const currentRouteNativeLifeSignals = (): RouteSlateNativeLifeSignal[] =>
-    currentNativeCreatureSites()
-      .slice()
-      .sort((a, b) => nativeLifeRoutePriority(b) - nativeLifeRoutePriority(a) || a.label.localeCompare(b.label))
-      .map((site) => {
-        const distanceM = greatCircleDistanceMeters(geo.centers, player.tile, site.tile, PLANET_RADIUS);
-        const bearingDeg = chartBearingDegrees(geo.centers, geo.frameOf(player.tile), player.tile, [player.fwdX, player.fwdY, player.fwdZ], site.tile);
-        return {
-          tile: site.tile,
-          kind: site.kind,
-          label: site.label,
-          detail: site.detail,
-          temperament: site.temperament,
-          rewardLabel: site.reward.label,
-          rewardCount: site.reward.count,
-          distanceM,
-          tended: site.tended,
-          warded: site.warded,
-          hint: site.hint,
-          distanceLabel: formatChartDistance(distanceM),
-          turn: chartTurnLabel(bearingDeg),
-          telegraph: site.combat?.telegraph,
-          weakness: site.combat?.weakness,
-          result: site.combat?.result,
-        };
-      });
-  const nearbyNativeCreature = (): NativeCreatureSite | null =>
-    currentNativeCreatureSites().find((site) => tileSetAround(player.tile, 1).has(site.tile)) ?? null;
-  const nearbyNativeHazard = (): NativeCreatureSite | null =>
-    nativeCreatureSitesNear(1, 16)
-      .find((site) => site.temperament !== 'harmless') ?? null;
-  const rangedNativeHazard = (): NativeCreatureSite | null => {
-    if (itemCount(counts, craftedItems, 'reedBow') <= 0 || itemCount(counts, craftedItems, 'whistlingArrow') <= 0) return null;
-    const rangedTiles = tileSetAround(player.tile, 5);
-    return nativeCreatureSitesNear(5, 24)
-      .filter((site) => site.kind === 'brambleback' || site.kind === 'screeSnapper' || site.kind === 'stormBurr' || site.kind === 'tideLurker')
-      .filter((site) => rangedTiles.has(site.tile))
-      .find((site) => !site.warded) ?? null;
-  };
   const facePlayerTowardTile = (tile: number): void => {
     const [ux, uy, uz] = player.up();
     const c = geo.centers;
@@ -1702,281 +1161,8 @@ async function boot(): Promise<void> {
       player.reorthonormalize();
     }
   };
-  const standForNativeCreature = (candidate: NativeCreatureSite): { stand: number; score: number } => {
-    const siteHeight = columns.heightOf(candidate.tile);
-    let stand = candidate.tile;
-    let score = 9999;
-    const ring1 = tileSetAround(candidate.tile, 1);
-    for (const nb of tileSetAround(candidate.tile, 2)) {
-      if (nb === candidate.tile) continue;
-      if (trees.hasTree(nb)) continue;
-      const h = columns.heightOf(nb);
-      const s = Math.abs(h - siteHeight) + (h < 2.5 ? 20 : 0) + (ring1.has(nb) ? 0 : 1.25);
-      if (s < score) {
-        score = s;
-        stand = nb;
-      }
-    }
-    return { stand, score };
-  };
-  const spawnAtNativeCreatureSite = (site: NativeCreatureSite): { site: NativeCreatureSite; standTile: number } => {
-    const liveSite = withNativeCreatureRoaming(SEED, geo, columns, terrain, site, nativeLifeSeconds);
-    const bestStand = standForNativeCreature(liveSite);
-    const stand = bestStand.stand >= 0 ? bestStand.stand : liveSite.tile;
-    player.spawnAt(stand);
-    facePlayerTowardTile(liveSite.tile);
-    player.mode = 'walk';
-    player.vx = 0; player.vy = 0; player.vz = 0;
-    nativeHazardCooldown = liveSite.temperament === 'harmless' ? Math.max(nativeHazardCooldown, 2.5) : 0;
-    lastNativeLifeAction = `debug spawned ${liveSite.label}`;
-    streamer.refreshDesired(...player.up(), player.altitudeAGL());
-    refreshUseButton();
-    nativeLifeRenderer.setSites(currentNativeCreatureSites());
-    return { site: liveSite, standTile: stand };
-  };
-  const findNativeCreatureOfKind = (kind: NativeCreatureKind, startTile = player.tile): NativeCreatureSite | null => {
-    const start = Math.max(0, Math.min(geo.count - 1, Math.trunc(Number.isFinite(startTile) ? startTile : player.tile)));
-    for (let i = 0; i < geo.count; i += 1) {
-      const tile = (start + i) % geo.count;
-      const site = nativeCreatureAt(SEED, geo, columns, terrain, tile, tendedNativeCreatures, wardedNativeCreatures);
-      if (site?.kind === kind) return site;
-    }
-    return null;
-  };
-  const debugSpawnAtDomainResource = (kind?: string) => {
-    const sites = currentDomainResourceSites()
-      .filter((site) => site.discovered && !site.harvested && (!kind || site.kind === kind));
-    const site = sites[0] ?? null;
-    if (!site) return null;
-    let stand = site.tile;
-    const deg = geo.degreeOf(site.tile);
-    for (let k = 0; k < deg; k += 1) {
-      const candidate = geo.neighbor(site.tile, k);
-      if (candidate >= 0) {
-        stand = candidate;
-        break;
-      }
-    }
-    player.spawnAt(stand);
-    facePlayerTowardTile(site.tile);
-    player.mode = 'walk';
-    player.vx = 0;
-    player.vy = 0;
-    player.vz = 0;
-    streamer.refreshDesired(...player.up(), player.altitudeAGL());
-    domainResourceRenderer.setSites(currentDomainResourceSites());
-    refreshUseButton();
-    return { site, standTile: stand, diagnostics: domainResourceDiagnostics() };
-  };
-  const nativeLifeDiagnostics = () => {
-    const sites = currentNativeCreatureSites();
-    const hazard = nearbyNativeHazard();
-    const rangedHazard = rangedNativeHazard();
-    return {
-      visible: sites.length,
-      tended: tendedNativeCreatures.size,
-      warded: wardedNativeCreatures.size,
-      roaming: {
-        actors: sites.filter((site) => !!site.motion).length,
-        moving: sites.filter((site) => site.motion?.moving).length,
-        playerReactive: sites.filter((site) => Number.isFinite(site.motion?.playerRings)).length,
-        states: sites.reduce<Record<string, number>>((totals, site) => {
-          const state = site.motion?.state ?? 'static';
-          totals[state] = (totals[state] ?? 0) + 1;
-          return totals;
-        }, {}),
-        moods: sites.reduce<Record<string, number>>((totals, site) => {
-          const mood = site.motion?.mood ?? 'unknown';
-          totals[mood] = (totals[mood] ?? 0) + 1;
-          return totals;
-        }, {}),
-        alertSources: sites.reduce<Record<string, number>>((totals, site) => {
-          const source = site.motion?.alertSource;
-          if (source) totals[source] = (totals[source] ?? 0) + 1;
-          return totals;
-        }, {}),
-      },
-      nearby: nearbyNativeCreature(),
-      hazard: hazard && !hazard.warded ? hazard : null,
-      rangedHazard,
-      pick: nativePick ? { tile: nativePick.tile, dist: Number(nativePick.dist.toFixed(2)), site: nativePick.site } : null,
-      placementBlocker: lastPick?.prevTile !== undefined && lastPick.prevTile >= 0 ? nativePlacementBlocker(lastPick.prevTile) : null,
-      lastAction: lastNativeLifeAction,
-      renderer: nativeLifeRenderer.stats(),
-      sites: sites.slice(0, 8),
-    };
-  };
-  const currentStrangerSeasons = (): StrangerSeasonWindow[] =>
-    strangerSeasonForecast(SEED, timeState.day, timeState.minute, geo.count, harvestedSkyfalls, observedMurmurs, 4);
-  const currentStrangerSeason = (): StrangerSeasonWindow | null => currentStrangerSeasons()[0] ?? null;
-  const currentRouteSeasonSignal = () => {
-    const season = currentStrangerSeason();
-    return season ? {
-      label: season.label,
-      detail: season.detail,
-      tradeoff: season.tradeoff,
-      routeHint: season.routeHint,
-      startsInMinutes: season.startsInMinutes,
-      endsInMinutes: season.endsInMinutes,
-      urgency: season.urgency,
-      focus: season.focus,
-      chain: {
-        progressLabel: season.chain.progressLabel,
-        payoffLabel: season.chain.payoffLabel,
-        payoffDetail: season.chain.payoffDetail,
-        routeEffect: season.chain.routeEffect,
-        linked: season.chain.linked,
-        fullChord: season.chain.fullChord,
-      },
-    } : null;
-  };
-  const currentSeasonAfterglow = (): StrangerSeasonAfterglow | null =>
-    seasonAfterglowForWindow(currentStrangerSeason(), seasonAfterglowReadings);
-  const nearbySeasonAfterglow = (): StrangerSeasonAfterglow | null => {
-    const afterglow = currentSeasonAfterglow();
-    if (!afterglow || afterglow.read) return null;
-    return tileSetAround(player.tile, 1).has(afterglow.tile) ? afterglow : null;
-  };
-  const currentRouteSeasonAfterglowSignal = () => {
-    const afterglow = currentSeasonAfterglow();
-    if (!afterglow) return null;
-    const distanceM = greatCircleDistanceMeters(geo.centers, player.tile, afterglow.tile, PLANET_RADIUS);
-    const bearingDeg = chartBearingDegrees(geo.centers, geo.frameOf(player.tile), player.tile, [player.fwdX, player.fwdY, player.fwdZ], afterglow.tile);
-    return {
-      tile: afterglow.tile,
-      id: afterglow.id,
-      label: afterglow.label,
-      detail: afterglow.detail,
-      note: afterglow.note,
-      routeHint: afterglow.routeHint,
-      read: afterglow.read,
-      distanceM,
-      distanceLabel: formatChartDistance(distanceM),
-      turn: chartTurnLabel(bearingDeg),
-      focusMinutes: afterglow.focusMinutes,
-    };
-  };
-  const seasonAfterglowDiagnostics = () => ({
-    current: currentSeasonAfterglow(),
-    nearby: nearbySeasonAfterglow(),
-    readings: [...seasonAfterglowReadings],
-    renderer: seasonAfterglowRenderer.stats(),
-    lastAction: lastSeasonAfterglowAction,
-  });
-  const seasonGuideForTile = (
-    kind: 'skyfall' | 'murmur',
-    tile: number,
-    label: string,
-    detail: string,
-    priority: number,
-  ): RouteGuide | null => {
-    if (!Number.isFinite(tile)) return null;
-    const targetTile = Math.max(0, Math.min(geo.count - 1, Math.trunc(tile)));
-    const distanceM = greatCircleDistanceMeters(geo.centers, player.tile, targetTile, PLANET_RADIUS);
-    if (distanceM <= 8) return null;
-    const bearingDeg = chartBearingDegrees(geo.centers, geo.frameOf(player.tile), player.tile, [player.fwdX, player.fwdY, player.fwdZ], targetTile);
-    return {
-      kind,
-      targetTile,
-      label,
-      detail: `${formatChartDistance(distanceM)} ${chartTurnLabel(bearingDeg)} · ${detail}`,
-      priority,
-    };
-  };
-  const currentSeasonRouteGuides = (): RouteGuide[] => {
-    const season = currentStrangerSeason();
-    if (!season || season.chain.fullChord || season.focus === 'quiet') return [];
-    const guides: RouteGuide[] = [];
-    const urgencyBoost = season.urgency === 'now' ? 0 : season.urgency === 'soon' ? -22 : -52;
-    const pushGuide = (guide: RouteGuide | null) => {
-      if (!guide) return;
-      if (guides.some((existing) => existing.targetTile === guide.targetTile)) return;
-      guides.push(guide);
-    };
-    const fallOpen = !!season.skyfall && season.skyfall.active && !season.skyfall.harvested;
-    if (fallOpen) {
-      const claimedNotes = season.chain.notesObserved > 0;
-      pushGuide(seasonGuideForTile(
-        'skyfall',
-        season.skyfall!.tile,
-        `Season Fall: ${season.skyfall!.label}`,
-        `season fall · ${season.skyfall!.omen.label} · +${season.skyfall!.reward.count} ${season.skyfall!.reward.label} · ${season.skyfall!.minutesRemaining}m left${claimedNotes ? ' · complete the link' : ''}`,
-        (claimedNotes ? 130 : 126) + urgencyBoost,
-      ));
-    }
-    const notes = season.murmurs
-      .filter((site) => site.active && !site.observed)
-      .map((site) => ({
-        site,
-        distanceM: greatCircleDistanceMeters(geo.centers, player.tile, site.tile, PLANET_RADIUS),
-      }))
-      .sort((a, b) => a.distanceM - b.distanceM)
-      .slice(0, 3);
-    for (const [index, entry] of notes.entries()) {
-      const detail = `season note ${index + 1}/${Math.max(1, season.chain.notesTotal)} · ${entry.site.label} · ${entry.site.minutesRemaining}m left${season.chain.fallClaimed ? ' · extend the chord' : ' · listen first'}`;
-      pushGuide(seasonGuideForTile(
-        'murmur',
-        entry.site.tile,
-        `Season Note: ${entry.site.label}`,
-        detail,
-        (season.chain.fallClaimed ? 128 : 122) + urgencyBoost - index,
-      ));
-    }
-    return guides.sort((a, b) => b.priority - a.priority || a.label.localeCompare(b.label));
-  };
-  const currentSeasonChain = () => currentStrangerSeason()?.chain ?? null;
-  const seasonChainFlash = (): string => {
-    const chain = currentSeasonChain();
-    return chain?.linked ? ` · ${chain.payoffLabel}: ${chain.payoffDetail}` : '';
-  };
-  const isSeasonActionRouteSignal = (signal: ReturnType<typeof routePlanSignal> | null): signal is NonNullable<ReturnType<typeof routePlanSignal>> =>
-    !!signal
-    && (
-      signal.sourceKind === 'seasonAfterglow'
-      || ((signal.sourceKind === 'skyfall' || signal.sourceKind === 'murmur') && signal.label.startsWith('Season '))
-    );
-  const strangerSeasonDiagnostics = () => ({
-    current: currentStrangerSeason(),
-    forecast: currentStrangerSeasons(),
-  });
-  const currentThresholdChambers = (): PentagonThresholdChamberSite[] =>
-    pentagonThresholdChambers(pentagonTiles, geo, discoveredPentagons, completedPentagonSites, observedThresholdChambers);
-  const nearbyThresholdChamber = () => nearestThresholdChamberSite(nearbyTiles(2), currentThresholdChambers());
-  const currentRouteThresholdChamberSignal = () => {
-    const site = nearbyThresholdChamber();
-    return site ? {
-      label: site.label,
-      detail: site.detail,
-      note: site.note,
-      rewardLabel: site.reward.label,
-      rewardCount: site.reward.count,
-      landmarkName: site.landmarkName,
-      thresholdLabel: site.thresholdLabel,
-      open: site.open,
-      observed: site.observed,
-      hint: site.hint,
-    } : null;
-  };
-  const thresholdChamberDiagnostics = () => {
-    const sites = currentThresholdChambers();
-    return {
-      total: sites.length,
-      open: sites.filter((site) => site.open).length,
-      observed: observedThresholdChambers.size,
-      nearby: nearbyThresholdChamber(),
-      sites,
-      lastAction: lastThresholdChamberAction,
-    };
-  };
   const shouldShowUseButton = (): boolean =>
     structures.length > 0 ||
-    nearbyThresholdChamber() !== null ||
-    nearbyDomainResource() !== null ||
-    nearbySkyfall() !== null ||
-    nearbyMurmur() !== null ||
-    nearbySeasonAfterglow() !== null ||
-    nearbyNativeCreature() !== null ||
-    rangedNativeHazard() !== null ||
     itemCount(counts, craftedItems, 'fishingRod') > 0 ||
     itemCount(counts, craftedItems, 'echoLantern') > 0 ||
     nearestPentagonOnTiles(nearbyTiles(1), pentagonTiles) !== null;
@@ -2076,23 +1262,9 @@ async function boot(): Promise<void> {
     );
   };
 
-  const isWaterlineUtilityItem = (item: PlaceableItemId): boolean => item === 'dockSegment' || item === 'fishTrap' || item === 'shoreNet';
-
-  const structureSnapTarget = (item: PlaceableItemId, tile: number, layer?: number): { layer: number; blocker: string | null } => {
-    let k = layer ?? columns.groundLayerBelow(tile, layers.bounds[0]);
-    let blocker: string | null = nativePlacementBlocker(tile);
-    if (!blocker && isWaterlineUtilityItem(item)) {
-      if (!waterNearTile(tile, 1)) {
-        blocker = `${placeableName(item).toLowerCase()} needs a shore or water edge`;
-      } else {
-        const groundK = columns.groundLayerBelow(tile, layers.bounds[0]);
-        const groundTop = layers.topRadius(groundK);
-        const waterK = layers.layerOfRadius(WATER_SURFACE);
-        k = groundTop < WATER_SURFACE + 0.2 ? waterK : groundK;
-      }
-    } else if (!blocker && !columns.solidAt(tile, k)) {
-      blocker = 'needs solid ground';
-    }
+  const structureSnapTarget = (_item: PlaceableItemId, tile: number, layer?: number): { layer: number; blocker: string | null } => {
+    const k = layer ?? columns.groundLayerBelow(tile, layers.bounds[0]);
+    const blocker: string | null = !columns.solidAt(tile, k) ? 'needs solid ground' : null;
     return { layer: k, blocker };
   };
 
@@ -2207,7 +1379,7 @@ async function boot(): Promise<void> {
     }
     const target = id !== undefined
       ? structures.find((s) => s.id === Math.trunc(id)) ?? null
-      : nearestStructureOnTiles(structures, nearbyStructureTiles());
+      : nearestStructureFacing(structures, nearbyStructureTiles());
     const result = rotatePlacedStructureCommand(structures, target, delta, geo);
     lastStructureAction = result.action;
     recordBuildCommand(source, 'rotate', target ? 'structure' : 'none', result, target);
@@ -2243,7 +1415,6 @@ async function boot(): Promise<void> {
     });
     recordBuildCommand(source, 'place', 'placement', result, result.placed, inventoryBefore, itemCount(counts, craftedItems, item));
     if (!result.ok || !result.placed) {
-      if (snap.blocker?.startsWith('native life on snap target')) lastNativeLifeAction = `placement blocked: ${snap.blocker}`;
       playAudio(audioEventForPlacement(false));
       hud.flash(result.message, 2.5);
       return false;
@@ -2345,7 +1516,7 @@ async function boot(): Promise<void> {
   const beginRelocationCursor = (id?: number, source: BuildCommandSource = 'keyboard'): boolean => {
     const target = id !== undefined
       ? structures.find((s) => s.id === Math.trunc(id)) ?? null
-      : nearestStructureOnTiles(structures, nearbyStructureTiles());
+      : nearestStructureFacing(structures, nearbyStructureTiles());
     if (!target) {
       const result = relocateStructureCommand({
         structures,
@@ -2482,7 +1653,7 @@ async function boot(): Promise<void> {
 
   hud.onPlaceSelect = selectStructureForPlacement;
 
-  const tileEntriesAroundTile = (centerTile: number, rings = 1): CaveMouthTile[] => {
+  const tileEntriesAroundTile = (centerTile: number, rings = 1): TileRingEntry[] => {
     const center = Math.max(0, Math.min(geo.count - 1, Math.trunc(centerTile)));
     const seen = new Set<number>([center]);
     const queue: { tile: number; ring: number }[] = [{ tile: center, ring: 0 }];
@@ -2503,17 +1674,10 @@ async function boot(): Promise<void> {
   const tilesAroundTile = (centerTile: number, rings = 1): number[] => tileEntriesAroundTile(centerTile, rings).map((entry) => entry.tile);
 
   const nearbyTiles = (rings = 1): number[] => tilesAroundTile(player.tile, rings);
-  const nearbyTileEntries = (rings = 1): CaveMouthTile[] => tileEntriesAroundTile(player.tile, rings);
 
-  const wallShellMovementBlocker = (fromTile: number, toTile: number): StructureTraversalBlock | null => {
-    const blocker = structureTraversalBlocker(structures, geo, fromTile, toTile);
-    if (blocker) {
-      lastStructureCollisionBlock = blocker;
-      lastStructureAction = `${blocker.item}:collision:${blocker.message}`;
-    }
-    return blocker;
-  };
-
+  // No surviving structure kind blocks player traversal (that was exclusively a wall-shell
+  // house-kit behavior), so the old per-frame O(n) traversal-blocker scan is removed rather
+  // than optimized: structureCollisionDiagnostics now reports a constant no-blocker result.
   const structureCollisionDiagnostics = (fromTile?: number, toTile?: number) => {
     const from = Math.max(0, Math.min(geo.count - 1, Math.trunc(Number.isFinite(fromTile) ? Number(fromTile) : player.tile)));
     const fallbackTo = geo.neighbor(from, 0);
@@ -2521,103 +1685,8 @@ async function boot(): Promise<void> {
     return {
       fromTile: from,
       toTile: to,
-      blocker: structureTraversalBlocker(structures, geo, from, to),
-      last: lastStructureCollisionBlock,
-    };
-  };
-
-  const siteWorkStructures = (site: PentagonExpeditionSiteReport): StructureSave[] => {
-    const local = new Set(tilesAroundTile(site.tile, 2));
-    return structures.filter((structure) => local.has(structure.tile));
-  };
-
-  const siteWorkStatus = (site: PentagonExpeditionSiteReport | null | undefined): PentagonSiteWorkStatus | null =>
-    site ? evaluatePentagonSiteWork(site, siteWorkStructures(site), craftedItems, completedPentagonSites) : null;
-
-  const siteWorkMissingLabels = (status: PentagonSiteWorkStatus | null): string[] =>
-    status ? status.missing.map((req) => req.label) : [];
-
-  const currentPentagonSiteWork = (): PentagonSiteWorkStatus | null => siteWorkStatus(currentPentagonSite());
-  const siteThreshold = (site: PentagonExpeditionSiteReport | null | undefined): PentagonSiteThresholdReport | null =>
-    site ? pentagonSiteThreshold(site, completedPentagonSites) : null;
-  const currentPentagonSiteThreshold = (): PentagonSiteThresholdReport | null => siteThreshold(currentPentagonSite());
-  const currentPentagonSiteThresholdEffect = () => pentagonSiteThresholdEffect(currentPentagonSiteThreshold());
-
-  const thresholdTerrainTiles = (site: PentagonExpeditionSiteReport, span: number): number[] => {
-    const wanted = Math.max(1, Math.trunc(span));
-    const occupied = new Set(structures.map((structure) => structure.tile));
-    const degree = geo.degreeOf(site.tile);
-    const startEdge = degree > 0 ? (site.landmark.index * 2 + 2) % degree : 0;
-    const neighbors: number[] = [];
-    for (let i = 0; i < degree; i++) neighbors.push(geo.neighbor(site.tile, (startEdge + i) % degree));
-    const outer: number[] = [];
-    for (const tile of neighbors) {
-      const outerDegree = geo.degreeOf(tile);
-      for (let i = 0; i < outerDegree; i++) {
-        const next = geo.neighbor(tile, i);
-        if (next === site.tile || neighbors.includes(next) || outer.includes(next)) continue;
-        outer.push(next);
-      }
-    }
-    const tiles: number[] = [];
-    const add = (tile: number, allowOccupied = false): void => {
-      if (tile < 0 || tiles.includes(tile)) return;
-      if (!allowOccupied && occupied.has(tile)) return;
-      tiles.push(tile);
-    };
-    for (const tile of neighbors) add(tile);
-    for (const tile of outer) add(tile);
-    add(site.tile);
-    for (const tile of neighbors) add(tile, true);
-    for (const tile of outer) add(tile, true);
-    add(site.tile, true);
-    return tiles.slice(0, wanted);
-  };
-
-  const carvePentagonThresholdTerrain = (site: PentagonExpeditionSiteReport | null | undefined) => {
-    if (!site) {
-      return { ok: false, changedCells: 0, tiles: [] as number[], label: '', detail: '', message: 'no site terrain threshold nearby' };
-    }
-    const threshold = siteThreshold(site);
-    const spec = pentagonSiteThresholdTerrainSpec(threshold);
-    if (!threshold?.open || !spec) {
-      return { ok: false, changedCells: 0, tiles: [] as number[], label: threshold?.label ?? '', detail: '', message: 'complete the site work to open its terrain threshold' };
-    }
-
-    const tiles = thresholdTerrainTiles(site, spec.tileSpan);
-    const changedTiles = new Set<number>();
-    let changedCells = 0;
-    for (const tile of tiles) {
-      const top = columns.topLayerOf(tile);
-      const end = Math.min(layers.L - 1, top + spec.carveDepthCells);
-      for (let layer = top; layer < end; layer++) {
-        if (columns.mine(tile, layer)) {
-          changedCells++;
-          changedTiles.add(tile);
-        }
-      }
-    }
-
-    if (changedCells > 0) {
-      edits += changedCells;
-      markSaveDirty();
-      for (const tile of changedTiles) rebuildAround(tile);
-    }
-
-    lastThresholdTerrainAction = changedCells > 0
-      ? `${spec.label}: opened ${changedCells} terrain cells across ${changedTiles.size} ${spec.role} tile${changedTiles.size === 1 ? '' : 's'}`
-      : `${spec.label}: terrain already open`;
-    return {
-      ok: true,
-      changedCells,
-      changedTiles: [...changedTiles],
-      tiles,
-      role: spec.role,
-      tileSpan: spec.tileSpan,
-      carveDepthCells: spec.carveDepthCells,
-      label: spec.label,
-      detail: spec.detail,
-      message: lastThresholdTerrainAction,
+      blocker: null as null,
+      last: null as null,
     };
   };
 
@@ -2632,380 +1701,72 @@ async function boot(): Promise<void> {
 
   const nearbyLandmarkTile = (): number | null => nearestPentagonOnTiles(nearbyTiles(1), pentagonTiles);
 
-  const horizonChartCount = (): number => itemCount(counts, craftedItems, 'horizonChart');
+  // cos(65°): interact-facing cone half-angle. Forgiving enough that you don't have to
+  // pixel-aim, tight enough that something behind or off to the side can't steal focus from
+  // whatever the player is actually facing.
+  const INTERACT_FACING_COS = Math.cos((65 * Math.PI) / 180);
 
-  const horizonChartSignal = () => nextHorizonChartSignal(
-    allPentagonLandmarks(pentagonTiles, discoveredPentagons),
-    discoveredPentagons,
-    geo.centers,
-    geo.frameOf(player.tile),
-    player.tile,
-    [player.fwdX, player.fwdY, player.fwdZ],
-    PLANET_RADIUS,
-  );
-
-  const visibleHorizonChartSignal = () => horizonChartCount() > 0 ? horizonChartSignal() : null;
-
-  const visibleHearthBeaconSignal = () => hearthBeaconSignal(
-    structures,
-    geo,
-    geo.centers,
-    geo.frameOf(player.tile),
-    player.tile,
-    [player.fwdX, player.fwdY, player.fwdZ],
-    PLANET_RADIUS,
-  );
-
-  const grantHorizonChart = (): boolean => {
-    if (horizonChartCount() > 0) return false;
-    craftedItems.horizonChart = 1;
-    lastNavigationAction = 'horizon chart unlocked';
-    return true;
+  // Bearing of `tile` relative to the player's facing: cosine of the angle between
+  // player.fwdX/Y/Z and the tile's direction projected onto the player's tangent plane. Same
+  // tangent-plane projection facePlayerTowardTile() uses to aim the player at a tile, just read
+  // instead of applied.
+  const facingCosToTile = (tile: number): number => {
+    const [ux, uy, uz] = player.up();
+    const c = geo.centers;
+    let bx = c[tile * 3], by = c[tile * 3 + 1], bz = c[tile * 3 + 2];
+    const d = bx * ux + by * uy + bz * uz;
+    bx -= ux * d; by -= uy * d; bz -= uz * d;
+    const l = Math.hypot(bx, by, bz);
+    if (l < 1e-6) return 1; // tile is directly underfoot — treat as fully aligned
+    return (bx * player.fwdX + by * player.fwdY + bz * player.fwdZ) / l;
   };
 
-  const routeSlateOpen = (): boolean => routeFocusActive && hud.routeVisible();
+  /**
+   * Facing-aware "which nearby structure did the player mean" resolution: among candidates on
+   * nearby tiles, prefer whichever is most aligned with where the player is actually facing,
+   * instead of picking whatever's nearest by tile-BFS order regardless of facing direction. See
+   * edit/pick.ts for the equivalent ray-marched approach mining/chopping already use for "what
+   * is the player looking at" — this is the tile-anchored analogue for structures, which don't
+   * need a full ray-march since each one owns exactly one tile. Falls back to the plain
+   * nearest-by-tiles pick when nothing sits inside the facing cone, so interaction still works
+   * when nothing nearby is in front of the player.
+   */
+  const nearestStructureFacing = (candidates: readonly StructureSave[], tiles: readonly number[]): StructureSave | null => {
+    const tileSet = new Set(tiles);
+    let best: StructureSave | null = null;
+    let bestCos = -Infinity;
+    for (const s of candidates) {
+      if (!tileSet.has(s.tile)) continue;
+      const cos = facingCosToTile(s.tile);
+      if (cos > bestCos) { bestCos = cos; best = s; }
+    }
+    return best && bestCos >= INTERACT_FACING_COS ? best : nearestStructureOnTiles(candidates, tiles);
+  };
+
   const currentPanelOwnership = (): PanelOwnershipSnapshot => panelOwnershipSnapshot({
-    routeSlateOpen: routeSlateOpen(),
     craftingOpen,
-    journalOpen,
     storageOpen: openChestId !== null,
   });
   const worldInputBlockedByPanel = (): boolean => currentPanelOwnership().worldInputBlocked;
   input.setWorldInputBlocked(worldInputBlockedByPanel);
-  const panelOwnerClasses = ['panel-routeSlate', 'panel-crafting', 'panel-journal', 'panel-storage'];
+  const panelOwnerClasses = ['panel-crafting', 'panel-storage'];
   const syncPanelOwnershipBody = (): void => {
     const owner = currentPanelOwnership().activePanel;
     document.body.classList.toggle('panel-open', owner !== null);
     for (const className of panelOwnerClasses) document.body.classList.toggle(className, className === `panel-${owner}`);
   };
 
-  const closeRouteSlate = (): void => {
-    routeFocusActive = false;
-    routeFocusDirty = false;
-    hud.setRouteSlate(null);
-  };
-
-  const clampRouteFocus = (guides: readonly RouteGuide[] = currentSelectableRouteGuides()): RouteGuide[] => {
-    const list = guides.slice();
-    routeFocusIndex = Math.max(0, Math.min(Math.max(0, list.length - 1), routeFocusIndex));
-    return list;
-  };
-
-  const routeSelectionState = () => {
-    const candidates = clampRouteFocus();
-    return {
-      open: routeSlateOpen(),
-      index: routeFocusIndex,
-      touched: routeFocusDirty,
-      selected: candidates[routeFocusIndex] ?? null,
-      candidates,
-    };
-  };
-
-  const refreshRouteSlate = (seconds = 10): void => {
-    if (!routeFocusActive) routeFocusActive = true;
-    clampRouteFocus();
-    hud.setRouteSlate(currentRouteSlate(), seconds);
-  };
-
-  const selectRouteCandidate = (index: number, touched = true): boolean => {
-    const candidates = clampRouteFocus();
-    if (candidates.length === 0) return false;
-    routeFocusIndex = Math.max(0, Math.min(candidates.length - 1, Math.trunc(Number.isFinite(index) ? index : 0)));
-    routeFocusActive = true;
-    routeFocusDirty = touched || routeFocusDirty;
-    hud.setRouteSlate(currentRouteSlate(), 12);
-    playAudio('uiConfirm');
-    return true;
-  };
-
-  const selectedRouteGuideForPin = (forceSelected = false): RouteGuide | null => {
-    if (!routeSlateOpen() || (!forceSelected && !routeFocusDirty)) return null;
-    const candidates = clampRouteFocus();
-    const guide = candidates[routeFocusIndex] ?? null;
-    return guide && guide.kind !== 'planned' ? guide : null;
-  };
-
-  const useHorizonChart = (): boolean => {
-    if (craftingOpen) {
-      craftingOpen = false;
-      refreshCraftingHud();
-    }
-    const chartAvailable = horizonChartCount() > 0;
-    const signal = chartAvailable ? horizonChartSignal() : null;
-    const beacon = visibleHearthBeaconSignal();
-    routeFocusActive = true;
-    routeFocusDirty = false;
-    clampRouteFocus(currentSelectableRouteGuides(signal));
-    const slate = currentRouteSlate(signal);
-    const planned = currentRoutePlanSignal();
-    const hasLocalPins = slate.pins.some((pin) => pin.id !== 'prep');
-    if (!chartAvailable) {
-      if (beacon || hasLocalPins) {
-        triggerCharacterAction('discover', beacon?.active ? 'torch' : 'map', 0.72);
-        hud.setRouteSlate(slate, 9);
-        lastNavigationAction = `route slate: ${slate.summary}`;
-        playAudio('routeSlate');
-        hud.flash(beacon?.active
-          ? beacon.message
-          : planned
-          ? `planned route: ${planned.message}`
-          : `${slate.summary} · awaken a pentagon for the chart`, 4);
-        return true;
-      }
-      routeFocusActive = false;
-      playAudio('uiDeny');
-      hud.flash('awaken a pentagon to unlock the horizon chart', 2.5);
-      lastNavigationAction = 'horizon chart locked';
-      return false;
-    }
-    triggerCharacterAction('discover', 'horizonChart', 0.9);
-    hud.setRouteSlate(slate, 9);
-    playAudio('routeSlate');
-    if (!signal) {
-      lastNavigationAction = `route slate: ${slate.summary}`;
-      hud.flash(beacon ? `horizon chart complete · ${beacon.message}` : `horizon chart complete · ${slate.summary}`, 4);
-      return true;
-    }
-    const plan = horizonExpeditionPlan(signal);
-    const bearing = `${Math.round(signal.bearingDeg)} deg`;
-    const homeNote = beacon?.active ? ` · home ${beacon.distanceLabel} ${beacon.turn}` : '';
-    lastNavigationAction = `route slate: ${slate.summary} · ${bearing}${homeNote} · ${plan.prepLabel}`;
-    hud.flash(`route slate: ${slate.summary}${homeNote} · ${plan.prepLabel}`, 4.5);
-    return true;
-  };
-
-  const pinCurrentRoute = (selectedGuide: RouteGuide | null = null): boolean => {
-    if (craftingOpen) {
-      craftingOpen = false;
-      refreshCraftingHud();
-    }
-    const seasonalGuides = currentSeasonRouteGuides();
-    const unplannedGuides = currentUnplannedRouteGuides();
-    const localNativeLead = unplannedGuides[0]?.kind === 'nativeHazard' || unplannedGuides[0]?.kind === 'nativeLife';
-    const guides = selectedGuide && selectedGuide.kind !== 'planned'
-      ? [selectedGuide]
-      : !activeRoutePlan && localNativeLead
-      ? [unplannedGuides[0]]
-      : !activeRoutePlan && seasonalGuides.length > 0
-      ? seasonalGuides
-      : unplannedGuides;
-    const guide = guides[0] ?? null;
-    if (!guide) {
-      playAudio('uiDeny');
-      lastNavigationAction = 'route plan: no target';
-      hud.flash('no route target to pin', 2.4);
-      return false;
-    }
-    if (!activeRoutePlan) {
-      activeRoutePlan = createRoutePlanFromGuides(guides, player.tile, timeState.day, timeState.minute);
-    } else {
-      const result = addRoutePlanLeg(activeRoutePlan, guide, player.tile, timeState.day, timeState.minute);
-      if (!result.ok) {
-        playAudio('uiDeny');
-        lastNavigationAction = `route itinerary: ${result.reason}`;
-        hud.flash(result.reason === 'duplicate'
-          ? `${result.label} is already in the itinerary`
-          : result.reason === 'full'
-          ? `itinerary full · ${result.legCount} stops`
-          : 'no route target to pin', 2.6);
-        return false;
-      }
-      activeRoutePlan = result.plan;
-    }
-    if (!activeRoutePlan) {
-      playAudio('uiDeny');
-      lastNavigationAction = 'route plan: no target';
-      hud.flash('no route target to pin', 2.4);
-      return false;
-    }
-    const signal = currentRoutePlanSignal();
-    const legCount = Math.max(1, Math.trunc(activeRoutePlan.legs?.length ?? 1));
-    triggerCharacterAction('discover', 'horizonChart', 0.72);
-    playAudio('routeSlate');
-    markSaveDirty();
-    routeFocusDirty = false;
-    refreshRouteSlate(9);
-    const seasonRoute = !selectedGuide && seasonalGuides.length > 0 && activeRoutePlan.legs?.some((leg) => leg.label.startsWith('Season '));
-    lastNavigationAction = seasonRoute
-      ? `season itinerary pinned: ${legCount} stops · ${activeRoutePlan.label} · ${signal?.distanceLabel ?? guide.detail}`
-      : legCount > 1
-      ? `route itinerary pinned: ${legCount} stops · ${activeRoutePlan.label} · ${signal?.distanceLabel ?? guide.detail}`
-      : `route plan pinned: ${activeRoutePlan.label} · ${signal?.distanceLabel ?? guide.detail}`;
-    hud.flash(seasonRoute
-      ? `season itinerary: ${legCount} stops · first ${activeRoutePlan.label}${signal ? ` · ${signal.distanceLabel} ${signal.turn}` : ''}`
-      : legCount > 1
-      ? `itinerary: ${legCount} stops · first ${activeRoutePlan.label}${signal ? ` · ${signal.distanceLabel} ${signal.turn}` : ''}`
-      : `planned path: ${activeRoutePlan.label}${signal ? ` · ${signal.distanceLabel} ${signal.turn}` : ''}`, 4);
-    return true;
-  };
-
-  const clearRoutePlan = (): boolean => {
-    if (!activeRoutePlan) {
-      playAudio('uiDeny');
-      lastNavigationAction = 'route plan: none';
-      hud.flash('no planned path to clear', 2);
-      return false;
-    }
-    const label = activeRoutePlan.label;
-    activeRoutePlan = null;
-    routeFocusDirty = false;
-    triggerCharacterAction('discover', 'map', 0.52);
-    playAudio('uiConfirm');
-    markSaveDirty();
-    refreshRouteSlate(6);
-    lastNavigationAction = `route plan cleared: ${label}`;
-    hud.flash(`cleared planned path: ${label}`, 2.8);
-    return true;
-  };
-
-  const deferActiveRouteStop = (): boolean => {
-    const result = deferActiveRoutePlanLeg(activeRoutePlan);
-    if (!result.ok) {
-      playAudio('uiDeny');
-      lastNavigationAction = `route itinerary later: ${result.reason}`;
-      hud.flash(result.reason === 'single'
-        ? 'no later stop to swap in'
-        : result.reason === 'complete'
-        ? 'itinerary already complete'
-        : result.reason === 'locked'
-        ? 'season route stops stay in order'
-        : 'no planned stop to move', 2.4);
-      return false;
-    }
-    activeRoutePlan = result.plan;
-    const signal = currentRoutePlanSignal();
-    routeFocusDirty = false;
-    triggerCharacterAction('discover', 'map', 0.52);
-    playAudio('routeSlate');
-    markSaveDirty();
-    refreshRouteSlate(8);
-    lastNavigationAction = `route itinerary later: ${result.label}`;
-    hud.flash(`moved ${result.label} later${signal ? ` · next ${signal.label}` : ''}`, 3.2);
-    return true;
-  };
-
-  const removeActiveRouteStop = (): boolean => {
-    const result = removeActiveRoutePlanLeg(activeRoutePlan);
-    if (!result.ok) {
-      playAudio('uiDeny');
-      lastNavigationAction = `route itinerary drop: ${result.reason}`;
-      hud.flash(result.reason === 'complete'
-        ? 'itinerary already complete'
-        : result.reason === 'locked'
-        ? 'season route stops stay in order'
-        : 'no planned stop to drop', 2.4);
-      return false;
-    }
-    activeRoutePlan = result.plan;
-    const signal = currentRoutePlanSignal();
-    routeFocusDirty = false;
-    triggerCharacterAction('discover', 'map', 0.52);
-    playAudio('uiConfirm');
-    markSaveDirty();
-    refreshRouteSlate(8);
-    lastNavigationAction = `route itinerary dropped: ${result.label}`;
-    hud.flash(signal
-      ? `dropped ${result.label} · next ${signal.label}`
-      : `dropped ${result.label} · itinerary empty`, 3.2);
-    return true;
-  };
-
-  const openRouteSlateCommand = (): boolean => {
-    if (journalOpen) closeJournal();
-    if (openChestId !== null) closeStorage();
-    return useHorizonChart();
-  };
-
-  const pinRouteCommand = (forceSelected = false): boolean => {
-    if (journalOpen) closeJournal();
-    if (openChestId !== null) closeStorage();
-    return pinCurrentRoute(selectedRouteGuideForPin(forceSelected));
-  };
-
-  const clearRouteCommand = (): boolean => {
-    if (journalOpen) closeJournal();
-    if (openChestId !== null) closeStorage();
-    if (craftingOpen) {
-      craftingOpen = false;
-      refreshCraftingHud();
-    }
-    return clearRoutePlan();
-  };
-
-  const deferRouteCommand = (): boolean => {
-    if (journalOpen) closeJournal();
-    if (openChestId !== null) closeStorage();
-    if (craftingOpen) {
-      craftingOpen = false;
-      refreshCraftingHud();
-    }
-    return deferActiveRouteStop();
-  };
-
-  const dropRouteCommand = (): boolean => {
-    if (journalOpen) closeJournal();
-    if (openChestId !== null) closeStorage();
-    if (craftingOpen) {
-      craftingOpen = false;
-      refreshCraftingHud();
-    }
-    return removeActiveRouteStop();
-  };
-
-  hud.onRoutePin = pinRouteCommand;
-  hud.onRouteClear = clearRouteCommand;
-  hud.onRouteLater = deferRouteCommand;
-  hud.onRouteDrop = dropRouteCommand;
-  hud.onRouteSelect = (index) => { selectRouteCandidate(index, true); };
-
   const useLandmark = (tile?: number): boolean => {
     const target = tile !== undefined ? Math.trunc(tile) : nearbyLandmarkTile();
     if (target === null || target === undefined) return false;
     const result = discoverPentagon(discoveredPentagons, target, pentagonTiles);
     if (!result.ok) return false;
-    const awardedChart = !result.alreadyKnown && grantHorizonChart();
-    let rewardText = '';
-    if (!result.alreadyKnown && result.landmark?.insight) {
-      for (const reward of result.landmark.insight.reward) addCraftedDebugItem(reward.item, reward.count);
-      rewardText = pentagonInsightRewardText(result.landmark.insight);
-    }
-    const site = result.landmark ? pentagonSiteForTile(result.landmark.tile, 0) : null;
-    const completion = site ? completePentagonSiteWork(completedPentagonSites, site, siteWorkStructures(site), craftedItems) : null;
-    let siteRewardText = '';
-    if (completion?.ok && !completion.alreadyComplete && completion.reward) {
-      addCraftedDebugItem(completion.reward.item, completion.reward.count);
-      siteRewardText = `site work complete: ${completion.message}`;
-    }
-    const terrain = completion?.ok && completion.status.completed ? carvePentagonThresholdTerrain(site) : null;
-    const terrainText = terrain?.ok ? `terrain: ${terrain.message}` : '';
-    const siteWork = completion?.status ?? siteWorkStatus(site);
-    const threshold = siteThreshold(site);
-    const siteMissing = siteWorkMissingLabels(siteWork);
-    const siteText = siteWork
-      ? siteWork.completed
-        ? `${siteWork.site.siteLabel}: complete · ${siteWork.plan.summary}${threshold ? ` · ${threshold.label} open` : ''}`
-        : siteWork.ready
-        ? `${siteWork.site.siteLabel}: ready · read the landmark again${threshold ? ` · ${threshold.label} waits` : ''}`
-        : `${siteWork.site.siteLabel}: needs ${siteMissing.slice(0, 4).join(', ') || siteWork.plan.summary}${threshold ? ` · ${threshold.label} sealed` : ''}`
-      : '';
-    const completedNow = !!completion?.ok && !completion.alreadyComplete;
-    triggerCharacterAction('discover', completedNow && completion?.reward ? completion.reward.item as CharacterPropId : awardedChart ? 'horizonChart' : 'map', completedNow ? 1.05 : result.alreadyKnown ? 0.75 : 1.1);
-    playAudio(completedNow ? 'craftConfirm' : result.alreadyKnown ? 'routeSlate' : 'landmarkAwaken');
-    lastLandmarkAction = [
-      result.message,
-      !result.alreadyKnown && result.landmark?.insight ? `insight: ${result.landmark.insight.label}` : '',
-      siteText,
-      awardedChart ? 'horizon chart unlocked' : '',
-      rewardText ? `gained ${rewardText}` : '',
-      siteRewardText,
-      terrainText,
-    ].filter(Boolean).join(' · ');
-    if (!result.alreadyKnown || completedNow) markSaveDirty();
-    hud.flash(`${lastLandmarkAction}${awardedChart ? ' · press M' : ''}`, awardedChart ? 8 : result.alreadyKnown ? 5 : 7);
+    triggerCharacterAction('discover', 'map', result.alreadyKnown ? 0.75 : 1.1);
+    playAudio(result.alreadyKnown ? 'routeSlate' : 'landmarkAwaken');
+    lastLandmarkAction = result.message;
+    if (!result.alreadyKnown) markSaveDirty();
+    hud.flash(lastLandmarkAction, result.alreadyKnown ? 5 : 7);
     refreshCraftingHud();
-    if (!result.alreadyKnown || completedNow) hud.setRouteSlate(currentRouteSlate(), 8);
-    if (journalOpen) hud.setJournal(currentHearthJournal(), true);
     refreshUseButton();
     return true;
   };
@@ -3121,351 +1882,6 @@ async function boot(): Promise<void> {
     return { ok: true, item: id, count: itemCount(counts, craftedItems, id) };
   };
 
-  const tryDomainResource = (): boolean => {
-    const site = nearbyDomainResource();
-    if (!site) return false;
-    if (player.mode === 'plane') {
-      lastDomainResourceAction = 'domain resource:in plane';
-      playAudio('uiDeny');
-      hud.flash('land before gathering domain resources', 2.5);
-      return true;
-    }
-    const result = harvestDomainResource(harvestedDomainResources, site);
-    lastDomainResourceAction = result.message;
-    if (!result.ok) {
-      triggerCharacterAction('discover', 'map', 0.55);
-      playAudio('uiConfirm');
-      hud.flash(result.message, 2.8);
-      return true;
-    }
-    addCraftedDebugItem(result.item!, result.count!);
-    triggerCharacterAction('farm', result.item as CharacterPropId, 0.72);
-    playAudio('gatherSoft');
-    markSaveDirty();
-    domainResourceRenderer.setSites(currentDomainResourceSites());
-    hud.flash(`${result.message} · ${site.landmarkName}`, 3.5);
-    refreshCraftingHud();
-    hud.setRouteSlate(currentRouteSlate(), 5);
-    return true;
-  };
-
-  const completeSeasonActionRouteStop = (kind: 'skyfall' | 'murmur', tile: number): { message: string; complete: boolean } | null => {
-    const signal = routePlanSignal(
-      activeRoutePlan,
-      geo.centers,
-      geo.frameOf(player.tile),
-      player.tile,
-      [player.fwdX, player.fwdY, player.fwdZ],
-      PLANET_RADIUS,
-    );
-    if (!isSeasonActionRouteSignal(signal)) return null;
-    if (signal.sourceKind !== kind || signal.targetTile !== Math.trunc(tile) || !signal.arrived || signal.complete) return null;
-    const arrival = markRoutePlanLegReached(activeRoutePlan, timeState.day, timeState.minute);
-    if (!arrival.changed) return null;
-    activeRoutePlan = arrival.plan;
-    const completeBonus = arrival.complete;
-    if (completeBonus) {
-      survivalState.trailFocus = Math.max(Math.trunc(survivalState.trailFocus ?? 0), 360);
-      survivalState.stamina = Math.min(100, survivalState.stamina + 18);
-      survivalState.exposure = Math.max(0, survivalState.exposure - 12);
-      lastSurvivalAction = 'season chord focus: 360m';
-    }
-    const message = completeBonus ? `${arrival.message} · season chord focus 360m` : arrival.message;
-    lastNavigationAction = `season itinerary action: ${message}`;
-    markSaveDirty();
-    return { message, complete: arrival.complete };
-  };
-
-  const trySkyfall = (): boolean => {
-    const site = nearbySkyfall();
-    if (!site) return false;
-    if (player.mode === 'plane') {
-      lastSkyfallAction = 'skyfall:in plane';
-      playAudio('uiDeny');
-      hud.flash('land before gathering skyfall fragments', 2.5);
-      return true;
-    }
-    const result = harvestSkyfall(harvestedSkyfalls, site);
-    lastSkyfallAction = result.message;
-    if (!result.ok) {
-      triggerCharacterAction('discover', 'map', 0.55);
-      playAudio('uiConfirm');
-      hud.flash(result.message, 2.8);
-      return true;
-    }
-    addCraftedDebugItem(result.item!, result.count!);
-    triggerCharacterAction('discover', result.item as CharacterPropId, 0.85);
-    playAudio('skyfallGather');
-    markSaveDirty();
-    skyfallRenderer.setSites(currentSkyfallSites());
-    const routeAdvance = completeSeasonActionRouteStop('skyfall', site.tile);
-    const chain = currentSeasonChain();
-    if (!routeAdvance && chain?.linked) lastNavigationAction = `season chain: ${chain.payoffLabel} · ${chain.progressLabel}`;
-    hud.flash(`${result.message}${routeAdvance ? ` · ${routeAdvance.message}` : ` · ${site.minutesRemaining}m before the next fall${seasonChainFlash()}`}`, routeAdvance || chain?.linked ? 4.8 : 3.5);
-    refreshCraftingHud();
-    hud.setRouteSlate(currentRouteSlate(), 5);
-    if (journalOpen) hud.setJournal(currentHearthJournal(), true);
-    return true;
-  };
-
-  const tryMurmur = (): boolean => {
-    const site = nearbyMurmur();
-    if (!site) return false;
-    if (player.mode === 'plane') {
-      lastMurmurAction = 'murmur:in plane';
-      playAudio('uiDeny');
-      hud.flash('land before listening to world murmurs', 2.5);
-      return true;
-    }
-    const result = observeMurmur(observedMurmurs, site);
-    lastMurmurAction = result.message;
-    if (!result.ok) {
-      triggerCharacterAction('discover', 'map', 0.55);
-      playAudio('uiConfirm');
-      hud.flash(result.message, 2.8);
-      return true;
-    }
-    triggerCharacterAction('discover', site.kind === 'caveBreath' ? 'echoLantern' : 'map', 0.85);
-    playAudio(site.kind === 'caveBreath' || site.kind === 'tideBell' ? 'caveRead' : 'routeSlate');
-    markSaveDirty();
-    murmurRenderer.setSites(currentMurmurSites());
-    const routeAdvance = completeSeasonActionRouteStop('murmur', site.tile);
-    const chain = currentSeasonChain();
-    if (!routeAdvance && chain?.linked) lastNavigationAction = `season chain: ${chain.payoffLabel} · ${chain.progressLabel}`;
-    hud.flash(`${result.message}${routeAdvance ? ` · ${routeAdvance.message}` : seasonChainFlash()}`, routeAdvance || chain?.linked ? 4.8 : 4);
-    hud.setRouteSlate(currentRouteSlate(), 5);
-    if (journalOpen) hud.setJournal(currentHearthJournal(), true);
-    return true;
-  };
-
-  const completeSeasonAfterglowRouteStop = (afterglow: StrangerSeasonAfterglow): string => {
-    const signal = routePlanSignal(
-      activeRoutePlan,
-      geo.centers,
-      geo.frameOf(player.tile),
-      player.tile,
-      [player.fwdX, player.fwdY, player.fwdZ],
-      PLANET_RADIUS,
-    );
-    if (!signal || signal.sourceKind !== 'seasonAfterglow' || signal.targetTile !== afterglow.tile || signal.complete) return '';
-    const arrival = markRoutePlanLegReached(activeRoutePlan, timeState.day, timeState.minute);
-    if (!arrival.changed) return '';
-    activeRoutePlan = arrival.plan;
-    markSaveDirty();
-    return ` · ${arrival.message}`;
-  };
-
-  const trySeasonAfterglow = (): boolean => {
-    const afterglow = nearbySeasonAfterglow();
-    if (!afterglow) return false;
-    if (player.mode === 'plane') {
-      lastSeasonAfterglowAction = 'season afterglow:in plane';
-      playAudio('uiDeny');
-      hud.flash('land before reading the season afterglow', 2.5);
-      return true;
-    }
-    const result = readSeasonAfterglow(seasonAfterglowReadings, afterglow);
-    lastSeasonAfterglowAction = result.message;
-    if (!result.ok) {
-      triggerCharacterAction('discover', 'map', 0.55);
-      playAudio('uiConfirm');
-      hud.flash(result.message, 2.8);
-      refreshUseButton();
-      return true;
-    }
-    survivalState.trailFocus = Math.max(Math.trunc(survivalState.trailFocus ?? 0), afterglow.focusMinutes);
-    survivalState.stamina = Math.min(100, survivalState.stamina + afterglow.stamina);
-    survivalState.exposure = Math.max(0, survivalState.exposure - afterglow.exposureRelief);
-    lastSurvivalAction = `season afterglow focus: ${afterglow.focusMinutes}m · +${afterglow.stamina} stamina · -${afterglow.exposureRelief} exposure`;
-    const routeStop = completeSeasonAfterglowRouteStop(afterglow);
-    lastNavigationAction = `season afterglow: ${afterglow.label} · ${afterglow.routeHint}${routeStop}`;
-    triggerCharacterAction('discover', 'echoLantern', 1.05);
-    playAudio('landmarkAwaken');
-    markSaveDirty();
-    seasonAfterglowRenderer.setAfterglow(currentSeasonAfterglow());
-    hud.flash(`${result.message} · +${afterglow.stamina} stamina · -${afterglow.exposureRelief} exposure${routeStop}`, 5);
-    hud.setRouteSlate(currentRouteSlate(), 6);
-    if (journalOpen) hud.setJournal(currentHearthJournal(), true);
-    refreshUseButton();
-    return true;
-  };
-
-  const tryWardNativeHazard = (site: NativeCreatureSite | null = nearbyNativeHazard()): boolean => {
-    if (!site) return false;
-    if (player.mode === 'plane') {
-      lastNativeLifeAction = 'native life:in plane';
-      playAudio('uiDeny');
-      hud.flash('land before tending native life', 2.5);
-      return true;
-    }
-    const readiness = nativeWardReadiness(site);
-    const result = wardNativeCreature(wardedNativeCreatures, site, readiness.prepared);
-    lastNativeLifeAction = result.message;
-    if (!result.ok) {
-      if (result.pressureApplied) {
-        applyNativeHazardPressure(site, 'ward failed');
-        nativeHazardCooldown = site.pressure?.interval ?? 3.2;
-        nativeLifeRenderer.setSites(currentNativeCreatureSites());
-        return true;
-      }
-      triggerCharacterAction(nativeDefenseActionForProp(readiness.prop), readiness.prop, 0.55);
-      playAudio('uiConfirm');
-      hud.flash(result.message, 2.8);
-      return true;
-    }
-    if (readiness.tool) applyToolUse(readiness.tool, `warded ${site.label}`);
-    const drops = spawnNativeLifeDrops(result.site);
-    triggerCharacterAction(nativeDefenseActionForProp(readiness.prop), readiness.prop, 0.95);
-    playAudio('gatherSoft');
-    markSaveDirty();
-    nativeLifeRenderer.setSites(currentNativeCreatureSites());
-    hud.flash(`${result.message} · ${readiness.label} · ${drops.length} pickup${drops.length === 1 ? '' : 's'}`, 3.4);
-    refreshCraftingHud();
-    refreshUseButton();
-    if (journalOpen) hud.setJournal(currentHearthJournal(), true);
-    return true;
-  };
-
-  const tryRangedNativeWard = (site: NativeCreatureSite | null = rangedNativeHazard()): boolean => {
-    if (!site) return false;
-    if (player.mode === 'plane') {
-      lastNativeLifeAction = 'native life:in plane';
-      playAudio('uiDeny');
-      hud.flash('land before warding native life', 2.5);
-      return true;
-    }
-    const bow = bestToolForRangedDefense(craftedItems, toolWear);
-    const arrows = itemCount(counts, craftedItems, 'whistlingArrow');
-    if (!bow.tool || arrows <= 0) {
-      lastNativeLifeAction = 'ranged ward needs reed bow and whistling arrows';
-      triggerCharacterAction(bow.tool ? nativeDefenseActionForProp(bow.tool) : 'interact', bow.tool ?? 'hands', 0.55);
-      playAudio('uiDeny');
-      hud.flash('craft a reed bow and whistling arrows to ward from range', 2.8);
-      refreshUseButton();
-      return true;
-    }
-    const result = wardNativeCreature(wardedNativeCreatures, site, true);
-    if (!result.ok) {
-      lastNativeLifeAction = result.message;
-      triggerCharacterAction('shoot', 'reedBow', 0.55);
-      playAudio('uiConfirm');
-      hud.flash(result.message, 2.8);
-      refreshUseButton();
-      return true;
-    }
-    spendCraftedItem('whistlingArrow');
-    applyToolUse(bow, `whistle-shot ${site.label}`);
-    const drops = spawnNativeLifeDrops(result.site);
-    const message = result.site.kind === 'screeSnapper'
-      ? `${result.site.label} stunned by a whistling arrow and skitters under scree · ${result.site.reward.count} ${result.site.reward.label} dropped`
-      : result.site.kind === 'stormBurr'
-      ? `${result.site.label} pinned by a whistling arrow and tumbles out of the gust · ${result.site.reward.count} ${result.site.reward.label} dropped`
-      : result.site.kind === 'tideLurker'
-      ? `${result.site.label} startled by a whistling arrow and slips below the cave tide · ${result.site.reward.count} ${result.site.reward.label} dropped`
-      : `${result.site.label} spooked by a whistling arrow · ${result.site.reward.count} ${result.site.reward.label} dropped`;
-    lastNativeLifeAction = message;
-    triggerCharacterAction('shoot', 'reedBow', 1.05);
-    playAudio('gatherSoft');
-    markSaveDirty();
-    nativeLifeRenderer.setSites(currentNativeCreatureSites());
-    hud.flash(`${message} · ${drops.length} pickup${drops.length === 1 ? '' : 's'}`, 3.6);
-    refreshCraftingHud();
-    refreshUseButton();
-    if (journalOpen) hud.setJournal(currentHearthJournal(), true);
-    return true;
-  };
-
-  const tryNativeCreature = (site: NativeCreatureSite | null = nearbyNativeCreature(), consumeRepeat = true): boolean => {
-    if (!site) return false;
-    if (player.mode === 'plane') {
-      lastNativeLifeAction = 'native life:in plane';
-      playAudio('uiDeny');
-      hud.flash('land before tending native life', 2.5);
-      return true;
-    }
-    if (site.temperament !== 'harmless') return tryWardNativeHazard(site);
-    const tendProp: CharacterPropId = site.kind === 'reedbackGrazer'
-      ? 'compost'
-      : site.kind === 'shellSkitter'
-      ? site.reward.item
-      : site.kind === 'caveBlinker'
-      ? 'caveMushroom'
-      : 'seeds';
-    const result = tendNativeCreature(tendedNativeCreatures, site);
-    lastNativeLifeAction = result.message;
-    if (!result.ok) {
-      if (!consumeRepeat) return false;
-      triggerCharacterAction('interact', tendProp, 0.55);
-      playAudio('uiConfirm');
-      hud.flash(result.message, 2.8);
-      return true;
-    }
-    const drops = spawnNativeLifeDrops(site);
-    let focusMessage = '';
-    if (site.kind === 'caveBlinker') {
-      const focus = Math.max(0, Math.trunc(survivalState.trailFocus ?? 0));
-      survivalState.trailFocus = Math.min(720, focus + 90);
-      survivalState.exposure = Math.max(0, survivalState.exposure - 4);
-      focusMessage = ' · cave focus 90m';
-      lastSurvivalAction = 'cave blinker focus: 90m · -4 exposure';
-      lastNativeLifeAction = `${result.message}${focusMessage}`;
-    }
-    triggerCharacterAction('interact', tendProp, 0.72);
-    playAudio('gatherSoft');
-    markSaveDirty();
-    nativeLifeRenderer.setSites(currentNativeCreatureSites());
-    hud.flash(`${result.message}${focusMessage} · ${drops.length} pickup${drops.length === 1 ? '' : 's'}`, 3.2);
-    refreshCraftingHud();
-    refreshUseButton();
-    if (journalOpen) hud.setJournal(currentHearthJournal(), true);
-    return true;
-  };
-
-  const tryTargetNativeCreature = (site: NativeCreatureSite | null = nativePick?.site ?? nearbyNativeCreature()): boolean => {
-    if (!site) return false;
-    return site.temperament === 'harmless' ? tryNativeCreature(site) : tryWardNativeHazard(site);
-  };
-
-  const tickNativeHazards = (dt: number): void => {
-    nativeHazardCooldown = Math.max(0, nativeHazardCooldown - Math.max(0, dt));
-    if (creativeActive || player.mode !== 'walk' || nativeHazardCooldown > 0) return;
-    const site = nearbyNativeHazard();
-    if (!site || site.warded) return;
-    if (site.kind === 'stormBurr' && !isHazardWeather(currentWeather())) return;
-    if (site.kind === 'tideLurker') return;
-    nativeHazardCooldown = site.pressure?.interval ?? 3.2;
-    applyNativeHazardPressure(site, site.kind === 'stormBurr' ? 'weather gust' : 'crowded');
-  };
-
-  const tryThresholdChamber = (): boolean => {
-    const site = nearbyThresholdChamber();
-    if (!site) return false;
-    if (player.mode === 'plane') {
-      lastThresholdChamberAction = 'threshold chamber:in plane';
-      playAudio('uiDeny');
-      hud.flash('land before reading threshold chambers', 2.5);
-      return true;
-    }
-    const result = observeThresholdChamber(observedThresholdChambers, site);
-    lastThresholdChamberAction = result.message;
-    if (!result.ok) {
-      triggerCharacterAction('discover', 'map', 0.55);
-      playAudio('uiConfirm');
-      hud.flash(result.message, 2.8);
-      return true;
-    }
-    addCraftedDebugItem(result.item!, result.count!);
-    triggerCharacterAction('discover', site.kind === 'bellThroat' || site.kind === 'lanternShaft' ? 'echoLantern' : result.item as CharacterPropId, 0.9);
-    playAudio(site.role === 'chamber' || site.kind === 'bellThroat' ? 'caveRead' : 'routeSlate');
-    markSaveDirty();
-    hud.flash(`${result.message} · ${site.landmarkName}`, 4.5);
-    refreshCraftingHud();
-    hud.setRouteSlate(currentRouteSlate(), 6);
-    if (journalOpen) hud.setJournal(currentHearthJournal(), true);
-    refreshUseButton();
-    return true;
-  };
-
   const foodCounts = () => ({
     bait: itemCount(counts, craftedItems, 'bait'),
     seeds: itemCount(counts, craftedItems, 'seeds'),
@@ -3480,17 +1896,9 @@ async function boot(): Promise<void> {
     campMeal: itemCount(counts, craftedItems, 'campMeal'),
     trailRation: itemCount(counts, craftedItems, 'trailRation'),
     expeditionStew: itemCount(counts, craftedItems, 'expeditionStew'),
-    cellarProvisions: rootCellarProvisionCount(structures, geo),
   });
 
-  const currentWeather = () => {
-    const domain = currentPentagonDomain();
-    return weatherAt(timeState, weatherState, player.tile, player.radius() - PLANET_RADIUS, player.submerged, domain ? {
-      effect: domain.effect,
-      intensity: domain.intensity,
-      label: domain.domainLabel,
-    } : null);
-  };
+  const currentWeather = () => weatherAt(timeState, weatherState, player.tile, player.radius() - PLANET_RADIUS, player.submerged);
 
   const currentWeatherProtection = () => weatherProtectionForInventory(craftedItems, currentWeather());
   const survivalSnapshot = () => ({
@@ -3498,36 +1906,7 @@ async function boot(): Promise<void> {
     weatherProtection: currentWeatherProtection(),
   });
 
-  const currentSkyLifeSites = (): SkyLifeSite[] => {
-    const weather = currentWeather();
-    const domain = currentPentagonDomain();
-    const candidates: SkyLifeCandidate[] = tileEntriesAroundTile(player.tile, 4).map((entry) => {
-      const tile = Math.max(0, Math.min(geo.count - 1, Math.trunc(entry.tile)));
-      const local = tilesAroundTile(tile, 1);
-      return {
-        tile,
-        ring: entry.ring,
-        height: columns.heightOf(tile),
-        nearWater: waterNearTile(tile, 1),
-        nearTrees: local.some((nearby) => trees.hasTree(nearby)),
-      };
-    });
-    return skyLifeSitesAround({
-      centerTile: player.tile,
-      day: timeState.day,
-      minute: timeState.minute,
-      weatherKind: weather.kind,
-      weatherLabel: weather.label,
-      weatherIntensity: weather.intensity,
-      domainEffect: domain?.effect ?? null,
-      domainIntensity: domain?.intensity ?? 0,
-      candidates,
-      maxSites: 4,
-    });
-  };
-
   const currentFishSchool = () => {
-    const domain = currentFishingDomain();
     return fishSchoolAt({
       tile: player.tile,
       day: timeState.day,
@@ -3537,10 +1916,6 @@ async function boot(): Promise<void> {
       bait: itemCount(counts, craftedItems, 'bait'),
       weatherKind: currentWeather().kind,
       caveKind: currentNaturalVoid()?.kind ?? null,
-      domainEffect: domain?.effect ?? null,
-      domainIntensity: domain?.intensity ?? 0,
-      thresholdFishBoost: currentPentagonSiteThresholdEffect()?.fishBoost,
-      thresholdLabel: currentPentagonSiteThresholdEffect()?.label,
     });
   };
 
@@ -3603,11 +1978,8 @@ async function boot(): Promise<void> {
       if (slug === 'fish-storm-runner') {
         return fishSchoolAt({ tile, day, minute, nearWater: true, bait: 0, weatherKind: 'storm', caveKind: null });
       }
-      if (slug === 'creature-driftjelly') {
-        return fishSchoolAt({ tile, day, minute, nearWater: true, bait: 0, weatherKind: 'clear', caveKind: null, domainEffect: 'tide', domainIntensity: 1 });
-      }
-      if (slug === 'fish-reed-fry') {
-        return fishSchoolAt({ tile, day, minute, nearWater: true, bait: 0, weatherKind: 'clear', caveKind: null, domainEffect: 'water', domainIntensity: 1 });
+      if (slug === 'creature-driftjelly' || slug === 'fish-reed-fry') {
+        return fishSchoolAt({ tile, day, minute, nearWater: true, bait: 0, weatherKind: 'clear', caveKind: null });
       }
       return fishSchoolAt({ tile, day, minute, nearWater: true, bait: 1, weatherKind: 'clear', caveKind: null });
     };
@@ -3637,11 +2009,6 @@ async function boot(): Promise<void> {
     const slug = fishVisualScenarioSlugs.includes(target as KilnFishSkinSlug) ? target as KilnFishSkinSlug : null;
     if (!slug) return { ok: false, reason: 'unknown fish skin slug', target, allowed: fishVisualScenarioSlugs };
     fishVisualOverride = null;
-    const wantedDomain = slug === 'creature-driftjelly'
-      ? 'tide'
-      : slug === 'fish-reed-fry'
-      ? 'water'
-      : null;
     const phaseSamples = Array.from({ length: 48 }, (_, i) => i / 48);
     const minuteSamples = [360, 480, 600, 720, 840, 960, 1080, 1260];
     const applyCandidate = (tile: number, day: number, minute: number, phase: number, bait: number) => {
@@ -3662,7 +2029,6 @@ async function boot(): Promise<void> {
         phase: weatherState.phase,
         bait: itemCount(counts, craftedItems, 'bait'),
         weather: currentWeather(),
-        domain: currentFishingDomain(),
         naturalVoid: currentNaturalVoid(),
         nearWater: nearFishingWater(),
         nearDock: nearDock(),
@@ -3695,7 +2061,6 @@ async function boot(): Promise<void> {
         phase: weatherState.phase,
         bait: itemCount(counts, craftedItems, 'bait'),
         weather: currentWeather(),
-        domain: currentFishingDomain(),
         naturalVoid: currentNaturalVoid(),
         nearWater: nearFishingWater(),
         nearDock: nearDock(),
@@ -3710,16 +2075,12 @@ async function boot(): Promise<void> {
       const height = columns.heightOf(tile);
       if (height <= SEA_LEVEL_HEIGHT + 0.35) continue;
       if (!waterNearTile(tile, 2)) continue;
-      const domain = pentagonDomainForTile(tile, FISHING_DOMAIN_RADIUS);
-      if (wantedDomain && domain?.effect !== wantedDomain) continue;
-      if (!wantedDomain && slug === 'fish-shore-minnow' && (domain?.effect === 'tide' || domain?.effect === 'water' || domain?.effect === 'storm')) continue;
       for (let day = 0; day <= 3; day += 1) {
         for (const minute of minuteSamples) {
           for (const phase of phaseSamples) {
             const probe = applyCandidate(tile, day, minute, phase, bait);
             if (slug === 'fish-storm-runner' && probe.weather.kind !== 'storm') continue;
             if (slug !== 'fish-storm-runner' && probe.weather.kind === 'storm') continue;
-            if (wantedDomain && probe.domain?.effect !== wantedDomain) continue;
             if (probe.mappedSlug !== slug || !probe.site) continue;
             return { ok: true, slug, setup: 'live-current-fish-school', ...probe };
           }
@@ -3728,9 +2089,8 @@ async function boot(): Promise<void> {
     }
     return {
       ok: false,
-      reason: 'no live tile/time/weather/domain context reached requested fish skin',
+      reason: 'no live tile/time/weather context reached requested fish skin',
       slug,
-      wantedDomain,
     };
   };
 
@@ -3769,8 +2129,7 @@ async function boot(): Promise<void> {
     });
     const renderer = fishSchoolRenderer.stats();
     const visibleSchool = renderer.active > 0
-      && renderer.fallbackVisible === 0
-      && (renderer.glbAnchorsVisible > 0 || renderer.pointSchoolSprites > 0);
+      && (renderer.fallbackVisible > 0 || renderer.pointSchoolSprites > 0);
     return {
       ...cue,
       nearWater,
@@ -3780,7 +2139,6 @@ async function boot(): Promise<void> {
       visual: {
         slug: renderer.slug,
         visibleSchool,
-        anchors: renderer.glbAnchorsVisible,
         points: renderer.pointSchoolSprites,
         nearBoids: renderer.nearBoidSprites,
         swimPathBeads: renderer.swimPathBeads,
@@ -3797,79 +2155,11 @@ async function boot(): Promise<void> {
     nearWater: nearFishingWater(),
     weatherKind: currentWeather().kind,
     caveKind: currentNaturalVoid()?.kind ?? null,
-    domainEffect: currentPentagonDomain()?.effect ?? null,
-    domainIntensity: currentPentagonDomain()?.intensity ?? 0,
-    thresholdForageBoost: currentPentagonSiteThresholdEffect()?.forageBoost,
-    thresholdLabel: currentPentagonSiteThresholdEffect()?.label,
   });
-
-  const weatherVaneForecast = () => {
-    const shelter = homeScore(structures, geo).shelter;
-    const homeTiles = new Set(shelter.centerTile !== null
-      ? tilesAroundTile(shelter.centerTile, 2)
-      : shelter.tiles);
-    const vane = structures.find((s) =>
-      s.item === 'weatherVane'
-      && Math.max(0, Math.trunc(s.state?.forecastReads ?? 0)) > 0
-      && (homeTiles.size === 0 || homeTiles.has(s.tile)));
-    return {
-      ready: vane !== undefined,
-      label: vane?.state?.forecastLabel ?? (vane ? 'weather vane' : ''),
-      kind: vane?.state?.forecastKind,
-      reads: Math.max(0, Math.trunc(vane?.state?.forecastReads ?? 0)),
-    };
-  };
-
-  const horizonExpeditionPlan = (signal: ReturnType<typeof horizonChartSignal> = visibleHorizonChartSignal()) => {
-    const shelter = homeScore(structures, geo).shelter;
-    const forecast = weatherVaneForecast();
-    const chain = currentSeasonChain();
-    const school = currentFishSchool();
-    const traps = fishTrapDiagnostics();
-    const nets = shoreNetDiagnostics();
-    const ecology = routeEcologyForExpedition({
-      centers: geo.centers,
-      fromTile: player.tile,
-      targetTile: signal?.target.tile ?? null,
-      radius: PLANET_RADIUS,
-      fishLabel: school.label,
-      fishStrength: school.strength,
-      traps: traps.map((trap) => ({ tile: trap.tile, ready: trap.ready })),
-      nets: nets.map((net) => ({ tile: net.tile, ready: net.ready })),
-    });
-    return planExpedition({
-      signal,
-      items: craftedItems,
-      survival: survivalState,
-      weather: currentWeather(),
-      home: {
-        ...shelter,
-        weatherVane: forecast.ready || currentPentagonSiteThresholdEffect()?.routePrep === 'weather',
-        forecastLabel: forecast.label || (currentPentagonSiteThresholdEffect()?.routePrep === 'weather' ? currentPentagonSiteThresholdEffect()?.label : undefined),
-        cellarProvisions: rootCellarProvisionCount(structures, geo),
-      },
-      ecology,
-      planeCrafted,
-      insights: pentagonInsights(),
-      seasonChain: chain,
-    });
-  };
 
   const nearLitWarmth = (): boolean => {
     const tiles = new Set(nearbyTiles(1));
     return structures.some((s) => s.item === 'campfire' && s.state?.lit === true && tiles.has(s.tile));
-  };
-
-  const currentCavePressure = () => {
-    const natural = currentNaturalVoid();
-    return cavePressureAt({
-      caveKind: natural?.kind ?? null,
-      flooded: natural?.flooded,
-      hasLantern: itemCount(counts, craftedItems, 'lantern') > 0,
-      hasEchoLantern: itemCount(counts, craftedItems, 'echoLantern') > 0,
-      nearWarmth: nearLitWarmth(),
-      trailFocus: survivalState.trailFocus,
-    });
   };
 
   const shelterAtPlayer = () => {
@@ -3880,196 +2170,6 @@ async function boot(): Promise<void> {
       sheltered: inside && home.shelter.protected,
       functionalShelter: inside && home.shelter.functional,
     };
-  };
-
-  const cropEnvironmentFor = (plot: StructureSave): CropPlotEnvironment => {
-    const localTiles = new Set(tilesAroundTile(plot.tile, 1));
-    const localStructures = structures.filter((s) => localTiles.has(s.tile));
-    const roofPieces = localStructures.filter((s) => s.item === 'roofBundle').length;
-    const hasWindow = localStructures.some((s) => s.item === 'windowFrame');
-    const localLight = localStructures.some((s) =>
-      (s.item === 'lantern' || s.item === 'campfire') && s.state?.lit === true,
-    );
-    const localWarmth = localStructures.some((s) => s.item === 'campfire' && s.state?.lit === true);
-    const shelter = homeScore(structures, geo).shelter;
-    const insideHomeShelter = shelter.tiles.includes(plot.tile);
-    const roofedByHome = insideHomeShelter && shelter.roofPieces >= shelter.roofNeed;
-    const daylight = timeState.minute >= 6 * 60 && timeState.minute <= 19 * 60;
-    const sheltered = insideHomeShelter || roofPieces > 0;
-    const protectedPlot = (insideHomeShelter && shelter.protected) || (roofPieces > 0 && (hasWindow || localLight));
-    const layer = Math.max(0, Math.min(layers.L - 1, Math.trunc(plot.layer)));
-    const height = layers.topRadius(layer) - PLANET_RADIUS;
-    const domain = pentagonDomainForTile(plot.tile, 2);
-    const weather = weatherAt(timeState, weatherState, plot.tile, height, 0, domain ? {
-      effect: domain.effect,
-      intensity: domain.intensity,
-      label: domain.domainLabel,
-    } : null);
-    const naturalWater = waterNearTile(plot.tile, 1);
-    const cisternWater = localStructures.reduce((max, s) =>
-      s.item === 'rainCistern' ? Math.max(max, Math.max(0, Math.trunc(s.state?.water ?? 0))) : max, 0);
-    const watered = naturalWater || cisternWater > 0;
-    const lit = localLight || (daylight && (!(roofPieces > 0 || roofedByHome) || hasWindow));
-    const warm = localWarmth || (insideHomeShelter && shelter.hasWarmth);
-    const cold = weather.kind === 'cold' || height > 42;
-    const storm = weather.kind === 'storm';
-    const tags: string[] = [naturalWater ? 'watered' : cisternWater > 0 ? 'cistern-watered' : 'dry'];
-    if (protectedPlot) tags.push('protected');
-    else if (sheltered) tags.push('sheltered');
-    else tags.push('open');
-    if (warm) tags.push('warm');
-    if (!lit) tags.push('dark');
-    if (cold) tags.push('cold');
-    if (storm) tags.push('storm');
-    return {
-      watered,
-      naturalWater,
-      cisternWater,
-      sheltered,
-      protected: protectedPlot,
-      lit,
-      warm,
-      cold,
-      storm,
-      highAltitude: height > 42,
-      label: tags.slice(0, 5).join(' · '),
-    };
-  };
-
-  const cropDiagnostics = () => structures
-    .filter((s) => s.item === 'cropPlot')
-    .map((s) => ({
-      id: s.id,
-      tile: s.tile,
-      state: s.state ? { ...s.state } : undefined,
-      environment: cropEnvironmentFor(s),
-    }));
-
-  const compostBinDiagnostics = () => structures
-    .filter((s) => s.item === 'compostBin')
-    .map((s) => ({
-      id: s.id,
-      tile: s.tile,
-      state: s.state ? { ...s.state } : undefined,
-    }));
-
-  const rainCisternDiagnostics = () => structures
-    .filter((s) => s.item === 'rainCistern')
-    .map((s) => ({
-      id: s.id,
-      tile: s.tile,
-      state: s.state ? { ...s.state } : undefined,
-      context: rainCisternContextFor(s),
-    }));
-
-  const rootCellarDiagnostics = () => structures
-    .filter((s) => s.item === 'rootCellar')
-    .map((s) => ({
-      id: s.id,
-      tile: s.tile,
-      state: s.state ? { ...s.state } : undefined,
-      countedForHome: homeScore(structures, geo).shelter.tiles.includes(s.tile),
-    }));
-
-  const caveAnchorDiagnostics = () => structures
-    .filter((s) => s.item === 'caveAnchor')
-    .map((s) => ({
-      id: s.id,
-      tile: s.tile,
-      state: s.state ? { ...s.state } : undefined,
-      context: caveAnchorContextFor(s),
-    }));
-
-  const waystoneDiagnostics = () => structures
-    .filter((s) => s.item === 'waystone')
-    .map((s) => ({
-      id: s.id,
-      tile: s.tile,
-      state: s.state ? { ...s.state } : undefined,
-      context: waystoneContextFor(s),
-    }));
-
-  const weatherVaneDiagnostics = () => structures
-    .filter((s) => s.item === 'weatherVane')
-    .map((s) => ({
-      id: s.id,
-      tile: s.tile,
-      state: s.state ? { ...s.state } : undefined,
-      context: weatherVaneContextFor(s),
-    }));
-
-  const fishTrapDiagnostics = () => structures
-    .filter((s) => s.item === 'fishTrap')
-    .map((s) => {
-      const context = fishTrapContextFor(s);
-      const setDay = s.state?.trapSetDay;
-      const setMinute = s.state?.trapSetMinute ?? 0;
-      const elapsed = setDay === undefined
-        ? 0
-        : Math.max(0, timeState.day * 1440 + timeState.minute - (setDay * 1440 + setMinute));
-      const checkAfter = s.state?.trapBaited === true ? 180 : 300;
-      return {
-        id: s.id,
-        tile: s.tile,
-        state: s.state ? { ...s.state } : undefined,
-        elapsed,
-        ready: setDay !== undefined && elapsed >= checkAfter,
-        context,
-      };
-    });
-
-  const shoreNetDiagnostics = () => structures
-    .filter((s) => s.item === 'shoreNet')
-    .map((s) => {
-      const context = fishTrapContextFor(s);
-      const setDay = s.state?.netSetDay;
-      const setMinute = s.state?.netSetMinute ?? 0;
-      const elapsed = setDay === undefined
-        ? 0
-        : Math.max(0, timeState.day * 1440 + timeState.minute - (setDay * 1440 + setMinute));
-      const checkAfter = context.school.kind === 'storm' || context.school.kind === 'dock' || context.school.kind === 'cave' ? 90 : 150;
-      return {
-        id: s.id,
-        tile: s.tile,
-        state: s.state ? { ...s.state } : undefined,
-        elapsed,
-        ready: setDay !== undefined && elapsed >= checkAfter,
-        context,
-      };
-    });
-
-  const waterlineRouteResupplySources = (originTile: number, targetTile: number): WaterlineRouteResupplySource[] => {
-    const origin = Math.max(0, Math.trunc(originTile));
-    const target = Math.max(0, Math.trunc(targetTile));
-    const adjacent = (tile: number) => routeAdjacentTile(geo.centers, origin, target, tile, PLANET_RADIUS);
-    const traps = fishTrapDiagnostics()
-      .filter((trap) => trap.ready && adjacent(trap.tile))
-      .map((trap) => ({ id: trap.id, kind: 'fishTrap' as const }));
-    const nets = shoreNetDiagnostics()
-      .filter((net) => net.ready && adjacent(net.tile))
-      .map((net) => ({ id: net.id, kind: 'shoreNet' as const }));
-    return [...traps, ...nets];
-  };
-
-  const consumeRouteArrivalWaterlineResupply = (): string => {
-    const status = routePlanItineraryStatus(activeRoutePlan);
-    if (!status || status.complete || status.active.reached === true) return '';
-    const active = status.active;
-    if (active.sourceKind !== 'target') return '';
-    const routeDistanceM = greatCircleDistanceMeters(geo.centers, active.originTile, active.targetTile, PLANET_RADIUS);
-    if (routeDistanceM < 650) return '';
-    const consumed = consumeWaterlineRouteResupply(
-      structures,
-      waterlineRouteResupplySources(active.originTile, active.targetTile),
-    );
-    if (consumed.consumed <= 0) return '';
-    structureRenderer.setStructures(structures);
-    const parts: string[] = [];
-    if (consumed.traps > 0) parts.push(`${consumed.traps} trap${consumed.traps === 1 ? '' : 's'}`);
-    if (consumed.nets > 0) parts.push(`${consumed.nets} net${consumed.nets === 1 ? '' : 's'}`);
-    const message = `waterline resupply spent: ${parts.join(' + ')}`;
-    lastFoodAction = `route arrival:${message}`;
-    return message;
   };
 
   const tryEatPackedFood = (): boolean => {
@@ -4119,37 +2219,6 @@ async function boot(): Promise<void> {
   const caveKindLabel = (kind: NaturalVoidKind): string =>
     kind === 'dryCave' ? 'dry cave' : kind === 'seaCave' ? 'sea cave' : 'natural arch';
 
-  const currentCaveResonance = () => {
-    const natural = currentNaturalVoid();
-    if (!natural || natural.kind === 'arch') return null;
-    return caveResonanceSite(SEED, player.tile, natural.layer, natural.kind, observedCaveResonances);
-  };
-
-  const currentRouteCaveResonanceSignal = () => {
-    if (itemCount(counts, craftedItems, 'echoLantern') <= 0) return null;
-    const site = currentCaveResonance();
-    return site
-      ? {
-        tile: site.tile,
-        label: site.label,
-        detail: site.detail,
-        note: site.note,
-        rewardLabel: site.reward.label,
-        rewardCount: site.reward.count,
-        observed: site.observed,
-      }
-      : null;
-  };
-
-  const caveResonanceDiagnostics = () => ({
-    current: currentCaveResonance(),
-    observed: observedCaveResonances.size,
-    notebook: caveResonanceNotebook(SEED, observedCaveResonances),
-  });
-
-  const currentCaveMouths = (rings = 4) => caveMouthSignals(columns, nearbyTileEntries(rings), 10);
-  const nearbyCaveMouth = (rings = 3) => nearestCaveMouthSignal(caveMouthSignals(columns, nearbyTileEntries(rings), 8));
-
   type NearbyCaveSignal = {
     tile: number;
     distance: number;
@@ -4167,23 +2236,6 @@ async function boot(): Promise<void> {
     const current = originTile === player.tile ? currentNaturalVoid() : null;
     if (current) {
       return { tile: originTile, distance: 0, layer: current.layer, kind: current.kind, depth: current.depth, flooded: current.flooded, spring: current.spring === true };
-    }
-    if (originTile === player.tile) {
-      const mouth = nearbyCaveMouth(3);
-      if (mouth) {
-        return {
-          tile: mouth.tile,
-          distance: mouth.ring,
-          layer: mouth.layer,
-          kind: mouth.kind,
-          label: mouth.label,
-          depth: mouth.depth,
-          flooded: mouth.flooded,
-          spring: mouth.spring === true,
-          clearance: mouth.clearance,
-          mouth: true,
-        };
-      }
     }
     const playerLayer = originLayer ?? layers.layerOfRadius(layers.topRadius(columns.groundLayerBelow(originTile, layers.bounds[0])) + 0.2);
     let best: NearbyCaveSignal | null = null;
@@ -4204,57 +2256,19 @@ async function boot(): Promise<void> {
     return best;
   };
 
-  const caveAnchorContextFor = (anchor: StructureSave): CaveAnchorContext | undefined => {
-    const signal = nearbyCaveSignal(anchor.tile, anchor.layer);
-    if (!signal) return undefined;
-    const label = 'label' in signal ? signal.label : undefined;
-    const clearance = 'clearance' in signal ? signal.clearance : undefined;
-    const mouth = 'mouth' in signal ? signal.mouth : undefined;
-    return {
-      tile: signal.tile,
-      kind: signal.kind,
-      label: label ?? caveKindLabel(signal.kind),
-      depth: signal.depth,
-      flooded: signal.flooded,
-      spring: signal.spring === true,
-      clearance,
-      distance: signal.distance,
-      mouth,
-    };
+  const weatherReportForStructure = (structure: StructureSave) => {
+    const height = layers.topRadius(Math.max(0, Math.min(layers.L - 1, structure.layer))) - PLANET_RADIUS;
+    return weatherAt(timeState, weatherState, structure.tile, height, 0);
   };
 
-  const springWaterContextFor = (structure: StructureSave) => {
-    const signal = nearbyCaveSignal(structure.tile, structure.layer);
-    if (!signal || signal.kind !== 'dryCave' || signal.spring !== true || signal.distance > 2) return null;
-    return {
-      spring: true,
-      label: signal.label ?? 'spring seep',
-      distance: signal.distance,
-    };
-  };
-
-  const rainCisternContextFor = (cistern: StructureSave) => ({
-    ...currentWeather(),
-    spring: springWaterContextFor(cistern),
-  });
-
-  const caveMouthDiagnostics = () => ({
-    mouths: currentCaveMouths(4),
-    nearest: nearbyCaveMouth(4),
-    renderer: caveMouthRenderer.stats(),
-  });
+  const rainCisternContextFor = (cistern: StructureSave): RainCisternContext => weatherReportForStructure(cistern);
 
   const waystoneContextFor = (stone: StructureSave): WaystoneContext => {
     const shelter = homeScore(structures, geo).shelter;
     const cave = nearbyCaveSignal(stone.tile, stone.layer);
     const height = layers.topRadius(Math.max(0, Math.min(layers.L - 1, stone.layer))) - PLANET_RADIUS;
     const nearWater = waterNearTile(stone.tile, 1);
-    const domain = pentagonDomainForTile(stone.tile, 2);
-    const weather = weatherAt(timeState, weatherState, stone.tile, height, 0, domain ? {
-      effect: domain.effect,
-      intensity: domain.intensity,
-      label: domain.domainLabel,
-    } : null);
+    const weather = weatherReportForStructure(stone);
     const forage = forageAt({
       tile: stone.tile,
       day: timeState.day,
@@ -4263,8 +2277,6 @@ async function boot(): Promise<void> {
       nearWater,
       weatherKind: weather.kind,
       caveKind: cave?.kind ?? null,
-      domainEffect: domain?.effect ?? null,
-      domainIntensity: domain?.intensity ?? 0,
     });
     return {
       home: shelter.tiles.includes(stone.tile) || structures.some((s) => s.item === 'bedroll' && s.state?.home === true && s.tile === stone.tile),
@@ -4274,18 +2286,12 @@ async function boot(): Promise<void> {
     };
   };
 
-  const weatherReportForStructure = (structure: StructureSave) => {
-    const height = layers.topRadius(Math.max(0, Math.min(layers.L - 1, structure.layer))) - PLANET_RADIUS;
-    const domain = pentagonDomainForTile(structure.tile, 2);
-    return weatherAt(timeState, weatherState, structure.tile, height, 0, domain ? {
-      effect: domain.effect,
-      intensity: domain.intensity,
-      label: domain.domainLabel,
-    } : null);
+  const weatherVaneContextFor = (vane: StructureSave): WeatherVaneContext => {
+    const weather = weatherReportForStructure(vane);
+    return { kind: weather.kind, label: weather.label, intensity: weather.intensity };
   };
 
   const fishTrapContextFor = (trap: StructureSave): FishTrapContext => {
-    const domain = pentagonDomainForTile(trap.tile, 2);
     const cave = nearbyCaveSignal(trap.tile, trap.layer);
     const nearWater = waterNearTile(trap.tile, 2) || dockNearTile(trap.tile, 1) !== null || cave?.kind === 'seaCave';
     const weather = weatherReportForStructure(trap);
@@ -4302,442 +2308,8 @@ async function boot(): Promise<void> {
         bait: itemCount(counts, craftedItems, 'bait'),
         weatherKind: weather.kind,
         caveKind: cave?.kind ?? null,
-        domainEffect: domain?.effect ?? null,
-        domainIntensity: domain?.intensity ?? 0,
       }),
     };
-  };
-
-  const weatherVaneContextFor = (vane: StructureSave): WeatherVaneContext => {
-    const weather = weatherReportForStructure(vane);
-    return {
-      kind: weather.kind,
-      label: weather.label,
-      intensity: weather.intensity,
-    };
-  };
-
-  const weatherWatchFor = (vane: StructureSave) => {
-    const home = homeScore(structures, geo);
-    const homeTiles = new Set(home.shelter.centerTile !== null
-      ? tilesAroundTile(home.shelter.centerTile, 2)
-      : home.shelter.tiles);
-    if (!homeTiles.has(vane.tile)) return null;
-    return waitForWeatherWindow(
-      survivalState,
-      timeState,
-      weatherState,
-      { ...home.shelter, nearWarmth: nearLitWarmth() },
-      () => weatherReportForStructure(vane),
-    );
-  };
-
-  const waystoneRouteSignals = () => structures
-    .filter((s) => s.item === 'waystone')
-    .map((s) => {
-      const mark = s.state?.waystone ?? 'survey';
-      const distanceM = greatCircleDistanceMeters(geo.centers, player.tile, s.tile, PLANET_RADIUS);
-      const bearingDeg = chartBearingDegrees(geo.centers, geo.frameOf(player.tile), player.tile, [player.fwdX, player.fwdY, player.fwdZ], s.tile);
-      return {
-        tile: s.tile,
-        mark,
-        label: waystoneMarkLabel(mark),
-        distanceM,
-        distanceLabel: formatChartDistance(distanceM),
-        turn: chartTurnLabel(bearingDeg),
-      };
-    })
-    .sort((a, b) => a.distanceM - b.distanceM)
-    .slice(0, 3);
-
-  const caveAnchorRouteSignals = () => structures
-    .filter((s) => s.item === 'caveAnchor' && s.state?.anchorKind)
-    .map((s) => {
-      const kind = s.state!.anchorKind!;
-      const targetTile = Number.isFinite(s.state?.anchorTile) ? Math.max(0, Math.trunc(s.state!.anchorTile!)) : s.tile;
-      const distanceM = greatCircleDistanceMeters(geo.centers, player.tile, targetTile, PLANET_RADIUS);
-      const bearingDeg = chartBearingDegrees(geo.centers, geo.frameOf(player.tile), player.tile, [player.fwdX, player.fwdY, player.fwdZ], targetTile);
-      const label = s.state?.anchorLabel || caveAnchorKindLabel(kind);
-      return {
-        tile: targetTile,
-        kind,
-        label: `anchored ${label}`,
-        distanceM,
-        distanceLabel: formatChartDistance(distanceM),
-        turn: chartTurnLabel(bearingDeg),
-        depth: Number.isFinite(s.state?.anchorDepth) ? Math.max(0, s.state!.anchorDepth!) : 0,
-        flooded: s.state?.anchorFlooded === true,
-        spring: s.state?.anchorSpring === true,
-        clearance: s.state?.anchorClearance,
-        uses: Math.max(0, Math.trunc(s.state?.anchorUses ?? 0)),
-      };
-    })
-    .sort((a, b) => a.distanceM - b.distanceM)
-    .slice(0, 3);
-
-  const currentRoutePlanSignal = () => routePlanSignal(
-    activeRoutePlan,
-    geo.centers,
-    geo.frameOf(player.tile),
-    player.tile,
-    [player.fwdX, player.fwdY, player.fwdZ],
-    PLANET_RADIUS,
-  );
-
-  const currentUnplannedRouteGuides = (signal: ReturnType<typeof horizonChartSignal> = visibleHorizonChartSignal()) => routeGuideCandidates({
-    chart: signal,
-    beacon: visibleHearthBeaconSignal(),
-    cave: nearbyCaveSignal(),
-    caveAnchors: caveAnchorRouteSignals(),
-    waystones: waystoneRouteSignals(),
-    skyfall: currentRouteSkyfallSignal(),
-    murmur: currentRouteMurmurSignal(),
-    seasonAfterglow: currentRouteSeasonAfterglowSignal(),
-    seasonGuides: currentSeasonRouteGuides(),
-    nativeLife: currentRouteNativeLifeSignals(),
-  });
-
-  const currentSelectableRouteGuides = (signal: ReturnType<typeof horizonChartSignal> = visibleHorizonChartSignal()): RouteGuide[] => {
-    const guides: RouteGuide[] = [];
-    const seen = new Set<string>();
-    const pushGuide = (guide: RouteGuide | null | undefined) => {
-      if (!guide || guide.kind === 'planned') return;
-      const targetTile = Number.isFinite(guide.targetTile) ? Math.trunc(guide.targetTile) : -1;
-      if (targetTile < 0) return;
-      const key = `${guide.kind}:${targetTile}:${guide.label}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      guides.push({ ...guide, targetTile });
-    };
-    const seasonalGuides = currentSeasonRouteGuides();
-    const unplannedGuides = currentUnplannedRouteGuides(signal);
-    if (!activeRoutePlan && seasonalGuides.length > 0) {
-      seasonalGuides.forEach(pushGuide);
-      unplannedGuides.forEach(pushGuide);
-    } else {
-      unplannedGuides.forEach(pushGuide);
-    }
-    return guides.sort((a, b) => b.priority - a.priority || a.label.localeCompare(b.label));
-  };
-
-  const currentRouteGuide = (signal: ReturnType<typeof horizonChartSignal> = visibleHorizonChartSignal()) => routeGuide({
-    chart: signal,
-    beacon: visibleHearthBeaconSignal(),
-    routePlan: currentRoutePlanSignal(),
-    cave: nearbyCaveSignal(),
-    caveAnchors: caveAnchorRouteSignals(),
-    waystones: waystoneRouteSignals(),
-    skyfall: currentRouteSkyfallSignal(),
-    murmur: currentRouteMurmurSignal(),
-    seasonAfterglow: currentRouteSeasonAfterglowSignal(),
-    seasonGuides: currentSeasonRouteGuides(),
-    nativeLife: currentRouteNativeLifeSignals(),
-  });
-
-  const currentRouteDomainSignal = () => {
-    const domain = currentPentagonDomain();
-    return domain ? {
-      label: domain.label,
-      domainLabel: domain.domainLabel,
-      landmarkName: domain.landmark.name,
-      discovered: domain.discovered,
-      ring: domain.ring,
-      intensity: domain.intensity,
-      challenge: domain.challenge,
-      boon: domain.boon,
-      routeHint: domain.routeHint,
-    } : null;
-  };
-
-  const currentRouteSiteSignal = () => {
-    const site = currentPentagonSite();
-    const work = siteWorkStatus(site);
-    const threshold = siteThreshold(site);
-    return site ? {
-      label: site.label,
-      siteLabel: site.siteLabel,
-      landmarkName: site.landmark.name,
-      discovered: site.discovered,
-      completed: work?.completed,
-      ready: work?.ready,
-      ring: site.ring,
-      intensity: site.intensity,
-      problem: site.problem,
-      opportunity: site.opportunity,
-      buildHint: site.buildHint,
-      routeHint: site.routeHint,
-      wonder: site.wonder,
-      workDetail: work?.detail,
-      missing: siteWorkMissingLabels(work),
-      rewardLabel: work?.reward.label,
-      rewardCount: work?.reward.count,
-      thresholdLabel: threshold?.label,
-      thresholdDetail: threshold?.detail,
-      thresholdOpen: threshold?.open,
-      thresholdTraversal: threshold?.traversal,
-    } : null;
-  };
-
-  const currentRouteSlate = (signal: ReturnType<typeof horizonChartSignal> = visibleHorizonChartSignal()) => {
-    const fishTraps = fishTrapDiagnostics();
-    const shoreNets = shoreNetDiagnostics();
-    const slate = routeSlate({
-      chart: signal,
-      beacon: visibleHearthBeaconSignal(),
-      routePlan: currentRoutePlanSignal(),
-      plan: horizonExpeditionPlan(signal),
-      cave: nearbyCaveSignal(),
-      caveResonance: currentRouteCaveResonanceSignal(),
-      caveAnchors: caveAnchorRouteSignals(),
-      waystones: waystoneRouteSignals(),
-      fish: {
-        ...currentFishSchool(),
-        trapCount: fishTraps.length,
-        trapReady: fishTraps.filter((trap) => trap.ready).length,
-        netCount: shoreNets.length,
-        netReady: shoreNets.filter((net) => net.ready).length,
-      },
-      forage: currentForage(),
-      weather: currentWeather(),
-      insights: pentagonInsights(),
-      domain: currentRouteDomainSignal(),
-      site: currentRouteSiteSignal(),
-      thresholdChamber: currentRouteThresholdChamberSignal(),
-      resource: currentRouteResourceSignal(),
-      skyfall: currentRouteSkyfallSignal(),
-      murmur: currentRouteMurmurSignal(),
-      season: currentRouteSeasonSignal(),
-      seasonAfterglow: currentRouteSeasonAfterglowSignal(),
-      nativeLife: currentRouteNativeLifeSignals(),
-    });
-    const candidates = clampRouteFocus(currentSelectableRouteGuides(signal));
-    if (!routeFocusActive || candidates.length === 0) return slate;
-    const pinForGuide = (guide: RouteGuide) =>
-      slate.pins.find((pin) => pin.id === guide.kind && pin.label === guide.label)
-      ?? slate.pins.find((pin) => pin.id === guide.kind);
-    const pins: RouteSlateView['pins'] = candidates.slice(0, 5).map((guide, index) => {
-      const sourcePin = pinForGuide(guide);
-      return {
-        id: guide.kind,
-        label: guide.label,
-        detail: sourcePin?.detail ?? guide.detail,
-        ready: sourcePin?.ready ?? true,
-        selected: routeFocusActive && index === routeFocusIndex,
-        selectable: true,
-      };
-    });
-    return { ...slate, pins };
-  };
-
-  const currentHearthJournal = () => {
-    const home = homeScore(structures, geo);
-    const survival = survivalSnapshot();
-    const weather = currentWeather();
-    const food = foodCounts();
-    const crops = cropDiagnostics();
-    const routeSignal = visibleHorizonChartSignal();
-    const plan = horizonExpeditionPlan(routeSignal);
-    const slate = currentRouteSlate(routeSignal);
-    const guide = currentRouteGuide(routeSignal);
-    const routePlan = currentRoutePlanSignal();
-    const progress = progressionState();
-    const insights = pentagonInsights();
-    const site = currentPentagonSite();
-    const siteWork = siteWorkStatus(site);
-    const threshold = siteThreshold(site);
-    const thresholdEffect = currentPentagonSiteThresholdEffect();
-    const resources = domainResourceDiagnostics();
-    const thresholdChambers = thresholdChamberDiagnostics();
-    const thresholdChamber = currentRouteThresholdChamberSignal();
-    const skyfall = skyfallDiagnostics();
-    const skyfallRoute = currentRouteSkyfallSignal();
-    const murmurs = murmurDiagnostics();
-    const murmurRoute = currentRouteMurmurSignal();
-    const season = currentRouteSeasonSignal();
-    const afterglow = currentRouteSeasonAfterglowSignal();
-    const cave = nearbyCaveSignal();
-    const caveResonance = currentRouteCaveResonanceSignal();
-    const fish = currentFishSchool();
-    const fishTraps = fishTrapDiagnostics();
-    const shoreNets = shoreNetDiagnostics();
-    const forage = currentForage();
-    const nativeLife = nativeLifeDiagnostics();
-    const nativeSignals = currentRouteNativeLifeSignals();
-    const nativeHazard = nativeSignals.find((site) => site.temperament !== 'harmless' && site.warded !== true);
-    const nativeHelper = nativeSignals.find((site) => site.temperament === 'harmless' && site.tended !== true);
-    const nativeDetail = (site: RouteSlateNativeLifeSignal | undefined): string | undefined => {
-      if (!site) return undefined;
-      const where = site.distanceLabel && site.turn ? `${site.distanceLabel} ${site.turn}` : 'nearby';
-      const reward = `+${Math.max(0, Math.trunc(site.rewardCount))} ${site.rewardLabel}`;
-      const firstHint = site.hint.split(/[.;]/)[0]?.trim() || site.hint;
-      return site.temperament === 'harmless'
-        ? `${where} · ${reward} · ${firstHint}`
-        : `${where} · answer with ${site.weakness ?? firstHint} · ${reward}`;
-    };
-    const recentMurmurs = murmurNotebook(SEED, geo.count, observedMurmurs)
-      .slice(-3)
-      .map((site) => ({ label: site.label, detail: site.note, tone: 'wonder' as const }));
-    const plantedCrops = crops.filter((crop) => crop.state?.crop).length;
-    const readyCrops = crops.filter((crop) => Math.trunc(crop.state?.growth ?? 0) >= 3).length;
-    const blockedCrops = crops.filter((crop) =>
-      crop.state?.crop
-      && Math.trunc(crop.state?.growth ?? 0) < 3
-      && (!crop.environment.watered || !crop.environment.lit || crop.environment.cold || crop.environment.storm)).length;
-    const caveLabel = cave ? cave.label ?? caveKindLabel(cave.kind) : undefined;
-    const caveDetail = cave ? `${cave.distance === 0 ? 'here' : `${cave.distance} ring${cave.distance === 1 ? '' : 's'}`} · depth ${cave.depth.toFixed(1)} m${cave.flooded ? ' · flooded' : ''}${cave.spring ? ' · spring seep' : ''}` : undefined;
-    const weatherNote = lastSurvivalAction.startsWith('weather watch:')
-      ? lastSurvivalAction.replace('weather watch:', '').split(' · ').slice(0, 2).join(' · ')
-      : undefined;
-    const routeSelection = routeSelectionState();
-    return buildHearthJournal({
-      home: {
-        label: home.label,
-        functional: home.functional,
-        protected: home.shelter.protected,
-        missing: home.shelter.missing,
-        storedItems: home.storedItems,
-        cellarProvisions: home.cellarProvisions,
-        structures: structures.length,
-      },
-      survival: {
-        label: survival.label,
-        status: survival.status,
-        stamina: survival.stamina,
-        exposure: survival.exposure,
-        trailFocus: survival.trailFocus,
-        collapseCount: Math.max(0, Math.trunc(survivalState.collapseCount ?? 0)),
-        day: timeState.day,
-        minute: timeState.minute,
-        weatherLabel: weather.label,
-        weatherNote,
-      },
-      food,
-      crops: {
-        plots: crops.length,
-        planted: plantedCrops,
-        ready: readyCrops,
-        blocked: blockedCrops,
-      },
-      route: {
-        chartKnown: horizonChartCount() > 0,
-        slateSummary: slate.summary,
-        primaryLabel: slate.primary?.label,
-        primaryDetail: slate.primary?.detail,
-        planReady: plan.ready,
-        planPrepLabel: plan.prepLabel,
-        planMissing: plan.missing,
-        guideLabel: guide?.label,
-        guideDetail: guide?.detail,
-        selectedCandidateLabel: routeSelection.selected?.label,
-        selectedCandidateDetail: routeSelection.selected?.detail,
-        routePlanLabel: routePlan
-          ? routePlan.legCount > 1
-            ? routePlan.complete ? 'itinerary complete' : `itinerary stop ${routePlan.legIndex + 1}/${routePlan.legCount}: ${routePlan.label}`
-            : routePlan.label
-          : undefined,
-        routePlanDetail: routePlan
-          ? routePlan.complete
-            ? `${routePlan.reachedCount}/${routePlan.legCount} stops reached · last ${routePlan.label}`
-            : `${routePlan.legCount > 1 ? `stop ${routePlan.legIndex + 1}/${routePlan.legCount} · ` : ''}${routePlan.distanceLabel} ${routePlan.turn} · ${routePlan.detail}`
-          : undefined,
-        hearthBeacon: visibleHearthBeaconSignal()?.label,
-        waystones: waystoneRouteSignals().length,
-        caveAnchors: caveAnchorRouteSignals().length,
-      },
-      discoveries: {
-        pentagonsKnown: progress.count,
-        pentagonsTotal: progress.total,
-        insightLabel: insights.prepLabel ?? insights.labels?.slice(0, 2).join(' + ') ?? 'no insights',
-        domainLabel: currentPentagonDomain()?.domainLabel,
-        siteLabel: site?.label,
-        siteDetail: siteWork
-          ? `${siteWork.detail}${threshold ? ` · ${threshold.label}: ${threshold.detail}` : ''}${thresholdEffect ? ` · ${thresholdEffect.detail}` : ''}`
-          : site ? `${site.discovered ? site.opportunity : site.routeHint} · ${site.discovered ? site.buildHint : site.wonder}${threshold ? ` · ${threshold.label}: ${threshold.detail}` : ''}${thresholdEffect ? ` · ${thresholdEffect.detail}` : ''}` : undefined,
-        siteDiscovered: site?.discovered,
-        siteCompleted: siteWork?.completed,
-        siteReady: siteWork?.ready,
-        siteMissing: siteWorkMissingLabels(siteWork),
-        resourcesDiscovered: resources.discovered,
-        resourcesHarvested: resources.harvested,
-        resourcesTotal: resources.total,
-        thresholdChambersOpen: thresholdChambers.open,
-        thresholdChambersObserved: thresholdChambers.observed,
-        thresholdChambersTotal: thresholdChambers.total,
-        thresholdChamberLabel: thresholdChamber?.label,
-        thresholdChamberDetail: thresholdChamber ? `${thresholdChamber.thresholdLabel} · ${thresholdChamber.detail}` : undefined,
-        caveResonancesObserved: observedCaveResonances.size,
-        caveResonanceLabel: caveResonance?.label,
-        caveResonanceDetail: caveResonance ? `${caveResonance.detail} · +${caveResonance.rewardCount} ${caveResonance.rewardLabel}` : undefined,
-        caveResonanceObserved: caveResonance?.observed,
-      },
-      world: {
-        skyfallActive: skyfall.active,
-        skyfallHarvested: skyfall.harvested,
-        skyfallCurrent: skyfall.current?.label,
-        skyfallOmen: skyfall.current?.omen.label,
-        skyfallRoute: skyfallRoute ? `${skyfallRoute.label} ${skyfallRoute.distanceLabel} ${skyfallRoute.turn}${skyfallRoute.omenLabel ? ` · ${skyfallRoute.omenLabel}` : ''}` : undefined,
-        murmursActive: murmurs.active,
-        murmursObserved: murmurs.observed,
-        murmurRoute: murmurRoute ? `${murmurRoute.label} ${murmurRoute.distanceLabel} ${murmurRoute.turn}` : undefined,
-        seasonLabel: season?.label,
-        seasonDetail: season ? `${season.detail} · ${season.tradeoff}` : undefined,
-        seasonChainLabel: season?.chain?.payoffLabel,
-        seasonChainDetail: season?.chain ? `${season.chain.progressLabel} · ${season.chain.payoffDetail}` : undefined,
-        seasonChainComplete: season?.chain?.linked,
-        seasonAfterglowLabel: afterglow?.label,
-        seasonAfterglowDetail: afterglow ? `${afterglow.distanceLabel} ${afterglow.turn} · ${afterglow.detail}` : undefined,
-        seasonAfterglowNote: afterglow?.note,
-        seasonAfterglowRead: afterglow?.read,
-        seasonAfterglowFocusMinutes: afterglow?.focusMinutes,
-        recentMurmurs,
-        caveSignal: caveLabel,
-        caveDetail,
-        caveResonance: caveResonance?.label,
-        caveResonanceDetail: caveResonance ? `${caveResonance.detail} · ${caveResonance.note}` : undefined,
-        caveResonanceObserved: caveResonance?.observed,
-        nativeLifeVisible: nativeLife.visible,
-        nativeLifeTended: nativeLife.tended,
-        nativeLifeWarded: nativeLife.warded,
-        nativeHelperLabel: nativeHelper?.label,
-        nativeHelperDetail: nativeDetail(nativeHelper),
-        nativeHazardLabel: nativeHazard?.label,
-        nativeHazardDetail: nativeDetail(nativeHazard),
-        fishLabel: fish.label,
-        fishStrength: fish.strength,
-        fishTraps: fishTraps.length,
-        fishTrapReady: fishTraps.filter((trap) => trap.ready).length,
-        shoreNets: shoreNets.length,
-        shoreNetReady: shoreNets.filter((net) => net.ready).length,
-        forageLabel: forage.label,
-        forageStrength: forage.strength,
-      },
-    });
-  };
-
-  const closeJournal = (): void => {
-    journalOpen = false;
-    hud.setJournal(null, false);
-  };
-
-  const toggleJournal = (): void => {
-    journalOpen = !journalOpen;
-    if (journalOpen) {
-      closeStorage();
-      craftingOpen = false;
-      refreshCraftingHud();
-      closeRouteSlate();
-      hud.setJournal(currentHearthJournal(), true);
-      playAudio('uiOpen');
-      return;
-    }
-    hud.setJournal(null, false);
-    playAudio('uiConfirm');
-  };
-
-  hud.onJournalToggle = toggleJournal;
-  hud.onJournalClose = () => {
-    closeJournal();
-    playAudio('uiConfirm');
   };
 
   const currentChestStorage = (): ChestStoragePanelView | null => {
@@ -4776,7 +2348,6 @@ async function boot(): Promise<void> {
   };
 
   const toggleCraftingPanel = (): void => {
-    if (journalOpen) closeJournal();
     if (openChestId !== null) closeStorage();
     craftingOpen = !craftingOpen;
     if (craftingOpen) {
@@ -4784,7 +2355,6 @@ async function boot(): Promise<void> {
       craftingFocusAction = 'craft';
     }
     refreshCraftingHud();
-    if (craftingOpen) closeRouteSlate();
     playAudio(craftingOpen ? 'uiOpen' : 'uiConfirm');
     if (craftingOpen) hud.flash('crafting opened', 1.4);
   };
@@ -4806,10 +2376,8 @@ async function boot(): Promise<void> {
     openChestId = chest.id;
     storageFocusIndex = 0;
     storageFocusAction = 'depositOne';
-    if (journalOpen) closeJournal();
     craftingOpen = false;
     refreshCraftingHud();
-    closeRouteSlate();
     refreshStorage();
     const view = currentChestStorage();
     lastStructureAction = `chest:open:${view?.summary ?? 'storage open'}`;
@@ -4861,8 +2429,7 @@ async function boot(): Promise<void> {
     action === 'depositOne' || action === 'depositAll' ? row.canDeposit : row.canWithdraw;
 
   const handleGamepadPanelInput = (gp: GamepadFrame): boolean => {
-    const routeInput = routeSlateOpen() && (gp.menuUp || gp.menuDown || gp.menuLeft || gp.menuRight || gp.confirm || gp.cancel || gp.chart || gp.pin || gp.clearPin);
-    const hasPanelInput = gp.menuUp || gp.menuDown || gp.menuLeft || gp.menuRight || gp.confirm || gp.cancel || routeInput;
+    const hasPanelInput = gp.menuUp || gp.menuDown || gp.menuLeft || gp.menuRight || gp.confirm || gp.cancel;
     if (!hasPanelInput) return false;
 
     if (openChestId !== null) {
@@ -4930,82 +2497,7 @@ async function boot(): Promise<void> {
       return true;
     }
 
-    if (routeSlateOpen()) {
-      const candidates = clampRouteFocus();
-      if (gp.cancel || gp.chart) {
-        closeRouteSlate();
-        playAudio('uiConfirm');
-        return true;
-      }
-      if (gp.clearPin) {
-        clearRouteCommand();
-        return true;
-      }
-      if (gp.menuLeft && !gp.clearPin) {
-        dropRouteCommand();
-        return true;
-      }
-      if (gp.menuRight && !gp.pin) {
-        deferRouteCommand();
-        return true;
-      }
-      if (gp.menuUp || gp.menuDown) {
-        if (candidates.length === 0) {
-          playAudio('uiDeny');
-          hud.flash('no route candidates to choose', 1.6);
-          return true;
-        }
-        const delta = gp.menuDown ? 1 : -1;
-        routeFocusIndex = (routeFocusIndex + delta + candidates.length) % candidates.length;
-        routeFocusDirty = true;
-        refreshRouteSlate(12);
-        playAudio('uiConfirm');
-        return true;
-      }
-      if (gp.confirm || gp.pin) {
-        pinRouteCommand(true);
-        return true;
-      }
-      return true;
-    }
-
     return false;
-  };
-
-  const handleRouteKeyboardInput = (up: boolean, down: boolean, left: boolean, right: boolean, confirm: boolean, cancel: boolean): boolean => {
-    if (!routeSlateOpen() || (!up && !down && !left && !right && !confirm && !cancel)) return false;
-    const candidates = clampRouteFocus();
-    if (cancel) {
-      closeRouteSlate();
-      playAudio('uiConfirm');
-      return true;
-    }
-    if (left) {
-      dropRouteCommand();
-      return true;
-    }
-    if (right) {
-      deferRouteCommand();
-      return true;
-    }
-    if (up || down) {
-      if (candidates.length === 0) {
-        playAudio('uiDeny');
-        hud.flash('no route candidates to choose', 1.6);
-        return true;
-      }
-      const delta = down ? 1 : -1;
-      routeFocusIndex = (routeFocusIndex + delta + candidates.length) % candidates.length;
-      routeFocusDirty = true;
-      refreshRouteSlate(12);
-      playAudio('uiConfirm');
-      return true;
-    }
-    if (confirm) {
-      pinRouteCommand(true);
-      return true;
-    }
-    return true;
   };
 
   const homeBedrollStructure = (): StructureSave | null =>
@@ -5028,14 +2520,12 @@ async function boot(): Promise<void> {
 
   const debugSetPlayerTile = (tile: number) => {
     relocatePlayerToTile(tile);
-    lastStructureCollisionBlock = null;
     return { tile: player.tile, mode: player.mode, grounded: player.grounded };
   };
 
   const debugWalkTowardTile = (tile: number, seconds = 1.35) => {
     const target = Math.max(0, Math.min(geo.count - 1, Math.trunc(Number.isFinite(tile) ? tile : player.tile)));
     const start = player.tile;
-    lastStructureCollisionBlock = null;
     facePlayerTowardTile(target);
     const frameDt = 1 / 60;
     const frames = Math.max(1, Math.min(240, Math.ceil(Math.max(0.05, Number.isFinite(seconds) ? seconds : 1.35) / frameDt)));
@@ -5047,8 +2537,8 @@ async function boot(): Promise<void> {
         sprint: false,
         jump: false,
         swimUp: false,
-      }, { structureTraversalBlocker: wallShellMovementBlocker });
-      if (player.tile !== start || lastStructureCollisionBlock) break;
+      });
+      if (player.tile !== start) break;
     }
     streamer.refreshDesired(...player.up(), player.altitudeAGL());
     return {
@@ -5056,42 +2546,17 @@ async function boot(): Promise<void> {
       targetTile: target,
       endTile: player.tile,
       crossed: player.tile !== start,
-      blocked: lastStructureCollisionBlock !== null,
+      blocked: false,
       collision: structureCollisionDiagnostics(start, target),
     };
   };
 
-  const skyLifeKinds: readonly SkyLifeSite['kind'][] = ['sky', 'shore', 'forest', 'storm'];
-
-  const normalizeSkyLifeKind = (kind: unknown): SkyLifeSite['kind'] | null =>
-    skyLifeKinds.includes(kind as SkyLifeSite['kind']) ? kind as SkyLifeSite['kind'] : null;
-
-  const findSkyLifeTile = (kind: SkyLifeSite['kind'], startTile = player.tile): number | null => {
-    const start = Math.max(0, Math.min(geo.count - 1, Math.trunc(Number.isFinite(startTile) ? startTile : player.tile)));
-    for (const entry of tileEntriesAroundTile(start, 64)) {
-      const tile = entry.tile;
-      const height = columns.heightOf(tile);
-      const nearWater = waterNearTile(tile, 1);
-      const nearTrees = tilesAroundTile(tile, 1).some((nearby) => trees.hasTree(nearby));
-      if (kind === 'shore' && nearWater && height > SEA_LEVEL_HEIGHT + 0.6) return tile;
-      if (kind === 'forest' && nearTrees && height > SEA_LEVEL_HEIGHT + 0.6) return tile;
-      if (kind === 'storm' && !nearTrees && height > SEA_LEVEL_HEIGHT + 1.6) return tile;
-      if (kind === 'sky' && !nearWater && !nearTrees && height > SEA_LEVEL_HEIGHT + 2.5) return tile;
-    }
-    return null;
-  };
-
-  const debugSpawnAtSkyLifeKind = (kind: unknown = 'sky', startTile?: number) => {
-    const targetKind = normalizeSkyLifeKind(kind);
-    if (!targetKind) return { ok: false, reason: 'unknown sky-life kind', kind, allowed: [...skyLifeKinds] };
-    const tile = findSkyLifeTile(targetKind, Number.isFinite(startTile) ? Math.trunc(startTile!) : player.tile);
-    if (tile === null) return { ok: false, reason: 'no sky-life tile found', kind: targetKind, sites: currentSkyLifeSites() };
-    relocatePlayerToTile(tile);
-    return { ok: true, kind: targetKind, tile, sites: currentSkyLifeSites() };
-  };
-
+  // Debug/dev-only rescue: force-relocates the player home/to spawn. No longer called from the
+  // animate loop — normal exposure pressure is a HUD warning + ongoing stamina drain (see
+  // isExposureWarning/isExposureCritical below), never a silent automatic teleport. Reachable
+  // only via the explicit debug.collapse(force) console hook.
   const triggerCollapseRecovery = (reason = 'exposure', force = false) => {
-    if (!force && (creativeActive || !shouldCollapse(survivalState))) return null;
+    if (!force && (creativeActive || !isExposureCritical(survivalState))) return null;
     const bedroll = homeBedrollStructure();
     const home = homeScore(structures, geo);
     const result = recoverFromCollapse(survivalState, timeState, weatherState, {
@@ -5100,10 +2565,8 @@ async function boot(): Promise<void> {
     });
     relocatePlayerToTile(bedroll?.tile ?? spawnTile);
     closeStorage();
-    if (journalOpen) closeJournal();
     craftingOpen = false;
     refreshCraftingHud();
-    closeRouteSlate();
     lastSurvivalAction = `${reason}:${result.message}`;
     triggerCharacterAction('sleep', bedroll ? 'bedroll' : 'hands', 1.05);
     playAudio(bedroll ? 'hearthRest' : 'uiDeny');
@@ -5114,32 +2577,6 @@ async function boot(): Promise<void> {
 
   const useEchoLantern = (): boolean => {
     if (itemCount(counts, craftedItems, 'echoLantern') <= 0) return false;
-    const resonance = currentCaveResonance();
-    if (resonance) {
-      if (resonance.observed) {
-        lastCaveAction = `echo lantern: ${resonance.label} already noted`;
-        triggerCharacterAction('discover', 'echoLantern', 0.72);
-        playAudio('caveRead');
-        hud.flash(`${resonance.label} already in the Hearth Journal`, 2.8);
-        if (journalOpen) hud.setJournal(currentHearthJournal(), true);
-        return true;
-      }
-      const result = observeCaveResonance(observedCaveResonances, resonance);
-      if (result.ok) {
-        craftedItems[result.site.reward.item] = Math.max(0, Math.trunc(craftedItems[result.site.reward.item] ?? 0) + result.site.reward.count);
-        lastCaveAction = `echo lantern: ${result.site.label} · ${result.site.note}`;
-        lastNavigationAction = `cave resonance: ${result.site.label}`;
-        triggerCharacterAction('discover', 'echoLantern', 0.95);
-        playAudio('caveRead');
-        markSaveDirty();
-        hud.flash(`${result.site.label} · +${result.site.reward.count} ${result.site.reward.label}`, 4);
-        refreshCraftingHud();
-        hud.setRouteSlate(currentRouteSlate(), 6);
-        if (journalOpen) hud.setJournal(currentHearthJournal(), true);
-        refreshUseButton();
-        return true;
-      }
-    }
     const signal = nearbyCaveSignal();
     if (!signal) return false;
     const label = signal.label ?? caveKindLabel(signal.kind);
@@ -5198,8 +2635,7 @@ async function boot(): Promise<void> {
     playAudio(audioEventForFoodAction('fish', true));
     markSaveDirty();
     refreshCraftingHud();
-    const tideHazard = triggerNativeFishingSplash(school);
-    hud.flash(tideHazard ? `${result.message} · tide lurker surge · ready light or blade` : `${result.message} · cook at a lit campfire`, tideHazard ? 4 : 3.2);
+    hud.flash(`${result.message} · cook at a lit campfire`, 3.2);
     return true;
   };
 
@@ -5281,66 +2717,10 @@ async function boot(): Promise<void> {
     return { ...feature, floorLayer: floorK, radius: r };
   };
 
-  const spawnAtSkyfall = () => {
-    const site = currentSkyfall();
-    if (!site) return null;
-    player.spawnAt(site.tile);
-    player.mode = 'walk';
-    player.vx = 0;
-    player.vy = 0;
-    player.vz = 0;
-    streamer.refreshDesired(...player.up(), player.altitudeAGL());
-    refreshUseButton();
-    return site;
-  };
-
-  const spawnAtMurmur = (index = 0) => {
-    const active = currentMurmurSites().filter((site) => site.active && !site.observed);
-    const site = active[Math.max(0, Math.min(active.length - 1, Math.trunc(index)))] ?? currentMurmurSites()[0];
-    if (!site) return null;
-    player.spawnAt(site.tile);
-    player.mode = 'walk';
-    player.vx = 0;
-    player.vy = 0;
-    player.vz = 0;
-    streamer.refreshDesired(...player.up(), player.altitudeAGL());
-    refreshUseButton();
-    return site;
-  };
-
-  const spawnAtSeasonAfterglow = () => {
-    const afterglow = currentSeasonAfterglow();
-    if (!afterglow) return null;
-    player.spawnAt(afterglow.tile);
-    player.mode = 'walk';
-    player.vx = 0;
-    player.vy = 0;
-    player.vz = 0;
-    streamer.refreshDesired(...player.up(), player.altitudeAGL());
-    refreshUseButton();
-    return seasonAfterglowDiagnostics();
-  };
-
-  const completeCurrentSeasonChord = () => {
-    const season = currentStrangerSeason();
-    if (!season?.skyfall) return null;
-    harvestedSkyfalls.add(season.skyfall.id);
-    for (const site of season.murmurs) observedMurmurs.add(site.id);
-    skyfallRenderer.setSites(currentSkyfallSites());
-    murmurRenderer.setSites(currentMurmurSites());
-    seasonAfterglowRenderer.setAfterglow(currentSeasonAfterglow());
-    lastNavigationAction = `debug completed season chord: ${currentSeasonAfterglow()?.label ?? season.label}`;
-    markSaveDirty();
-    refreshUseButton();
-    hud.setRouteSlate(currentRouteSlate(), 6);
-    if (journalOpen) hud.setJournal(currentHearthJournal(), true);
-    return seasonAfterglowDiagnostics();
-  };
-
   const tryDismantleStructure = (id?: number, source: BuildCommandSource = 'debug'): boolean => {
     const target = id !== undefined
       ? structures.find((s) => s.id === Math.trunc(id)) ?? null
-      : nearestStructureOnTiles(structures, nearbyStructureTiles());
+      : nearestStructureFacing(structures, nearbyStructureTiles());
     const inventoryBefore = target ? itemCount(counts, craftedItems, target.item) : undefined;
     const result = packStructureCommand(structures, target, craftedItems, creativeActive);
     lastStructureAction = result.action;
@@ -5365,21 +2745,13 @@ async function boot(): Promise<void> {
   };
 
   const useStructure = (id?: number, source: BuildCommandSource = 'debug'): boolean => {
-    if (id === undefined && tryThresholdChamber()) return true;
     const target = id !== undefined
       ? structures.find((s) => s.id === Math.trunc(id)) ?? null
-      : nearestStructureOnTiles(structures, nearbyStructureTiles());
+      : nearestStructureFacing(structures, nearbyStructureTiles());
     if (!target) {
       if (id === undefined) {
         const landmark = nearbyLandmarkTile();
         if (landmark !== null && !discoveredPentagons.has(landmark) && useLandmark(landmark)) return true;
-        if (tryDomainResource()) return true;
-        if (trySkyfall()) return true;
-        if (tryMurmur()) return true;
-        if (trySeasonAfterglow()) return true;
-        if (tryNativeCreature(undefined, false)) return true;
-        if (tryRangedNativeWard()) return true;
-        if (tryThresholdChamber()) return true;
         if (useLandmark()) return true;
         if (useEchoLantern()) return true;
         const fished = tryFish();
@@ -5415,31 +2787,15 @@ async function boot(): Promise<void> {
       }, target);
       return opened;
     }
-    if (target.item === 'dockSegment' && itemCount(counts, craftedItems, 'fishingRod') > 0) {
-      tryFish();
-      lastStructureAction = `dockSegment:cast:${lastFoodAction}`;
-      recordBuildCommand(source, 'use', 'structure', {
-        ok: true,
-        command: 'use',
-        item: target.item,
-        id: target.id,
-        message: lastFoodAction || 'dock cast',
-        action: lastStructureAction,
-        mode: 'inspect',
-      }, target);
-      return true;
-    }
     const command = useStructureInteractionCommand({
       structures,
       target,
       materialCounts: counts,
       craftedItems,
       topology: geo,
-      cropEnvironment: target.item === 'cropPlot' ? cropEnvironmentFor(target) : undefined,
       waystoneContext: target.item === 'waystone' ? waystoneContextFor(target) : undefined,
       weatherVaneContext: target.item === 'weatherVane' ? weatherVaneContextFor(target) : undefined,
       rainCisternContext: target.item === 'rainCistern' ? rainCisternContextFor(target) : undefined,
-      caveAnchorContext: target.item === 'caveAnchor' ? caveAnchorContextFor(target) : undefined,
       fishTrapContext: target.item === 'fishTrap' || target.item === 'shoreNet' ? fishTrapContextFor(target) : undefined,
     });
     const result = command.interaction!;
@@ -5448,8 +2804,6 @@ async function boot(): Promise<void> {
     lastStructureAction = command.action;
     recordBuildCommand(source, 'use', 'structure', command, target);
     if (command.foodAction) lastFoodAction = command.foodAction;
-    if (command.navigationAction) lastNavigationAction = command.navigationAction;
-    if (command.caveAction) lastCaveAction = command.caveAction;
     if (result.ok) {
       if (result.mode === 'home') {
         const homeBeforeRest = homeScore(structures, geo);
@@ -5468,28 +2822,14 @@ async function boot(): Promise<void> {
               hearthSupperPrepared = true;
               feedbackMessage = `${rest.message} · ${supper.message}`;
               lastSurvivalAction = `${rest.message} · ${supper.message}`;
-              lastFoodAction = `home supper:${supper.message}`;
               lastStructureAction = `${target.item}:home:${result.message}:${rest.message}:${supper.message}:cellar ${spend.remaining}`;
             }
           }
         }
       }
-      if (result.mode === 'forecast') {
-        const watch = weatherWatchFor(target);
-        if (watch && (watch.ok || !watch.cleared)) {
-          feedbackMessage = watch.message;
-          lastSurvivalAction = `weather watch:${watch.message}`;
-          lastStructureAction = `${target.item}:forecast:${result.message}:${watch.message}`;
-          lastNavigationAction = lastStructureAction;
-          if (watch.ok) {
-            hud.setRouteSlate(currentRouteSlate(), 5);
-            if (journalOpen) hud.setJournal(currentHearthJournal(), true);
-          }
-        }
-      }
       const action: CharacterAction = result.mode === 'setTrap' || result.mode === 'checkTrap' || result.mode === 'collectTrap' || result.mode === 'setNet' || result.mode === 'checkNet' || result.mode === 'collectNet'
         ? 'fish'
-        : result.mode === 'plant' || result.mode === 'plantReeds' || result.mode === 'tend' || result.mode === 'harvest' || result.mode === 'fertilize' || result.mode === 'irrigate' || result.mode === 'compost' || result.mode === 'collectWater'
+        : result.mode === 'collectWater'
         ? 'farm'
         : result.mode === 'cook' || result.mode === 'preserve' || result.mode === 'cache' || result.mode === 'withdrawProvision'
         ? 'cook'
@@ -5497,13 +2837,13 @@ async function boot(): Promise<void> {
         ? 'cook'
         : result.mode === 'home'
         ? 'sleep'
-        : result.mode === 'forecast' || result.mode === 'anchor'
+        : result.mode === 'forecast'
         ? 'discover'
         : 'interact';
       const movedProp = result.moved
         ? Object.keys(result.moved).find((id) => Object.prototype.hasOwnProperty.call(ITEM_DEFS, id)) as CharacterPropId | undefined
         : undefined;
-      triggerCharacterAction(action, movedProp ?? (hearthSupperPrepared ? 'trailRation' : propForStructureInteraction(target.item, result.mode)), action === 'sleep' ? 0.85 : hearthSupperPrepared ? 0.95 : result.mode === 'forecast' || result.mode === 'anchor' ? 0.72 : 0.55);
+      triggerCharacterAction(action, movedProp ?? (hearthSupperPrepared ? 'trailRation' : propForStructureInteraction(target.item, result.mode)), action === 'sleep' ? 0.85 : hearthSupperPrepared ? 0.95 : result.mode === 'forecast' ? 0.72 : 0.55);
       playAudio(audioEventForStructure(target.item, result.mode, true));
       markSaveDirty();
       structureRenderer.setStructures(structures);
@@ -5547,33 +2887,22 @@ async function boot(): Promise<void> {
       craftedItems: { ...craftedItems },
       inventory: packLedger(),
       tools: { ...toolSummary(craftedItems, toolWear), wear: { ...toolWear }, lastAction: lastToolAction, reach: playerReach() },
-      food: { ...foodCounts(), lastAction: lastFoodAction, nearWater: nearFishingWater(), nearDock: nearDock(), school: currentFishSchool(), fishingCue: currentFishingCue(), fishVisuals: fishSchoolRenderer.stats(), forage: currentForage(), crops: cropDiagnostics(), fishTraps: fishTrapDiagnostics(), shoreNets: shoreNetDiagnostics() },
-      skyLife: { sites: currentSkyLifeSites(), renderer: skyLifeRenderer.stats() },
+      food: { ...foodCounts(), lastAction: lastFoodAction, nearWater: nearFishingWater(), nearDock: nearDock(), school: currentFishSchool(), fishingCue: currentFishingCue(), fishVisuals: fishSchoolRenderer.stats(), forage: currentForage() },
       audio: audio.state(),
       controls: { ux: uxManager.snapshot(), gamepad: gamepad.snapshot(), touch: touch.enabled, inputActive: input.active(), aimActive: input.active() || gamepad.active(), panels: currentPanelOwnership() },
       relocation: relocationDiagnostics(),
       structureCollision: structureCollisionDiagnostics(),
       survival: { ...survivalSnapshot(), time: { ...timeState }, state: { ...survivalState }, pack: packBurden(), lastAction: lastSurvivalAction },
-      caves: { current: currentNaturalVoid(), signal: nearbyCaveSignal(), resonance: caveResonanceDiagnostics(), mouths: caveMouthDiagnostics(), pressure: currentCavePressure(), lastAction: lastCaveAction, echoLantern: itemCount(counts, craftedItems, 'echoLantern') },
-      navigation: { horizonChart: horizonChartCount(), signal: visibleHorizonChartSignal(), hearthBeacon: visibleHearthBeaconSignal(), routePlan: currentRoutePlanSignal(), savedRoutePlan: activeRoutePlan, waystones: waystoneRouteSignals(), caveAnchors: caveAnchorRouteSignals(), weatherVane: weatherVaneForecast(), domain: currentPentagonDomain(), site: currentRouteSiteSignal(), thresholdChamber: currentRouteThresholdChamberSignal(), resource: currentRouteResourceSignal(), skyfall: currentRouteSkyfallSignal(), murmur: currentRouteMurmurSignal(), season: currentRouteSeasonSignal(), seasonAfterglow: currentRouteSeasonAfterglowSignal(), seasonRoute: currentSeasonRouteGuides(), guide: currentRouteGuide(), plan: horizonExpeditionPlan(), slate: currentRouteSlate(), lastAction: lastNavigationAction },
-      journal: { open: journalOpen, state: currentHearthJournal() },
+      caves: { current: currentNaturalVoid(), signal: nearbyCaveSignal(), lastAction: lastCaveAction, echoLantern: itemCount(counts, craftedItems, 'echoLantern') },
       storage: { open: openChestId !== null, chestId: openChestId, state: currentChestStorage() },
-      domainResources: domainResourceDiagnostics(),
-      thresholdChambers: thresholdChamberDiagnostics(),
-      skyfall: skyfallDiagnostics(),
-      murmurs: murmurDiagnostics(),
-      nativeLife: nativeLifeDiagnostics(),
-      strangerSeasons: strangerSeasonDiagnostics(),
-      seasonAfterglow: seasonAfterglowDiagnostics(),
       character: character.state(),
       characterIntent: characterVisualState(),
       characterRenderer: character.stats(),
       naturalVoid: currentNaturalVoid(),
-      landmarks: { ...progressionState(), insights: pentagonInsights(), domain: currentPentagonDomain(), site: currentPentagonSite(), siteWork: currentPentagonSiteWork(), siteThreshold: currentPentagonSiteThreshold(), siteThresholdEffect: currentPentagonSiteThresholdEffect(), thresholdTerrain: lastThresholdTerrainAction, thresholdChambers: thresholdChamberDiagnostics(), siteCompletions: [...completedPentagonSites], siteCompletionsCount: completedPentagonSites.size, sites: pentagonExpeditionSites(pentagonTiles, discoveredPentagons), thresholds: pentagonSiteThresholds(pentagonTiles, discoveredPentagons, completedPentagonSites), resources: domainResourceDiagnostics(), skyfall: skyfallDiagnostics(), murmurs: murmurDiagnostics(), strangerSeasons: strangerSeasonDiagnostics(), seasonAfterglow: seasonAfterglowDiagnostics(), nearby: pentagonLandmark(nearbyLandmarkTile() ?? -1, pentagonTiles, discoveredPentagons), lastAction: lastLandmarkAction },
+      landmarks: { ...progressionState(), nearby: pentagonLandmark(nearbyLandmarkTile() ?? -1, pentagonTiles, discoveredPentagons), lastAction: lastLandmarkAction },
       structures: structures.length,
       home: homeScore(structures, geo),
       lastStructureAction,
-      spawnSafety: spawnSafetyDiagnostics(spawnTile),
       naturalFeatureNearSpawn: columns.naturalFeature(undefined, spawnTile),
       spawnTile,
     }),
@@ -5633,32 +2962,23 @@ async function boot(): Promise<void> {
       const layer = columns.groundLayerBelow(target, layers.bounds[0]);
       const mat = columns.materialAt(target, layer);
       const materialItem = materialItemForMaterial(mat);
-      const caveDrop = caveResourceAt(columns, target, layer, materialItem);
       const before = { stamina: survivalState.stamina, exposure: survivalState.exposure };
       const ok = columns.mine(target, layer);
       if (ok) {
         mining.clear(target, layer);
         const slot = yieldSlot(mat);
         if (slot >= 0) spawnMineDrops(target, materialItem, 1);
-        if (caveDrop) {
-          spawnMineDrops(target, caveDrop.item, caveDrop.amount);
-          lastCaveAction = `mined loose ${caveDrop.label}`;
-        }
         edits++;
         markSaveDirty();
-        triggerNativeMiningNoise(target, materialItem);
         rebuildAround(target);
-        treeAssetSyncNeeded = true;
       }
       return {
         ok,
         tile: target,
         layer,
         materialItem,
-        caveDrop,
         before,
         after: { stamina: survivalState.stamina, exposure: survivalState.exposure },
-        nativeLife: nativeLifeDiagnostics(),
         resourceDrops: resourceDropDiagnostics(),
         mineProgress: mineProgressDiagnostics(),
       };
@@ -5697,7 +3017,7 @@ async function boot(): Promise<void> {
       if (!(item in ITEM_DEFS)) return { ok: false, reason: 'unknown item', item, diagnostics: resourceDropDiagnostics() };
       const target = Math.max(0, Math.min(geo.count - 1, Number.isFinite(tile) ? Math.trunc(tile!) : player.tile));
       const dropSource: ResourceDropSource = source === 'creature' || source === 'debug' || source === 'tree' ? source : 'mine';
-      const spawned = spawnItemDrops(target, nextDropId, item as ItemId, Math.max(1, Math.trunc(Number.isFinite(total) ? total : 1)), dropSource, Math.min(3, Math.max(1, Math.trunc(Number.isFinite(total) ? total : 1))));
+      const spawned = spawnItemDrops(target, nextDropId, groundRadiusAt(target), item as ItemId, Math.max(1, Math.trunc(Number.isFinite(total) ? total : 1)), dropSource, Math.min(3, Math.max(1, Math.trunc(Number.isFinite(total) ? total : 1))));
       nextDropId = spawned.nextId;
       resourceDrops = [...resourceDrops, ...spawned.drops];
       resourceDropRenderer.setDrops(resourceDrops);
@@ -5744,25 +3064,12 @@ async function boot(): Promise<void> {
     debugSetFishVisualScenario,
     debugSetLiveFishScenario,
     debugClearFishVisualScenario: () => { fishVisualOverride = null; return { ok: true }; },
-    skyLife: () => ({ sites: currentSkyLifeSites(), renderer: skyLifeRenderer.stats() }),
-    debugSpawnAtSkyLifeKind,
     debugSpawnAtNaturalFeature: spawnAtNaturalFeature,
     debugSpawnBesideNaturalFeature: spawnBesideNaturalFeature,
     forage: () => currentForage(),
     gatherForage: () => tryForage(),
-    caves: () => ({ current: currentNaturalVoid(), signal: nearbyCaveSignal(), resonance: caveResonanceDiagnostics(), mouths: caveMouthDiagnostics(), pressure: currentCavePressure(), lastAction: lastCaveAction, glowCrystal: itemCount(counts, craftedItems, 'glowCrystal'), lantern: itemCount(counts, craftedItems, 'lantern'), echoLantern: itemCount(counts, craftedItems, 'echoLantern') }),
-    caveMouths: () => caveMouthDiagnostics(),
+    caves: () => ({ current: currentNaturalVoid(), signal: nearbyCaveSignal(), lastAction: lastCaveAction, glowCrystal: itemCount(counts, craftedItems, 'glowCrystal'), echoLantern: itemCount(counts, craftedItems, 'echoLantern') }),
     echoLantern: () => useEchoLantern(),
-    horizonChart: () => useHorizonChart(),
-    navigation: () => ({ horizonChart: horizonChartCount(), signal: visibleHorizonChartSignal(), hearthBeacon: visibleHearthBeaconSignal(), routePlan: currentRoutePlanSignal(), savedRoutePlan: activeRoutePlan, waystones: waystoneRouteSignals(), caveAnchors: caveAnchorRouteSignals(), weatherVane: weatherVaneForecast(), domain: currentPentagonDomain(), site: currentRouteSiteSignal(), thresholdChamber: currentRouteThresholdChamberSignal(), resource: currentRouteResourceSignal(), skyfall: currentRouteSkyfallSignal(), murmur: currentRouteMurmurSignal(), season: currentRouteSeasonSignal(), seasonAfterglow: currentRouteSeasonAfterglowSignal(), seasonRoute: currentSeasonRouteGuides(), strangerSeasons: strangerSeasonDiagnostics(), guide: currentRouteGuide(), routeSelection: routeSelectionState(), routeRenderer: routeRenderer.stats(), plan: horizonExpeditionPlan(), slate: currentRouteSlate(), lastAction: lastNavigationAction }),
-    routePlan: () => ({ saved: activeRoutePlan, signal: currentRoutePlanSignal() }),
-    selectRouteCandidate: (index = 0) => { selectRouteCandidate(index, true); return routeSelectionState(); },
-    pinRoute: (selected = false) => pinRouteCommand(selected),
-    clearRoutePlan: () => clearRoutePlan(),
-    deferRouteStop: () => deferActiveRouteStop(),
-    dropRouteStop: () => removeActiveRouteStop(),
-    journal: () => ({ open: journalOpen, state: currentHearthJournal() }),
-    toggleJournal: () => { toggleJournal(); return { open: journalOpen, state: currentHearthJournal() }; },
     storage: () => ({ open: openChestId !== null, chestId: openChestId, state: currentChestStorage() }),
     openChest: (id?: number) => {
       const target = id !== undefined
@@ -5772,153 +3079,22 @@ async function boot(): Promise<void> {
     },
     closeStorage: () => { closeStorage(); return { open: openChestId !== null, chestId: openChestId, state: currentChestStorage() }; },
     transferChest: (id: number, item: string, action: ChestTransferAction = 'depositAll') => transferChestStorage(id, item, action),
-    domainResources: () => domainResourceDiagnostics(),
-    debugRevealDomainResources,
-    debugSpawnAtDomainResource,
-    gatherDomainResource: () => tryDomainResource(),
-    thresholdChambers: () => thresholdChamberDiagnostics(),
-    inspectThresholdChamber: () => {
-      const before = thresholdChamberDiagnostics();
-      const used = tryThresholdChamber();
-      return {
-        ok: used,
-        before,
-        after: thresholdChamberDiagnostics(),
-        navigation: currentRouteThresholdChamberSignal(),
-        slate: currentRouteSlate(),
-        journal: currentHearthJournal(),
-        crafted: { ...craftedItems },
-        lastAction: lastThresholdChamberAction,
-      };
-    },
-    skyfall: () => skyfallDiagnostics(),
-    gatherSkyfall: () => trySkyfall(),
-    murmurs: () => murmurDiagnostics(),
-    observeMurmur: () => tryMurmur(),
-    seasonAfterglow: () => seasonAfterglowDiagnostics(),
-    completeCurrentSeasonChord,
-    spawnAtSeasonAfterglow,
-    readSeasonAfterglow: () => trySeasonAfterglow(),
-    nativeLife: () => nativeLifeDiagnostics(),
-    debugSetNativeLifeTime: (seconds: unknown) => {
-      const value = Math.max(0, Number.isFinite(Number(seconds)) ? Number(seconds) : 0);
-      nativeLifeTimeOverride = value;
-      nativeLifeSeconds = value;
-      const sites = currentNativeCreatureSites();
-      nativeLifeRenderer.setSites(sites);
-      nativeLifeRenderer.update(sites, geo, layers, columns, camWorld, nativeLifeSeconds);
-      return nativeLifeDiagnostics();
-    },
-    debugClearNativeLifeTime: () => {
-      nativeLifeTimeOverride = null;
-      nativeLifeSeconds = performance.now() / 1000;
-      const sites = currentNativeCreatureSites();
-      nativeLifeRenderer.setSites(sites);
-      nativeLifeRenderer.update(sites, geo, layers, columns, camWorld, nativeLifeSeconds);
-      return nativeLifeDiagnostics();
-    },
-    tendNativeLife: () => tryNativeCreature(),
-    debugInteractNativeLife: (targetId?: unknown) => {
-      const id = Number(targetId);
-      const site = Number.isFinite(id)
-        ? currentNativeCreatureSites().find((candidate) => candidate.id === Math.trunc(id)) ?? null
-        : null;
-      return tryTargetNativeCreature(site ?? undefined);
-    },
-    debugSpawnAtNativeLifeKind: (kind: unknown = 'mossPuff', startTile?: number) => {
-      const targetKind = normalizeNativeCreatureKind(kind);
-      if (!targetKind) return { ok: false, reason: 'unknown native creature kind', kind, allowed: [...nativeCreatureKinds] };
-      const site = findNativeCreatureOfKind(targetKind, Number.isFinite(startTile) ? Math.trunc(startTile!) : player.tile);
-      if (!site) return { ok: false, reason: 'no native creature of kind', kind: targetKind, nativeLife: nativeLifeDiagnostics() };
-      return { ok: true, ...spawnAtNativeCreatureSite(site), diagnostics: nativeLifeDiagnostics() };
-    },
-    spawnAtNativeLife: (kindOrRings: NativeCreatureKind | number = 'mossPuff', maybeRings = 48) => {
-      const kind: NativeCreatureKind = typeof kindOrRings === 'string' ? kindOrRings : 'mossPuff';
-      const rings = typeof kindOrRings === 'number' ? kindOrRings : maybeRings;
-      const sites = nativeCreatureSitesAround(SEED, geo, columns, terrain, player.tile, Math.max(1, Math.trunc(rings)), tendedNativeCreatures, wardedNativeCreatures, 32, kind);
-      let site: NativeCreatureSite | null = null;
-      let bestScore = 9999;
-      for (const candidate of sites) {
-        const next = standForNativeCreature(candidate);
-        if (next.score < bestScore) {
-          site = candidate;
-          bestScore = next.score;
-        }
-      }
-      if (!site) return null;
-      return spawnAtNativeCreatureSite(site);
-    },
-    spawnAtNativeHazard: (rings = 64) => (window as any).__world.spawnAtNativeLife('brambleback', rings),
-    wardNativeHazard: () => tryWardNativeHazard(),
-    wardRangedNativeHazard: () => tryRangedNativeWard(),
-    strangerSeasons: () => strangerSeasonDiagnostics(),
     naturalFeature: (kind?: string, startTile?: number) => columns.naturalFeature(naturalFeatureKind(kind), startTile ?? player.tile),
     springFeature: (startTile?: number) => columns.naturalFeature('dryCave', startTile ?? player.tile, true) ?? columns.naturalFeature('dryCave', 0, true),
     spawnAtNaturalFeature,
     spawnAtSpring,
-    spawnAtSkyfall,
-    spawnAtMurmur,
     useLandmark: (tile?: number) => useLandmark(tile),
-    siteWork: (tile?: number) => {
-      const site = tile !== undefined ? pentagonSiteForTile(Math.trunc(tile), 0) : currentPentagonSite();
-      return siteWorkStatus(site);
-    },
-    siteThreshold: (tile?: number) => {
-      const site = tile !== undefined ? pentagonSiteForTile(Math.trunc(tile), 0) : currentPentagonSite();
-      return siteThreshold(site);
-    },
-    siteThresholdEffect: () => currentPentagonSiteThresholdEffect(),
-    thresholdTerrain: () => lastThresholdTerrainAction,
-    openThresholdTerrain: (tile?: number) => {
-      const site = tile !== undefined ? pentagonSiteForTile(Math.trunc(tile), 0) : currentPentagonSite();
-      return carvePentagonThresholdTerrain(site);
-    },
-    completeSiteWork: (tile?: number) => {
-      const site = tile !== undefined ? pentagonSiteForTile(Math.trunc(tile), 0) : currentPentagonSite();
-      if (!site) return null;
-      const result = completePentagonSiteWork(completedPentagonSites, site, siteWorkStructures(site), craftedItems);
-      const terrain = result.ok && result.status.completed ? carvePentagonThresholdTerrain(site) : null;
-      if (result.ok && !result.alreadyComplete && result.reward) {
-        addCraftedDebugItem(result.reward.item, result.reward.count);
-      }
-      if (result.ok && (!result.alreadyComplete || (terrain?.changedCells ?? 0) > 0)) {
-        lastLandmarkAction = [result.message, terrain?.ok ? `terrain: ${terrain.message}` : ''].filter(Boolean).join(' · ');
-        markSaveDirty();
-        refreshCraftingHud();
-        hud.setRouteSlate(currentRouteSlate(), 8);
-        if (journalOpen) hud.setJournal(currentHearthJournal(), true);
-      }
-      return { ...result, terrain };
-    },
     spawnAtPentagon,
     landmarks: () => ({
       items: allPentagonLandmarks(pentagonTiles, discoveredPentagons),
-      landscapes: pentagonLandscapeProfiles(pentagonTiles),
-      sites: pentagonExpeditionSites(pentagonTiles, discoveredPentagons),
-      siteCompletions: [...completedPentagonSites],
-      siteCompletionsCount: completedPentagonSites.size,
       progress: progressionState(),
-      insights: pentagonInsights(),
-      domain: currentPentagonDomain(),
-      site: currentPentagonSite(),
-      siteWork: currentPentagonSiteWork(),
-      siteThreshold: currentPentagonSiteThreshold(),
-      siteThresholdEffect: currentPentagonSiteThresholdEffect(),
-      thresholdTerrain: lastThresholdTerrainAction,
-      thresholdChambers: thresholdChamberDiagnostics(),
-      thresholds: pentagonSiteThresholds(pentagonTiles, discoveredPentagons, completedPentagonSites),
-      resources: domainResourceDiagnostics(),
-      skyfall: skyfallDiagnostics(),
-      murmurs: murmurDiagnostics(),
-      strangerSeasons: strangerSeasonDiagnostics(),
       nearby: pentagonLandmark(nearbyLandmarkTile() ?? -1, pentagonTiles, discoveredPentagons),
       renderer: landmarkRenderer.stats(),
       lastAction: lastLandmarkAction,
-      chart: { horizonChart: horizonChartCount(), signal: visibleHorizonChartSignal(), hearthBeacon: visibleHearthBeaconSignal(), routePlan: currentRoutePlanSignal(), waystones: waystoneRouteSignals(), caveAnchors: caveAnchorRouteSignals(), weatherVane: weatherVaneForecast(), domain: currentPentagonDomain(), site: currentRouteSiteSignal(), thresholdChamber: currentRouteThresholdChamberSignal(), resource: currentRouteResourceSignal(), skyfall: currentRouteSkyfallSignal(), murmur: currentRouteMurmurSignal(), season: currentRouteSeasonSignal(), seasonAfterglow: currentRouteSeasonAfterglowSignal(), seasonRoute: currentSeasonRouteGuides(), guide: currentRouteGuide(), slate: currentRouteSlate(), lastAction: lastNavigationAction },
     }),
     craft: (recipeId: string) => craftSelected(recipeId),
     crafting: () => ({ open: craftingOpen, crafted: { ...craftedItems }, recipes: craftingRows(), ledger: packLedger() }),
-    structures: () => ({ items: structures.map((s) => ({ ...s, state: s.state ? { ...s.state } : undefined, turn: structureYawTurn(s.yaw), socket: structureSocketOccupancy(s) })), placement: placementDiagnostics(), relocation: relocationDiagnostics(), snapPreview: currentStructureSnapPreview(), commands: buildCommandDiagnostics(), sockets: { houseKit: houseKitSocketCatalog(), wallShell: wallShellSocketCatalog(), k4Utilities: k4UtilitySocketCatalog() }, collision: structureCollisionDiagnostics(), crops: cropDiagnostics(), compostBins: compostBinDiagnostics(), rainCisterns: rainCisternDiagnostics(), rootCellars: rootCellarDiagnostics(), caveAnchors: caveAnchorDiagnostics(), waystones: waystoneDiagnostics(), weatherVanes: weatherVaneDiagnostics(), fishTraps: fishTrapDiagnostics(), shoreNets: shoreNetDiagnostics(), storage: { open: openChestId !== null, chestId: openChestId, state: currentChestStorage() }, home: homeScore(structures, geo), renderer: structureRenderer.stats(), lastAction: lastStructureAction }),
+    structures: () => ({ items: structures.map((s) => ({ ...s, state: s.state ? { ...s.state } : undefined, turn: structureYawTurn(s.yaw), socket: structureSocketOccupancy(s) })), placement: placementDiagnostics(), relocation: relocationDiagnostics(), snapPreview: currentStructureSnapPreview(), commands: buildCommandDiagnostics(), sockets: { core: structureSocketCatalog() }, collision: structureCollisionDiagnostics(), storage: { open: openChestId !== null, chestId: openChestId, state: currentChestStorage() }, home: homeScore(structures, geo), renderer: structureRenderer.stats(), lastAction: lastStructureAction }),
     buildCommands: () => buildCommandDiagnostics(),
     selectStructure: (item: string) => selectStructureForPlacement(item),
     placeStructure: (item: string, tile?: number) => {
@@ -5952,7 +3128,7 @@ async function boot(): Promise<void> {
         craftedItems,
         drops: resourceDrops,
         structures,
-        progression: { pentagons: [...discoveredPentagons], siteCompletions: [...completedPentagonSites], domainHarvests: [...harvestedDomainResources], skyfallHarvests: [...harvestedSkyfalls], murmurObservations: [...observedMurmurs], seasonAfterglowReadings: [...seasonAfterglowReadings], thresholdChamberObservations: [...observedThresholdChambers], caveResonanceObservations: [...observedCaveResonances], nativeCreatureTends: [...tendedNativeCreatures], nativeCreatureWards: [...wardedNativeCreatures], routePlan: activeRoutePlan, toolWear },
+        progression: { pentagons: [...discoveredPentagons], toolWear },
         time: timeState,
         weather: weatherState,
         survival: survivalState,
@@ -5965,7 +3141,7 @@ async function boot(): Promise<void> {
         applyColumnEdits(columns, save.columns);
         applyChoppedTrees(trees, save.choppedTrees, geo.count);
         applyTreeChopProgress(trees, save.treeChopProgress, geo.count);
-        resourceDrops = normalizeResourceDrops(save.drops, geo.count);
+        resourceDrops = backfillDropGroundRadius(normalizeResourceDrops(save.drops, geo.count));
         nextDropId = nextResourceDropId(resourceDrops);
         resourceDropRenderer.setDrops(resourceDrops);
         applyPlayerSave(player, save.player, geo.count);
@@ -5976,41 +3152,16 @@ async function boot(): Promise<void> {
         structureRenderer.setStructures(structures);
         discoveredPentagons.clear();
         for (const tile of normalizePentagonDiscoveries(save.progression?.pentagons, pentagonTiles)) discoveredPentagons.add(tile);
-        completedPentagonSites.clear();
-        for (const tile of normalizePentagonSiteCompletions(save.progression?.siteCompletions, pentagonTiles)) completedPentagonSites.add(tile);
-        harvestedDomainResources.clear();
-        for (const id of normalizeDomainHarvests(save.progression?.domainHarvests)) harvestedDomainResources.add(id);
-        domainResourceRenderer.setSites(currentDomainResourceSites());
-        harvestedSkyfalls.clear();
-        for (const id of normalizeSkyfallHarvests(save.progression?.skyfallHarvests)) harvestedSkyfalls.add(id);
-        skyfallRenderer.setSites(currentSkyfallSites());
-        observedMurmurs.clear();
-        for (const id of normalizeMurmurObservations(save.progression?.murmurObservations)) observedMurmurs.add(id);
-        murmurRenderer.setSites(currentMurmurSites());
-        seasonAfterglowReadings.clear();
-        for (const id of normalizeSeasonAfterglowReadings(save.progression?.seasonAfterglowReadings)) seasonAfterglowReadings.add(id);
-        observedThresholdChambers.clear();
-        for (const id of normalizeThresholdChamberObservations(save.progression?.thresholdChamberObservations)) observedThresholdChambers.add(id);
-        observedCaveResonances.clear();
-        for (const id of normalizeCaveResonanceObservations(save.progression?.caveResonanceObservations)) observedCaveResonances.add(id);
-        tendedNativeCreatures.clear();
-        for (const id of normalizeNativeCreatureTends(save.progression?.nativeCreatureTends)) tendedNativeCreatures.add(id);
-        wardedNativeCreatures.clear();
-        for (const id of normalizeNativeCreatureWards(save.progression?.nativeCreatureWards)) wardedNativeCreatures.add(id);
-        nativeLifeRenderer.setSites(currentNativeCreatureSites());
-        activeRoutePlan = normalizeRoutePlan(save.progression?.routePlan, geo.count);
         toolWear = normalizeToolWear(save.progression?.toolWear);
         Object.assign(timeState, normalizeTimeState(save.time));
         Object.assign(weatherState, normalizeWeatherState(save.weather));
         Object.assign(survivalState, normalizeSurvivalState(save.survival));
-        seasonAfterglowRenderer.setAfterglow(currentSeasonAfterglow());
         refreshUseButton();
         hotbarSel = Math.max(0, Math.min(SLOTS.length - 1, save.hotbarSel));
         planeCrafted = save.planeCrafted;
         if ((craftedItems.planeFrame ?? 0) > 0) planeCrafted = true;
         streamer.releaseAll();
         streamer.refreshDesired(...player.up(), player.altitudeAGL());
-        treeAssetSyncNeeded = true;
         saveDirty = true;
         hud.flash('save imported', 2);
         return true;
@@ -6025,7 +3176,7 @@ async function boot(): Promise<void> {
         markSaveDirty();
       },
     },
-    debugPick: () => ({ lastPick, treePick, nativePick }),
+    debugPick: () => ({ lastPick, treePick }),
     debugAimAtTile: (tile: number, layer?: number) => {
       const target = Math.max(0, Math.min(geo.count - 1, Math.trunc(Number.isFinite(tile) ? tile : player.tile)));
       const targetLayer = Math.max(0, Math.min(layers.L - 1, Math.trunc(Number.isFinite(layer) ? layer! : columns.groundLayerBelow(target, layers.bounds[0]))));
@@ -6045,7 +3196,7 @@ async function boot(): Promise<void> {
         treePick = null;
       }
       debugPickHoldUntil = performance.now() + 1400;
-      return { targetTile: target, targetLayer, pick: lastPick, treePick, nativePick, relocation: relocationDiagnostics() };
+      return { targetTile: target, targetLayer, pick: lastPick, treePick, relocation: relocationDiagnostics() };
     },
     screenPointForTile: (tile: number, layer?: number) => {
       const target = Math.max(0, Math.min(geo.count - 1, Math.trunc(Number.isFinite(tile) ? tile : player.tile)));
@@ -6236,24 +3387,13 @@ async function boot(): Promise<void> {
         streamer: streamer.stats(),
         character: character.state(),
         characterIntent: characterVisualState(),
-        landmarks: { ...progressionState(), insights: pentagonInsights(), site: currentPentagonSite(), siteWork: currentPentagonSiteWork(), siteThreshold: currentPentagonSiteThreshold(), siteThresholdEffect: currentPentagonSiteThresholdEffect(), thresholdTerrain: lastThresholdTerrainAction, thresholdChambers: thresholdChamberDiagnostics(), siteCompletions: [...completedPentagonSites], siteCompletionsCount: completedPentagonSites.size, resources: domainResourceDiagnostics(), skyfall: skyfallDiagnostics(), murmurs: murmurDiagnostics(), strangerSeasons: strangerSeasonDiagnostics(), seasonAfterglow: seasonAfterglowDiagnostics() },
-        navigation: { horizonChart: horizonChartCount(), signal: visibleHorizonChartSignal(), hearthBeacon: visibleHearthBeaconSignal(), routePlan: currentRoutePlanSignal(), savedRoutePlan: activeRoutePlan, waystones: waystoneRouteSignals(), caveAnchors: caveAnchorRouteSignals(), weatherVane: weatherVaneForecast(), domain: currentPentagonDomain(), site: currentRouteSiteSignal(), thresholdChamber: currentRouteThresholdChamberSignal(), resource: currentRouteResourceSignal(), skyfall: currentRouteSkyfallSignal(), murmur: currentRouteMurmurSignal(), season: currentRouteSeasonSignal(), seasonAfterglow: currentRouteSeasonAfterglowSignal(), seasonRoute: currentSeasonRouteGuides(), guide: currentRouteGuide(), plan: horizonExpeditionPlan(), slate: currentRouteSlate() },
-        journal: { open: journalOpen, state: currentHearthJournal() },
-        domainResources: domainResourceDiagnostics(),
-        thresholdChambers: thresholdChamberDiagnostics(),
-        skyfall: skyfallDiagnostics(),
-        murmurs: murmurDiagnostics(),
-        strangerSeasons: strangerSeasonDiagnostics(),
-        seasonAfterglow: seasonAfterglowDiagnostics(),
-        caveMouths: caveMouthDiagnostics(),
-        caveResonances: caveResonanceDiagnostics(),
+        landmarks: { ...progressionState(), nearby: pentagonLandmark(nearbyLandmarkTile() ?? -1, pentagonTiles, discoveredPentagons), lastAction: lastLandmarkAction },
         audio: audio.state(),
         controls: { ux: uxManager.snapshot(), gamepad: gamepad.snapshot(), touch: touch.enabled, panels: currentPanelOwnership() },
         characterRenderer: character.stats(),
         mineProgress: mineProgressDiagnostics(),
         treeAssets: treeAssetDiagnostics(),
         fishVisuals: fishSchoolRenderer.stats(),
-        skyLife: { sites: currentSkyLifeSites(), renderer: skyLifeRenderer.stats() },
         survival: { ...survivalSnapshot(), time: { ...timeState }, pack: packBurden() },
         structures: { relocation: relocationDiagnostics(), snapPreview: currentStructureSnapPreview(), commands: buildCommandDiagnostics() },
       };
@@ -6283,38 +3423,12 @@ async function boot(): Promise<void> {
       crafted: { ...craftedItems },
       ledger: packLedger(),
       tools: { ...toolSummary(craftedItems, toolWear), wear: { ...toolWear }, lastAction: lastToolAction, reach: playerReach() },
-      food: { ...foodCounts(), lastAction: lastFoodAction, nearWater: nearFishingWater(), nearDock: nearDock(), school: currentFishSchool(), fishingCue: currentFishingCue(), fishVisuals: fishSchoolRenderer.stats(), forage: currentForage(), crops: cropDiagnostics(), fishTraps: fishTrapDiagnostics(), shoreNets: shoreNetDiagnostics() },
+      food: { ...foodCounts(), lastAction: lastFoodAction, nearWater: nearFishingWater(), nearDock: nearDock(), school: currentFishSchool(), fishingCue: currentFishingCue(), fishVisuals: fishSchoolRenderer.stats(), forage: currentForage() },
       survival: { ...survivalSnapshot(), time: { ...timeState }, pack: packBurden(), lastAction: lastSurvivalAction },
       audio: audio.state(),
       controls: { ux: uxManager.snapshot(), gamepad: gamepad.snapshot(), touch: touch.enabled, panels: currentPanelOwnership() },
-      caves: { current: currentNaturalVoid(), signal: nearbyCaveSignal(), resonance: caveResonanceDiagnostics(), mouths: caveMouthDiagnostics(), pressure: currentCavePressure(), lastAction: lastCaveAction },
+      caves: { current: currentNaturalVoid(), signal: nearbyCaveSignal(), lastAction: lastCaveAction },
     },
-    skyLife: { sites: currentSkyLifeSites(), renderer: skyLifeRenderer.stats() },
-    navigation: {
-      horizonChart: horizonChartCount(),
-      signal: visibleHorizonChartSignal(),
-      hearthBeacon: visibleHearthBeaconSignal(),
-      routePlan: currentRoutePlanSignal(),
-      savedRoutePlan: activeRoutePlan,
-      waystones: waystoneRouteSignals(),
-      caveAnchors: caveAnchorRouteSignals(),
-      weatherVane: weatherVaneForecast(),
-      domain: currentPentagonDomain(),
-      site: currentRouteSiteSignal(),
-      thresholdChamber: currentRouteThresholdChamberSignal(),
-      resource: currentRouteResourceSignal(),
-      skyfall: currentRouteSkyfallSignal(),
-      murmur: currentRouteMurmurSignal(),
-      season: currentRouteSeasonSignal(),
-      seasonAfterglow: currentRouteSeasonAfterglowSignal(),
-      seasonRoute: currentSeasonRouteGuides(),
-      guide: currentRouteGuide(),
-      routeRenderer: routeRenderer.stats(),
-      plan: horizonExpeditionPlan(),
-      slate: currentRouteSlate(),
-      lastAction: lastNavigationAction,
-    },
-    journal: { open: journalOpen, state: currentHearthJournal() },
     storage: { open: openChestId !== null, chestId: openChestId, state: currentChestStorage() },
     plane: {
       crafted: planeCrafted,
@@ -6328,18 +3442,9 @@ async function boot(): Promise<void> {
       relocation: relocationDiagnostics(),
       snapPreview: currentStructureSnapPreview(),
       commands: buildCommandDiagnostics(),
-      sockets: { houseKit: houseKitSocketCatalog(), wallShell: wallShellSocketCatalog(), k4Utilities: k4UtilitySocketCatalog() },
+      sockets: { core: structureSocketCatalog() },
       collision: structureCollisionDiagnostics(),
       yawTurns: structures.map((s) => ({ id: s.id, item: s.item, tile: s.tile, turn: structureYawTurn(s.yaw), yaw: s.yaw })),
-      crops: cropDiagnostics(),
-      compostBins: compostBinDiagnostics(),
-      rainCisterns: rainCisternDiagnostics(),
-      rootCellars: rootCellarDiagnostics(),
-      caveAnchors: caveAnchorDiagnostics(),
-      waystones: waystoneDiagnostics(),
-      weatherVanes: weatherVaneDiagnostics(),
-      fishTraps: fishTrapDiagnostics(),
-      shoreNets: shoreNetDiagnostics(),
       renderer: structureRenderer.stats(),
       storage: { open: openChestId !== null, chestId: openChestId, state: currentChestStorage() },
       home: homeScore(structures, geo),
@@ -6351,29 +3456,9 @@ async function boot(): Promise<void> {
     characterRenderer: character.stats(),
     landmarks: {
       progress: progressionState(),
-      insights: pentagonInsights(),
-      domain: currentPentagonDomain(),
-      site: currentPentagonSite(),
-      siteWork: currentPentagonSiteWork(),
-      siteThreshold: currentPentagonSiteThreshold(),
-      siteThresholdEffect: currentPentagonSiteThresholdEffect(),
-      thresholdTerrain: lastThresholdTerrainAction,
-      thresholdChambers: thresholdChamberDiagnostics(),
-      siteCompletions: [...completedPentagonSites],
-      siteCompletionsCount: completedPentagonSites.size,
-      resources: domainResourceDiagnostics(),
-      skyfall: skyfallDiagnostics(),
-      murmurs: murmurDiagnostics(),
-      strangerSeasons: strangerSeasonDiagnostics(),
-      seasonAfterglow: seasonAfterglowDiagnostics(),
       nearby: pentagonLandmark(nearbyLandmarkTile() ?? -1, pentagonTiles, discoveredPentagons),
       lastAction: lastLandmarkAction,
-      chart: { horizonChart: horizonChartCount(), signal: visibleHorizonChartSignal(), hearthBeacon: visibleHearthBeaconSignal(), routePlan: currentRoutePlanSignal(), waystones: waystoneRouteSignals(), caveAnchors: caveAnchorRouteSignals(), weatherVane: weatherVaneForecast(), domain: currentPentagonDomain(), site: currentRouteSiteSignal(), thresholdChamber: currentRouteThresholdChamberSignal(), resource: currentRouteResourceSignal(), skyfall: currentRouteSkyfallSignal(), murmur: currentRouteMurmurSignal(), season: currentRouteSeasonSignal(), seasonAfterglow: currentRouteSeasonAfterglowSignal(), seasonRoute: currentSeasonRouteGuides(), guide: currentRouteGuide(), plan: horizonExpeditionPlan(), slate: currentRouteSlate(), lastAction: lastNavigationAction },
     },
-    murmurs: murmurDiagnostics(),
-    nativeLife: nativeLifeDiagnostics(),
-    strangerSeasons: strangerSeasonDiagnostics(),
-    seasonAfterglow: seasonAfterglowDiagnostics(),
     creativeActive,
   });
   (window as any).advanceTime = (ms = 16) => new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
@@ -6426,7 +3511,7 @@ async function boot(): Promise<void> {
     if (gamepadNotice) hud.flash(gamepadNotice === 'gamepad disconnected' ? gamepadNotice : 'gamepad ready', 2.4);
 
     // key edges
-    const fDown = input.down('KeyF'), gDown = input.down('KeyG'), oDown = input.down('KeyO'), eDown = input.down('KeyE'), vDown = input.down('KeyV'), bDown = input.down('KeyB'), rDown = input.down('KeyR'), qDown = input.down('KeyQ'), mDown = input.down('KeyM'), pDown = input.down('KeyP'), nDown = input.down('KeyN'), jDown = input.down('KeyJ'), zDown = input.down('KeyZ'), xDown = input.down('KeyX'), escDown = input.down('Escape');
+    const fDown = input.down('KeyF'), gDown = input.down('KeyG'), oDown = input.down('KeyO'), eDown = input.down('KeyE'), vDown = input.down('KeyV'), bDown = input.down('KeyB'), rDown = input.down('KeyR'), qDown = input.down('KeyQ'), nDown = input.down('KeyN'), zDown = input.down('KeyZ'), xDown = input.down('KeyX'), escDown = input.down('Escape');
     const f3Down = input.down('F3'), hDown = input.down('KeyH');
     const fPressed = input.pressed('KeyF') || (fDown && !fWas);
     const gPressed = input.pressed('KeyG') || (gDown && !gWas);
@@ -6436,23 +3521,12 @@ async function boot(): Promise<void> {
     const bPressed = input.pressed('KeyB') || (bDown && !bWas);
     const rPressed = input.pressed('KeyR') || (rDown && !rWas);
     const qPressed = input.pressed('KeyQ') || (qDown && !qWas);
-    const mPressed = input.pressed('KeyM') || (mDown && !mWas);
-    const pPressed = input.pressed('KeyP') || (pDown && !pWas);
     const nPressed = input.pressed('KeyN') || (nDown && !nWas);
-    const jPressed = input.pressed('KeyJ') || (jDown && !jWas);
     const zPressed = input.pressed('KeyZ') || (zDown && !zWas);
     const xPressed = input.pressed('KeyX') || (xDown && !xWas);
     const escPressed = input.pressed('Escape') || (escDown && !escWas);
     const f3Pressed = input.pressed('F3') || (f3Down && !f3Was);
     const hPressed = input.pressed('KeyH') || (hDown && !hWas);
-    const routeKeyboardConsumed = handleRouteKeyboardInput(
-      input.pressed('ArrowUp'),
-      input.pressed('ArrowDown'),
-      input.pressed('ArrowLeft'),
-      input.pressed('ArrowRight'),
-      input.pressed('Enter'),
-      escPressed,
-    );
     if (fPressed && !worldBlocked() && !autopilot.active) {
       player.toggleFly();
       if (creativeActive) hud.flash(player.mode === 'fly' ? 'creative free-flight' : 'walk mode', 2);
@@ -6473,15 +3547,12 @@ async function boot(): Promise<void> {
       }
     }
     let gamepadUseConsumed = false;
-    if (!routeKeyboardConsumed && escPressed && relocationCursor) {
+    if (escPressed && relocationCursor) {
       cancelRelocationCursor('keyboard');
-    } else if (!routeKeyboardConsumed && escPressed && openChestId !== null) {
+    } else if (escPressed && openChestId !== null) {
       closeStorage();
       playAudio('uiConfirm');
-    } else if (!routeKeyboardConsumed && escPressed && journalOpen) {
-      closeJournal();
-      playAudio('uiConfirm');
-    } else if (!routeKeyboardConsumed && escPressed && craftingOpen) {
+    } else if (escPressed && craftingOpen) {
       craftingOpen = false;
       refreshCraftingHud();
       playAudio('uiConfirm');
@@ -6493,17 +3564,12 @@ async function boot(): Promise<void> {
       closeStorage();
       playAudio('uiConfirm');
       gamepadUseConsumed = true;
-    } else if (gp.use && !gpPanelConsumed && journalOpen) {
-      closeJournal();
-      playAudio('uiConfirm');
-      gamepadUseConsumed = true;
     } else if (gp.use && !gpPanelConsumed && craftingOpen) {
       craftingOpen = false;
       refreshCraftingHud();
       playAudio('uiConfirm');
       gamepadUseConsumed = true;
     }
-    if ((jPressed || (gp.journal && !gpPanelConsumed)) && !autopilot.active) toggleJournal();
     if (bPressed || (gp.craft && !gpPanelConsumed)) {
       toggleCraftingPanel();
     }
@@ -6514,16 +3580,9 @@ async function boot(): Promise<void> {
       useStructure(undefined, gp.use ? 'gamepad' : tf.use ? 'touch' : 'keyboard');
     }
     if ((qPressed || (gp.eat && !worldBlocked())) && !worldBlocked() && !autopilot.active) tryEatPackedFood();
-    if ((mPressed || tf.chart || (gp.chart && !worldBlocked())) && !autopilot.active) {
-      openRouteSlateCommand();
-    }
-    const gamepadBuildRotate = (selectedStructureItem !== null || relocationCursor !== null) && !routeSlateOpen() && !worldBlocked() && (gp.pin || gp.clearPin);
+    const gamepadBuildRotate = (selectedStructureItem !== null || relocationCursor !== null) && !worldBlocked() && (gp.pin || gp.clearPin);
     if ((zPressed || xPressed || gamepadBuildRotate) && !worldBlocked() && !autopilot.active) {
       rotateBuildFacing((zPressed || gp.clearPin) && !xPressed ? -1 : 1, undefined, gamepadBuildRotate ? 'gamepad' : 'keyboard');
-    }
-    if ((pPressed || tf.pin || tf.clearPin || ((gp.pin || gp.clearPin) && !worldBlocked() && !gamepadBuildRotate)) && (!worldBlocked() || routeSlateOpen()) && !autopilot.active) {
-      if (input.down('ShiftLeft') || tf.clearPin || (gp.clearPin && !worldBlocked() && !gamepadBuildRotate)) clearRouteCommand();
-      else pinRouteCommand();
     }
     if (nPressed || (gp.mute && !gpPanelConsumed)) {
       const muted = audio.toggleMuted();
@@ -6532,7 +3591,7 @@ async function boot(): Promise<void> {
     }
     if (f3Pressed || (gp.diag && !gpPanelConsumed)) showDiag = !showDiag;
     if (hPressed || (gp.help && !gpPanelConsumed)) hud.toggleHelp();
-    fWas = fDown; gWas = gDown; oWas = oDown; eWas = eDown; vWas = vDown; bWas = bDown; rWas = rDown; qWas = qDown; mWas = mDown; pWas = pDown; nWas = nDown; jWas = jDown; zWas = zDown; xWas = xDown; escWas = escDown; f3Was = f3Down; hWas = hDown;
+    fWas = fDown; gWas = gDown; oWas = oDown; eWas = eDown; vWas = vDown; bWas = bDown; rWas = rDown; qWas = qDown; nWas = nDown; zWas = zDown; xWas = xDown; escWas = escDown; f3Was = f3Down; hWas = hDown;
     worldInputBlocked = worldBlocked();
     if (worldInputBlocked) {
       input.cancelWorldInput();
@@ -6600,10 +3659,9 @@ async function boot(): Promise<void> {
         sprint: sprintIntent && sprintAllowed,
         jump: jumpIntent,
         swimUp: jumpIntent,
-      }, { structureTraversalBlocker: wallShellMovementBlocker });
+      });
       const shelter = shelterAtPlayer();
       advanceSurvivalTime(timeState, weatherState, dt, player.mode === 'plane' ? 13 : 8);
-      const thresholdEffect = currentPentagonSiteThresholdEffect();
       updateSurvival(survivalState, {
         dt,
         moving: Math.hypot(player.vx, player.vy, player.vz) > 0.5,
@@ -6617,35 +3675,26 @@ async function boot(): Promise<void> {
         nearWarmth: nearLitWarmth(),
         weather: currentWeather(),
         weatherProtection: currentWeatherProtection(),
-        cavePressure: currentCavePressure(),
-        thresholdEffect: thresholdEffect ? { label: thresholdEffect.label, ...thresholdEffect.survival } : null,
+        thresholdEffect: null,
       });
-      tickNativeHazards(dt);
-      if (shouldCollapse(survivalState)) {
-        triggerCollapseRecovery('exposure');
+      // Soft exposure pressure: warn as exposure enters the 'worn' band, then keep the ongoing
+      // stamina-drain penalty (applied inside updateSurvival) visible while exposure is maxed.
+      // No relocation happens here — the player only moves via the bedroll "use" action above
+      // (player choice) or the explicit debug.collapse() console hook.
+      const exposureCriticalNow = isExposureCritical(survivalState);
+      const exposureWarningNow = isExposureWarning(survivalState);
+      if (exposureCriticalNow && !exposureCriticalActive) {
+        hud.flash('exposure maxed — cold is winning, stamina draining fast until you find shelter or warmth', 5);
+      } else if (exposureWarningNow && !exposureWarningActive) {
+        hud.flash('exposure rising — seek shelter or warmth soon', 4);
       }
+      exposureWarningActive = exposureWarningNow;
+      exposureCriticalActive = exposureCriticalNow;
       if (sprintIntent && !sprintAllowed && player.mode === 'walk') {
         const reason = burden.sprintBlocked ? `${burden.label}: stash materials or build a chest` : 'too winded to sprint';
         if (lastSurvivalAction !== reason) lastSurvivalAction = reason;
       }
       if (player.planeStowed) hud.flash(player.submerged > 0.2 ? 'splashdown' : 'touched down', 2);
-    }
-
-    const routeArrivalSignal = currentRoutePlanSignal();
-    if (routeArrivalSignal?.arrived && !routeArrivalSignal.complete && !isSeasonActionRouteSignal(routeArrivalSignal)) {
-      const waterlineResupply = consumeRouteArrivalWaterlineResupply();
-      const arrival = markRoutePlanLegReached(activeRoutePlan, timeState.day, timeState.minute);
-      if (arrival.changed) {
-        activeRoutePlan = arrival.plan;
-        const arrivalMessage = `${arrival.message}${waterlineResupply ? ` · ${waterlineResupply}` : ''}`;
-        lastNavigationAction = `route itinerary arrival: ${arrivalMessage}`;
-        triggerCharacterAction('discover', arrival.complete ? 'horizonChart' : 'map', arrival.complete ? 0.8 : 0.58);
-        playAudio(arrival.complete ? 'uiConfirm' : 'routeSlate');
-        markSaveDirty();
-        hud.flash(arrivalMessage, waterlineResupply ? 4.8 : arrival.complete ? 4.2 : 3.4);
-        hud.setRouteSlate(currentRouteSlate(), arrival.complete ? 7 : 5);
-        if (journalOpen) hud.setJournal(currentHearthJournal(), true);
-      }
     }
 
     // user wheel always takes priority over scripted/auto zoom
@@ -6761,23 +3810,10 @@ async function boot(): Promise<void> {
       streamer.refreshDesired(ux, uy, uz, agl);
     }
     const builtThisFrame = streamer.pump();
-    if (treeAssetRenderer.readyForProceduralReplacement() && streamer.proceduralTreesActive()) {
-      if (streamer.setProceduralTreesEnabled(false)) {
-        treeAssetSyncNeeded = true;
-        streamer.refreshDesired(ux, uy, uz, player.altitudeAGL());
-      }
-    }
-    if (builtThisFrame > 0 || streamer.residencyDirty || treeAssetSyncNeeded) {
-      treeAssetRenderer.setChunks(streamer.residentChunks(), geo, trees);
-      treeAssetSyncNeeded = false;
-    }
-    treeAssetRenderer.setProceduralFallbackActive(streamer.proceduralTreesActive());
-    treeAssetRenderer.setRenderEnabled(!streamer.proceduralTreesActive() && treeAssetRenderer.readyForProceduralReplacement());
     // deferred seam-neighbor rebuilds from edits: one per frame
     if (pendingRebuilds.length > 0) {
       const key = pendingRebuilds.shift()!;
       if (streamer.resident.has(key)) streamer.rebuildNow(key);
-      treeAssetSyncNeeded = true;
     }
     // far-sphere refilter is a 184k-tri scan + index re-upload: keep it off build frames
     // and cap it at 4 Hz — a briefly unfiltered far tri sits 6 m under a loaded chunk, invisible
@@ -6799,32 +3835,9 @@ async function boot(): Promise<void> {
     structureRenderer.update(structures, geo, layers, camWorld, now / 1000);
     structureRenderer.updateSnapPreview(currentStructureSnapPreview(), geo, layers, camWorld, now / 1000);
     resourceDropRenderer.update(resourceDrops, geo, layers, columns, camWorld, now / 1000);
-    treeAssetRenderer.update(geo, layers, columns, trees, camWorld, now / 1000);
-    landmarkRenderer.update(pentagonTiles, discoveredPentagons, geo, layers, columns, camWorld, now / 1000, completedPentagonSites);
-    const domainSites = currentDomainResourceSites();
-    domainResourceRenderer.setSites(domainSites);
-    domainResourceRenderer.update(domainSites, geo, layers, columns, camWorld, now / 1000);
-    const skyfallSitesNow = currentSkyfallSites();
-    skyfallRenderer.setSites(skyfallSitesNow);
-    skyfallRenderer.update(skyfallSitesNow, geo, layers, columns, camWorld, now / 1000);
-    const murmurSitesNow = currentMurmurSites();
-    murmurRenderer.setSites(murmurSitesNow);
-    murmurRenderer.update(murmurSitesNow, geo, layers, columns, camWorld, now / 1000);
-    const afterglowNow = currentSeasonAfterglow();
-    seasonAfterglowRenderer.setAfterglow(afterglowNow);
-    seasonAfterglowRenderer.update(afterglowNow, geo, layers, columns, camWorld, now / 1000);
-    nativeLifeSeconds = nativeLifeTimeOverride ?? now / 1000;
-    const nativeSitesNow = currentNativeCreatureSites();
-    nativeLifeRenderer.setSites(nativeSitesNow);
-    nativeLifeRenderer.update(nativeSitesNow, geo, layers, columns, camWorld, now / 1000);
+    landmarkRenderer.update(pentagonTiles, discoveredPentagons, geo, layers, columns, camWorld, now / 1000);
     const fishVisualSiteNow = currentFishVisualSite();
     fishSchoolRenderer.update(fishVisualSiteNow, geo, layers, columns, camWorld, now / 1000);
-    const skyLifeSitesNow = currentSkyLifeSites();
-    skyLifeRenderer.update(skyLifeSitesNow, geo, layers, columns, camWorld, now / 1000);
-    const caveMouths = currentCaveMouths();
-    caveMouthRenderer.setMouths(caveMouths);
-    caveMouthRenderer.update(caveMouths, geo, layers, columns, camWorld, now / 1000);
-    routeRenderer.update(currentRouteGuide(), player.tile, geo, layers, columns, camWorld, camDist, now / 1000);
 
     // --- picking + edits ---
     const debugPickHeld = performance.now() < debugPickHoldUntil;
@@ -6833,7 +3846,7 @@ async function boot(): Promise<void> {
       const dl = Math.hypot(dirx, diry, dirz) || 1;
       updatePicks(dirx / dl, diry / dl, dirz / dl);
     }
-    if (!debugPickHeld && (!aimActive || camDist >= 120)) { lastPick = null; treePick = null; nativePick = null; }
+    if (!debugPickHeld && (!aimActive || camDist >= 120)) { lastPick = null; treePick = null; }
     // touch: a tap mines at the tapped ray, a long-press builds there
     if (!worldBlocked() && touch.enabled && camDist < 120 && (tf.mines.length > 0 || tf.places.length > 0)) {
       for (const m of tf.mines) {
@@ -6851,17 +3864,15 @@ async function boot(): Promise<void> {
       if (performance.now() >= debugPickHoldUntil) {
         lastPick = null;
         treePick = null;
-        nativePick = null;
       }
     }
 
-    const hlNative = nativePick && (!lastPick || nativePick.dist <= lastPick.dist + 0.2);
-    const hlTree = !hlNative && treePick && (!lastPick || treePick.dist < lastPick.dist);
-    const hlTile = hlNative ? nativePick!.tile : hlTree ? treePick!.tile : lastPick ? lastPick.hitTile : -1;
+    const hlTree = treePick && (!lastPick || treePick.dist < lastPick.dist);
+    const hlTile = hlTree ? treePick!.tile : lastPick ? lastPick.hitTile : -1;
     if (hlTile >= 0) {
       highlight.visible = true;
       const deg = geo.degreeOf(hlTile);
-      const r = (hlNative || hlTree ? layers.topRadius(columns.topLayerOf(hlTile)) : layers.topRadius(lastPick!.hitLayer)) + 0.03;
+      const r = (hlTree ? layers.topRadius(columns.topLayerOf(hlTile)) : layers.topRadius(lastPick!.hitLayer)) + 0.03;
       const corner = new Float64Array(3);
       for (let k = 0; k < deg; k++) {
         geo.cornerUnit(hlTile, k, corner);
@@ -6879,7 +3890,7 @@ async function boot(): Promise<void> {
     }
 
     mineTimer -= dt; placeTimer -= dt;
-    if (!worldBlocked() && (drained.mine || gp.minePressed || ((input.mineHeld || gp.mine) && mineTimer <= 0)) && (lastPick || treePick || nativePick)) { tryMine(); mineTimer = nextMineCooldown; }
+    if (!worldBlocked() && (drained.mine || gp.minePressed || ((input.mineHeld || gp.mine) && mineTimer <= 0)) && (lastPick || treePick)) { tryMine(); mineTimer = nextMineCooldown; }
     if (!worldBlocked() && (drained.place || gp.placePressed || ((input.placeHeld || gp.place) && placeTimer <= 0)) && lastPick) {
       tryPlace((gp.placePressed || gp.place) ? 'gamepad' : touch.enabled ? 'touch' : 'pointer');
       placeTimer = 0.17;
@@ -6894,10 +3905,6 @@ async function boot(): Promise<void> {
     // --- hud + metrics ---
     metrics.frame(dtMs);
     hud.tick(dt);
-    if (routeFocusActive && !hud.routeVisible()) {
-      routeFocusActive = false;
-      routeFocusDirty = false;
-    }
     syncPanelOwnershipBody();
     hudTimer -= dt;
     if (hudTimer <= 0) {
@@ -6911,51 +3918,16 @@ async function boot(): Promise<void> {
       const burden = packBurden();
       const natural = currentNaturalVoid();
       const caveSignal = nearbyCaveSignal();
-      const caveResonance = currentCaveResonance();
-      const domain = currentPentagonDomain();
-      const site = currentPentagonSite();
-      const siteWork = currentPentagonSiteWork();
-      const siteThresholdNow = currentPentagonSiteThreshold();
-      const siteThresholdEffectNow = currentPentagonSiteThresholdEffect();
-      const thresholdChambers = thresholdChamberDiagnostics();
-      const thresholdChamber = thresholdChambers.nearby;
-      const domainResource = nearbyDomainResource();
-      const skyfall = currentSkyfall();
-      const skyfallNearby = nearbySkyfall();
-      const murmur = currentRouteMurmurSignal();
-      const murmurNearby = nearbyMurmur();
-      const season = currentRouteSeasonSignal();
-      const afterglow = currentRouteSeasonAfterglowSignal();
-      const chartSignal = horizonChartCount() > 0 ? horizonChartSignal() : null;
-      const hearthBeacon = visibleHearthBeaconSignal();
-      const guide = currentRouteGuide(chartSignal);
-      const slate = currentRouteSlate(chartSignal);
-      const routeSelection = routeSelectionState();
-      const vaneForecast = weatherVaneForecast();
-      const cisternWater = rainCisternDiagnostics().reduce((sum, cistern) => sum + Math.max(0, Math.trunc(cistern.state?.water ?? 0)), 0);
-      const cellarProvisions = rootCellarProvisionCount(structures, geo);
-      const trapStats = fishTrapDiagnostics();
-      const trapReady = trapStats.filter((trap) => trap.ready).length;
-      const netStats = shoreNetDiagnostics();
-      const netReady = netStats.filter((net) => net.ready).length;
       const landmarkProgress = progressionState();
       const landmarkNearby = nearbyLandmarkTile() !== null;
       const fishingCueNow = currentFishingCue();
-      hud.setVitals(`${metrics.fpsEma.toFixed(0)} fps${metrics.active() ? ` · ● ${metrics.active()}` : ''} · ${survival.status} ${survival.stamina}/${survival.exposure}${!creativeActive && burden.status !== 'light' ? ` · ${burden.label}` : ''}${structures.length > 0 ? ` · ${home.label}` : ''}${foodTotal > 0 ? ` · food ${foodTotal}` : ''}${domain ? ` · ${domain.domainLabel}` : ''}${landmarkProgress.count > 0 || landmarkNearby ? ` · ${landmarkProgress.label}` : ''}${fishingCueNow.showInVitals ? ` · ${fishingCueNow.hud}` : ''}`);
+      const vitalsAlert = isExposureCritical(survivalState) ? 'critical' : isExposureWarning(survivalState) ? 'warning' : 'none';
+      hud.setVitals(`${metrics.fpsEma.toFixed(0)} fps${metrics.active() ? ` · ● ${metrics.active()}` : ''} · ${survival.status} ${survival.stamina}/${survival.exposure}${!creativeActive && burden.status !== 'light' ? ` · ${burden.label}` : ''}${structures.length > 0 ? ` · ${home.label}` : ''}${foodTotal > 0 ? ` · food ${foodTotal}` : ''}${landmarkProgress.count > 0 || landmarkNearby ? ` · ${landmarkProgress.label}` : ''}${fishingCueNow.showInVitals ? ` · ${fishingCueNow.hud}` : ''}`, vitalsAlert);
       if (showDiag) {
         const s = streamer.stats();
         const propStats = structureRenderer.stats();
         const landmarkStats = landmarkRenderer.stats();
-        const resourceStats = domainResourceRenderer.stats();
-        const skyfallStats = skyfallRenderer.stats();
-        const murmurStats = murmurRenderer.stats();
-        const afterglowStats = seasonAfterglowRenderer.stats();
-        const nativeStats = nativeLifeRenderer.stats();
         const fishVisualStats = fishSchoolRenderer.stats();
-        const skyLifeStats = skyLifeRenderer.stats();
-        const nativeHazard = nearbyNativeHazard();
-        const mouthStats = caveMouthRenderer.stats();
-        const routeStats = routeRenderer.stats();
         const characterState = character.state();
         const characterStats = character.stats();
         const gamepadState = gamepad.snapshot();
@@ -6979,51 +3951,19 @@ async function boot(): Promise<void> {
           `tools ${tools.owned.map((tool) => tool.label).join(' · ') || 'hands'}${tools.repairKits > 0 ? ` · repair kits ${tools.repairKits}` : ''} · reach ${playerReach().toFixed(1)}`,
           `character ${characterState.action} · held ${characterState.held} · back ${characterState.backProps.join(',') || 'none'} · silhouette ${characterStats.silhouetteParts} · sockets ${characterStats.propSockets.length}`,
           `audio ${audioState.muted ? 'muted' : audioState.unlocked ? 'on' : 'locked'} · loaded ${audioState.loaded.length} · music ${audioState.musicStarted ? audioState.musicPlaying ? 'playing' : audioState.musicQueued ? 'waiting' : 'paused' : 'idle'}${audioState.musicTrack ? ` ${audioState.musicTrack}` : ''} · last ${audioState.lastEvent ?? 'none'}${audioState.errors.length ? ` · errors ${audioState.errors.length}` : ''}`,
-          `structures ${structures.length} · prop meshes ${propStats.meshes} · route marker roles ${propStats.routeReadabilityRoles}/${propStats.routeSilhouettes} · ${home.label}${cisternWater > 0 ? ` · cistern water ${cisternWater}` : ''}${cellarProvisions > 0 ? ` · cellar provisions ${cellarProvisions}` : ''}`,
-          `food bait ${food.bait} · seeds ${food.seeds} · compost ${food.compost} · berries ${food.berries} · mushroom/herb/kelp/reeds ${food.caveMushroom}/${food.snowHerb}/${food.kelp}/${food.reeds} · raw/cooked fish ${food.rawFish}/${food.cookedFish} · traps ${trapReady}/${trapStats.length} ready · nets ${netReady}/${netStats.length} ready · meals/rations/stews ${food.campMeal}/${food.trailRation}/${food.expeditionStew} · cellar ${food.cellarProvisions}`,
-          `fish ${fishSchoolStats.label} · strength ${fishSchoolStats.strength.toFixed(2)} · catch ${fishSchoolStats.catchCount} · cue ${fishingCueNow.hud} · visual ${fishVisualStats.slug ?? 'none'} anchors ${fishVisualStats.glbAnchorsVisible}/${fishVisualStats.glbAnchors} pts ${fishVisualStats.pointSchoolSprites} path ${fishVisualStats.swimPathBeads}`,
-          `sky life ${skyLifeStats.kinds.join(',') || 'none'} · birds ${skyLifeStats.glbBirdsVisible}/${skyLifeStats.glbBirds} pts ${skyLifeStats.pointFlockSprites} · loaded ${skyLifeStats.kilnBirdSkinsLoaded} fallback ${skyLifeStats.fallbackVisible}`,
+          `structures ${structures.length} · prop meshes ${propStats.meshes} · ${home.label}`,
+          `food bait ${food.bait} · seeds ${food.seeds} · compost ${food.compost} · berries ${food.berries} · mushroom/herb/kelp/reeds ${food.caveMushroom}/${food.snowHerb}/${food.kelp}/${food.reeds} · raw/cooked fish ${food.rawFish}/${food.cookedFish} · meals/rations/stews ${food.campMeal}/${food.trailRation}/${food.expeditionStew}`,
+          `fish ${fishSchoolStats.label} · strength ${fishSchoolStats.strength.toFixed(2)} · catch ${fishSchoolStats.catchCount} · cue ${fishingCueNow.hud} · visual ${fishVisualStats.slug ?? 'none'} pts ${fishVisualStats.pointSchoolSprites} path ${fishVisualStats.swimPathBeads}`,
           `forage ${currentForage().label} · strength ${currentForage().strength.toFixed(2)}`,
-          `cave pressure ${currentCavePressure().label} · light ${currentCavePressure().light} · exposure ${currentCavePressure().exposureRate.toFixed(2)}${currentCavePressure().focus?.active ? ` · focus ${currentCavePressure().focus?.minutes}m` : ''}`,
-          caveResonance ? `cave resonance ${caveResonance.label} · ${caveResonance.observed ? 'noted' : `unread · +${caveResonance.reward.count} ${caveResonance.reward.label}`}` : '',
-          `cave mouths ${mouthStats.active}/${mouthStats.groups} · meshes ${mouthStats.meshes}`,
           `survival ${survival.label} · day ${timeState.day + 1} ${(Math.floor(timeState.minute / 60)).toString().padStart(2, '0')}:${(Math.floor(timeState.minute % 60)).toString().padStart(2, '0')}`,
-          `landmarks ${landmarkProgress.count}/${landmarkProgress.total} · meshes ${landmarkStats.meshes} · landscape ${landmarkStats.landscapeMeshes}/${landmarkStats.profiles}`,
-          `domain resources ${resourceStats.active}/${resourceStats.groups} · meshes ${resourceStats.meshes} · silhouettes ${resourceStats.silhouettes}/${resourceStats.kinds}`,
-          skyfall ? `skyfall ${skyfall.harvested ? skyfall.dormantLabel : skyfall.label} · ${skyfall.omen.label} · tile ${skyfall.tile} · ${skyfall.minutesRemaining}m left · meshes ${skyfallStats.meshes} · omens ${skyfallStats.omens}` : '',
-          skyfallNearby ? `near skyfall ${skyfallNearby.label} · +${skyfallNearby.reward.count} ${skyfallNearby.reward.label}` : '',
-          `murmurs ${murmurStats.active}/${murmurStats.groups} · meshes ${murmurStats.meshes}`,
-          `native life ${nativeStats.active}/${nativeStats.groups} · silhouettes ${nativeStats.silhouettes}/${nativeStats.kinds} · telegraphs ${nativeStats.telegraphRoles}/${nativeStats.telegraphMeshes} · hazards ${nativeStats.hazards} · tended ${tendedNativeCreatures.size} · warded ${wardedNativeCreatures.size}`,
-          nativeHazard ? `near hazard ${nativeHazard.label} · ${nativeHazard.warded ? 'warded' : nativeHazard.hint}` : '',
-          murmur ? `murmur ${murmur.label} · tile ${murmur.tile} · ${murmur.distanceLabel} ${murmur.turn} · ${murmur.minutesRemaining}m left` : '',
-          murmurNearby ? `near murmur ${murmurNearby.label} · ${murmurNearby.hint}` : '',
-          season ? `stranger season ${season.label} · ${season.detail} · ${season.tradeoff} · ${season.chain.progressLabel}` : '',
-          afterglow ? `season afterglow ${afterglow.read ? 'read' : 'unread'} · ${afterglow.label} · ${afterglow.distanceLabel} ${afterglow.turn} · meshes ${afterglowStats.meshes}` : '',
-          domain ? `domain ${domain.label} · ${domain.domainLabel} · ring ${domain.ring}/${domain.radius} · ${domain.discovered ? domain.boon : domain.routeHint}` : '',
-          site ? `site ${site.label} · ${siteWork?.completed ? 'complete' : siteWork?.ready ? 'ready' : site.discovered ? `needs ${siteWorkMissingLabels(siteWork).slice(0, 3).join(', ') || site.buildHint}` : site.routeHint}${siteThresholdNow ? ` · threshold ${siteThresholdNow.label}${siteThresholdNow.open ? ' open' : ' sealed'}` : ''}` : '',
-          siteThresholdEffectNow ? `threshold effect ${siteThresholdEffectNow.label} · ${siteThresholdEffectNow.detail}` : '',
-          `threshold chambers ${thresholdChambers.observed}/${thresholdChambers.total} read · ${thresholdChambers.open} open${thresholdChamber ? ` · nearby ${thresholdChamber.label}` : ''}`,
-          lastThresholdTerrainAction ? `threshold terrain ${lastThresholdTerrainAction}` : '',
-          lastThresholdChamberAction ? `last threshold chamber ${lastThresholdChamberAction}` : '',
-          domainResource ? `near resource ${domainResource.discovered ? domainResource.label : domainResource.dormantLabel} · ${domainResource.discovered ? `+${domainResource.reward.count} ${domainResource.reward.label}` : domainResource.hint}` : '',
-          chartSignal ? `chart ${chartSignal.label} · bearing ${Math.round(chartSignal.bearingDeg)} deg` : horizonChartCount() > 0 ? 'chart complete' : '',
-          hearthBeacon ? `hearth beacon ${hearthBeacon.label} · strength ${hearthBeacon.strength.toFixed(2)}` : '',
-          vaneForecast.ready ? `weather vane ${vaneForecast.label || 'read'} · reads ${vaneForecast.reads}` : '',
-          guide ? `route ribbon ${guide.label} · ${guide.detail} · dashes ${routeStats.active}/${routeStats.meshes} · atlas ${routeStats.atlasActive}/${routeStats.atlasMeshes}` : '',
-          slate.primary ? `route slate ${slate.summary}` : '',
-          routeSelection.open && routeSelection.selected ? `route choice ${routeSelection.index + 1}/${routeSelection.candidates.length} · ${routeSelection.selected.label}` : '',
+          `landmarks ${landmarkProgress.count}/${landmarkProgress.total} · meshes ${landmarkStats.meshes} · lit ${landmarkStats.lit}`,
           natural ? `natural void ${natural.kind} · depth ${natural.depth.toFixed(1)} m` : '',
           caveSignal && !natural ? `cave signal ${caveSignal.label ?? caveKindLabel(caveSignal.kind)} · ${caveSignal.distance} ring${caveSignal.distance === 1 ? '' : 's'} · depth ${caveSignal.depth.toFixed(1)} m${caveSignal.clearance !== undefined ? ` · clearance ${caveSignal.clearance}` : ''}` : '',
           lastFoodAction ? `last food ${lastFoodAction}` : '',
           lastToolAction ? `last tool ${lastToolAction}` : '',
           lastCaveAction ? `last cave ${lastCaveAction}` : '',
           lastSurvivalAction ? `last survival ${lastSurvivalAction}` : '',
-          lastNavigationAction ? `last navigation ${lastNavigationAction}` : '',
           lastLandmarkAction ? `last landmark ${lastLandmarkAction}` : '',
-          lastDomainResourceAction ? `last resource ${lastDomainResourceAction}` : '',
-          lastSkyfallAction ? `last skyfall ${lastSkyfallAction}` : '',
-          lastMurmurAction ? `last murmur ${lastMurmurAction}` : '',
-          lastNativeLifeAction ? `last native ${lastNativeLifeAction}` : '',
           lastEditMs > 0 ? `last edit rebuild ${lastEditMs.toFixed(1)} ms` : '',
         ].filter((l) => l !== ''));
       } else {
@@ -7035,7 +3975,6 @@ async function boot(): Promise<void> {
         autopilot.active ? 'autopilot — G stops' : null);
       hud.setHotbar(SLOTS.map((sl, i) => ({ name: sl.name, css: sl.css, count: counts[i] })), hotbarSel);
       refreshCraftingHud();
-      if (journalOpen) hud.setJournal(currentHearthJournal(), true);
       touch.setPlaneButton(
         creativeActive ? 'fly'
         : player.mode === 'plane' ? 'flying'
@@ -7053,16 +3992,7 @@ async function boot(): Promise<void> {
   });
 }
 
-if (params.get('assetViewer') === 'kiln') {
-  import('./tools/kilnAssetViewer')
-    .then((module) => module.bootKilnAssetViewer())
-    .catch((err) => {
-      console.error(err);
-      splash(`asset viewer failed: ${err}`, 0);
-    });
-} else {
-  boot().catch((err) => {
-    console.error(err);
-    splash(`boot failed: ${err}`, 0);
-  });
-}
+boot().catch((err) => {
+  console.error(err);
+  splash(`boot failed: ${err}`, 0);
+});

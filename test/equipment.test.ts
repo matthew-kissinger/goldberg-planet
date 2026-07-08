@@ -4,7 +4,6 @@ import {
   characterActionForLocomotion,
   defaultHeldProp,
   miningPropForMaterial,
-  nativeDefenseActionForProp,
   pickupPropForItem,
   propForStructureInteraction,
 } from '../src/sim/equipment';
@@ -30,40 +29,16 @@ describe('Hearth and Horizon character equipment rules', () => {
     expect(defaultHeldProp(null, 'wood', 0)).toBe('hands');
     expect(defaultHeldProp(null, 'wood', 3)).toBe('wood');
     expect(defaultHeldProp('campfire', 'wood', 3)).toBe('campfire');
-    expect(defaultHeldProp('dockSegment', 'wood', 3)).toBe('dockSegment');
-    expect(defaultHeldProp('fishTrap', 'wood', 3)).toBe('fishTrap');
-    expect(defaultHeldProp('shoreNet', 'wood', 3)).toBe('shoreNet');
-    expect(defaultHeldProp('dryingRack', 'wood', 3)).toBe('dryingRack');
-    expect(defaultHeldProp('compostBin', 'wood', 3)).toBe('compostBin');
-    expect(defaultHeldProp('rainCistern', 'wood', 3)).toBe('rainCistern');
-    expect(defaultHeldProp('rootCellar', 'wood', 3)).toBe('rootCellar');
-    expect(defaultHeldProp('caveAnchor', 'wood', 3)).toBe('caveAnchor');
-    expect(defaultHeldProp('weatherVane', 'wood', 3)).toBe('weatherVane');
+    expect(defaultHeldProp('chest', 'wood', 3)).toBe('chest');
+    expect(defaultHeldProp('bedroll', 'wood', 3)).toBe('bedroll');
   });
 
   it('maps structure interactions to readable hand props', () => {
-    expect(propForStructureInteraction('cropPlot', 'plant')).toBe('seeds');
     expect(propForStructureInteraction('campfire', 'cook')).toBe('campMeal');
-    expect(propForStructureInteraction('lantern', 'lit')).toBe('torch');
+    expect(propForStructureInteraction('campfire', 'lit')).toBe('torch');
+    expect(propForStructureInteraction('echoLantern', 'lit')).toBe('torch');
     expect(propForStructureInteraction('bedroll', 'home')).toBe('bedroll');
     expect(propForStructureInteraction('chest')).toBe('chest');
-    expect(propForStructureInteraction('dockSegment', 'inspect')).toBe('dockSegment');
-    expect(propForStructureInteraction('compostBin', 'compost')).toBe('compost');
-    expect(propForStructureInteraction('cropPlot', 'fertilize')).toBe('compost');
-    expect(propForStructureInteraction('rainCistern', 'collectWater')).toBe('waterJar');
-    expect(propForStructureInteraction('cropPlot', 'irrigate')).toBe('waterJar');
-    expect(propForStructureInteraction('rootCellar', 'cache')).toBe('trailRation');
-    expect(propForStructureInteraction('rootCellar', 'withdrawProvision')).toBe('trailRation');
-    expect(propForStructureInteraction('caveAnchor', 'anchor')).toBe('caveAnchor');
-    expect(propForStructureInteraction('cropPlot', 'plantReeds')).toBe('reeds');
-    expect(propForStructureInteraction('cropPlot', 'harvest')).toBe('berries');
-    expect(propForStructureInteraction('fishTrap', 'setTrap')).toBe('bait');
-    expect(propForStructureInteraction('fishTrap', 'collectTrap')).toBe('rawFish');
-    expect(propForStructureInteraction('shoreNet', 'setNet')).toBe('shoreNet');
-    expect(propForStructureInteraction('shoreNet', 'collectNet')).toBe('rawFish');
-    expect(propForStructureInteraction('dryingRack', 'preserve')).toBe('trailRation');
-    expect(propForStructureInteraction('weatherVane', 'forecast')).toBe('weatherVane');
-    expect(propForStructureInteraction('waystone', 'mark')).toBe('map');
   });
 
   it('shows collected world drops as the picked-up item prop', () => {
@@ -72,17 +47,8 @@ describe('Hearth and Horizon character equipment rules', () => {
     expect(pickupPropForItem('rawFish')).toBe('rawFish');
   });
 
-  it('maps native hazard counters to explicit readable avatar actions', () => {
-    expect(nativeDefenseActionForProp('stoneBlade')).toBe('ward');
-    expect(nativeDefenseActionForProp('stoneHatchet')).toBe('ward');
-    expect(nativeDefenseActionForProp('lantern')).toBe('ward');
-    expect(nativeDefenseActionForProp('stormCloak')).toBe('brace');
-    expect(nativeDefenseActionForProp('reedBow')).toBe('shoot');
-    expect(nativeDefenseActionForProp('hands')).toBe('interact');
-  });
-
   it('shows owned tools on the backpack in stable priority order', () => {
-    expect(backPropsForInventory(owns('packFrame', 'stormCloak', 'fishingRod', 'reedBow', 'whistlingArrow', 'fishTrap', 'shoreNet', 'reeds', 'stoneHatchet', 'stoneBlade', 'stonePick', 'echoPick', 'repairKit', 'lantern', 'echoLantern', 'horizonChart', 'waystone', 'weatherVane', 'rootCellar', 'caveAnchor'))).toEqual(['packFrame', 'stormCloak', 'echoPick', 'stoneHatchet', 'stoneBlade', 'stonePick', 'repairKit', 'fishingRod', 'reedBow', 'whistlingArrow', 'fishTrap', 'shoreNet', 'reeds', 'lantern', 'echoLantern', 'horizonChart', 'waystone', 'weatherVane', 'rootCellar', 'caveAnchor']);
+    expect(backPropsForInventory(owns('packFrame', 'stormCloak', 'fishingRod', 'reeds', 'stoneHatchet', 'stonePick', 'echoPick', 'repairKit', 'echoLantern'))).toEqual(['packFrame', 'stormCloak', 'echoPick', 'stoneHatchet', 'stonePick', 'repairKit', 'fishingRod', 'reeds', 'echoLantern']);
     expect(backPropsForInventory(owns('expeditionStew'))).toEqual(['expeditionStew']);
   });
 

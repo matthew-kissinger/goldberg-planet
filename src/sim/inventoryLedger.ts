@@ -70,7 +70,7 @@ const SECTION_COPY: Record<InventoryLedgerSectionId, { title: string; emptyLabel
   tools: { title: 'Tools & Light', emptyLabel: 'craft tools at a workbench' },
   food: { title: 'Food & Bait', emptyLabel: 'forage, fish, farm, or cook' },
   build: { title: 'Build Kits', emptyLabel: 'craft house and camp props' },
-  route: { title: 'Route Gear', emptyLabel: 'make markers, charts, and travel gear' },
+  route: { title: 'Route Gear', emptyLabel: 'make markers and travel gear' },
   parts: { title: 'Parts', emptyLabel: 'craft handles, fiber, crystals, and compost' },
 };
 
@@ -87,15 +87,10 @@ const FOOD_UNITS: Partial<Record<ItemId, number>> = {
 };
 
 const ROUTE_GEAR = new Set<ItemId>([
-  'caveAnchor',
   'echoLantern',
-  'horizonChart',
-  'lantern',
   'packFrame',
   'planeFrame',
   'stormCloak',
-  'waystone',
-  'weatherVane',
 ]);
 
 const BASE_PACK_CAPACITY = 42;
@@ -111,7 +106,6 @@ const ITEM_LOADS: Partial<Record<ItemId, number>> = {
   sticks: 0.04,
   workbench: 3.2,
   stoneHatchet: 0.9,
-  stoneBlade: 0.85,
   stoneAxe: 1.6,
   stonePick: 1.9,
   stoneShovel: 1.7,
@@ -122,8 +116,6 @@ const ITEM_LOADS: Partial<Record<ItemId, number>> = {
   stormCloak: 0.9,
   repairKit: 0.45,
   fishingRod: 1,
-  reedBow: 1.15,
-  whistlingArrow: 0.04,
   bait: 0.08,
   seeds: 0.04,
   compost: 0.2,
@@ -141,23 +133,7 @@ const ITEM_LOADS: Partial<Record<ItemId, number>> = {
   campfire: 3,
   chest: 3.4,
   bedroll: 2.2,
-  cropPlot: 2.4,
-  compostBin: 2.8,
-  rainCistern: 3.2,
-  rootCellar: 4,
-  caveAnchor: 2.2,
-  doorKit: 1.8,
-  windowFrame: 1.5,
-  roofBundle: 1.3,
-  dockSegment: 3.6,
-  fishTrap: 1.7,
-  shoreNet: 1.1,
-  dryingRack: 1.9,
-  weatherVane: 1.3,
-  lantern: 0.9,
-  waystone: 2,
   echoLantern: 1.2,
-  horizonChart: 0.15,
   planeFrame: 5.5,
 };
 
@@ -184,15 +160,13 @@ function entryDetail(id: ItemId, def: ItemDef, count: number, wear: ToolWear): s
   if (isToolItem(id)) {
     const profile = TOOL_PROFILES[id];
     const used = cleanCount(wear[id]);
-    const targetLabel = profile.target === 'rangedDefense' ? 'ranged defense' : profile.target;
-    return `${Math.max(0, profile.durability - used)}/${profile.durability} uses · ${targetLabel}`;
+    return `${Math.max(0, profile.durability - used)}/${profile.durability} uses · ${profile.target}`;
   }
   if (id === 'repairKit') return `${count} auto-repair ${count === 1 ? 'kit' : 'kits'}`;
   if (id === 'packFrame') return `carry frame · +${PACK_FRAME_CAPACITY_BONUS} capacity`;
   if (id === 'stormCloak') return `weather cloak · storm exposure x${STORM_CLOAK_EXPOSURE_MULTIPLIER}`;
   if (id === 'echoLantern') return 'cave resonance light';
   if (id === 'fishingRod') return 'shore and dock casting';
-  if (id === 'whistlingArrow') return `${count} ranged ward ${count === 1 ? 'shot' : 'shots'}`;
   if (id === 'bait') return 'fishing bait';
   if (id === 'seeds') return 'plant stock';
   if (id === 'sticks') return 'handles and frames';

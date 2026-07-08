@@ -6,7 +6,6 @@ export type CraftedItemId =
   | 'sticks'
   | 'workbench'
   | 'stoneHatchet'
-  | 'stoneBlade'
   | 'stoneAxe'
   | 'stonePick'
   | 'stoneShovel'
@@ -17,8 +16,6 @@ export type CraftedItemId =
   | 'stormCloak'
   | 'repairKit'
   | 'fishingRod'
-  | 'reedBow'
-  | 'whistlingArrow'
   | 'bait'
   | 'seeds'
   | 'compost'
@@ -36,21 +33,8 @@ export type CraftedItemId =
   | 'campfire'
   | 'chest'
   | 'bedroll'
-  | 'cropPlot'
-  | 'compostBin'
   | 'rainCistern'
   | 'rootCellar'
-  | 'caveAnchor'
-  | 'floorFoundation'
-  | 'wallPanel'
-  | 'wallHalfRail'
-  | 'wallDoorPanel'
-  | 'wallWindowPanel'
-  | 'wallCorner'
-  | 'roofJoin'
-  | 'doorKit'
-  | 'windowFrame'
-  | 'roofBundle'
   | 'dockSegment'
   | 'fishTrap'
   | 'shoreNet'
@@ -59,7 +43,6 @@ export type CraftedItemId =
   | 'lantern'
   | 'waystone'
   | 'echoLantern'
-  | 'horizonChart'
   | 'planeFrame';
 
 export type ItemId = MaterialItemId | CraftedItemId;
@@ -116,8 +99,7 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
   wood: { id: 'wood', name: 'Wood', kind: 'material', css: '#a8763f', description: 'Tree wood for shelters, tools, stations, and the plane frame.' },
   sticks: { id: 'sticks', name: 'Sticks', kind: 'part', css: '#c69254', description: 'Light handles and frames for early tools.' },
   workbench: { id: 'workbench', name: 'Workbench', kind: 'station', css: '#8d6948', description: 'The first station for real survival recipes.' },
-  stoneHatchet: { id: 'stoneHatchet', name: 'Stone Hatchet', kind: 'tool', css: '#b6aaa0', description: 'A light one-handed chopping and warding tool with short reach and quick, fragile swings.' },
-  stoneBlade: { id: 'stoneBlade', name: 'Stone Blade', kind: 'tool', css: '#c8c0b4', description: 'A short close-control blade for warding territorial native hazards without expanding mining reach.' },
+  stoneHatchet: { id: 'stoneHatchet', name: 'Stone Hatchet', kind: 'tool', css: '#b6aaa0', description: 'A light one-handed chopping tool with short reach and quick, fragile swings.' },
   stoneAxe: { id: 'stoneAxe', name: 'Stone Axe', kind: 'tool', css: '#a5a7ac', description: 'A woodcutting tool target for faster chopping.' },
   stonePick: { id: 'stonePick', name: 'Stone Pick', kind: 'tool', css: '#8f939b', description: 'A mining tool target for rock and cave materials.' },
   stoneShovel: { id: 'stoneShovel', name: 'Stone Shovel', kind: 'tool', css: '#9b8974', description: 'A digging tool target for soil, sand, and farming prep.' },
@@ -128,8 +110,6 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
   stormCloak: { id: 'stormCloak', name: 'Storm Cloak', kind: 'travel', css: '#5f7f92', description: 'A reed-wrapped weather cloak that softens rain, cold, storm, and soaked exposure without replacing real shelter.' },
   repairKit: { id: 'repairKit', name: 'Field Repair Kit', kind: 'part', css: '#c9a56d', description: 'Reed lashings, wedges, and stone flakes that save a worn tool at the breaking point.' },
   fishingRod: { id: 'fishingRod', name: 'Fishing Rod', kind: 'tool', css: '#c8a36b', description: 'A first path into shore, dock, and cave fishing.' },
-  reedBow: { id: 'reedBow', name: 'Reed Bow', kind: 'tool', css: '#9ab76a', description: 'A light bow for whistling arrows that ward territorial native life before it crowds the camp.' },
-  whistlingArrow: { id: 'whistlingArrow', name: 'Whistling Arrow', kind: 'part', css: '#d4c06d', description: 'Reed-fletched warning arrows that scare bramblebacks instead of turning them into targets.' },
   bait: { id: 'bait', name: 'Bait', kind: 'food', css: '#c98b5a', description: 'Berry mash and scraps for pulling better fish schools toward shore.' },
   seeds: { id: 'seeds', name: 'Berry Seeds', kind: 'food', css: '#9abf5a', description: 'Hardy starts for repeatable crop plots.' },
   compost: { id: 'compost', name: 'Compost', kind: 'part', css: '#6b5b32', description: 'Broken-down scraps that feed crop plots and speed a protected farm.' },
@@ -147,30 +127,16 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
   campfire: { id: 'campfire', name: 'Campfire', kind: 'placeable', css: '#e07a3f', description: 'Warmth, cooking, light, and a visible home signal.' },
   chest: { id: 'chest', name: 'Chest', kind: 'placeable', css: '#a56d3a', description: 'Persistent storage for a functional house.' },
   bedroll: { id: 'bedroll', name: 'Bedroll', kind: 'placeable', css: '#8fb0d0', description: 'A sleep and respawn target until a full bed ships.' },
-  cropPlot: { id: 'cropPlot', name: 'Crop Plot', kind: 'placeable', css: '#5f8e4b', description: 'A seedbed for the farming loop.' },
-  compostBin: { id: 'compostBin', name: 'Compost Bin', kind: 'placeable', css: '#6b5b32', description: 'A farm station that turns forage and scraps into crop fertility.' },
-  rainCistern: { id: 'rainCistern', name: 'Rain Cistern', kind: 'placeable', css: '#5faed2', description: 'A camp basin that catches storm water and irrigates dry inland gardens.' },
-  rootCellar: { id: 'rootCellar', name: 'Root Cellar', kind: 'placeable', css: '#7b6a8f', description: 'A cool home cache for staging preserved food and cave forage before expeditions.' },
-  caveAnchor: { id: 'caveAnchor', name: 'Cave Anchor', kind: 'placeable', css: '#70d6d1', description: 'A rope-and-crystal marker that records cave mouths for planned return trips.' },
-  floorFoundation: { id: 'floorFoundation', name: 'Floor Foundation', kind: 'placeable', css: '#8c806e', description: 'A leveled house-floor socket that supports snug wall placement without acting like a wall.' },
-  wallPanel: { id: 'wallPanel', name: 'Wall Panel', kind: 'placeable', css: '#9b7448', description: 'A code-owned full wall segment for real shelter boundaries and future decorative skins.' },
-  wallHalfRail: { id: 'wallHalfRail', name: 'Half Rail', kind: 'placeable', css: '#b58b52', description: 'A low rail for porches, lofts, and decks; useful but not enough to seal a shelter.' },
-  wallDoorPanel: { id: 'wallDoorPanel', name: 'Wall Door Panel', kind: 'placeable', css: '#a36a3a', description: 'A full wall segment with an integrated doorway that counts as shelter boundary and access.' },
-  wallWindowPanel: { id: 'wallWindowPanel', name: 'Wall Window Panel', kind: 'placeable', css: '#a7c8d2', description: 'A full wall segment with an integrated window opening for shelter light and readability.' },
-  wallCorner: { id: 'wallCorner', name: 'Wall Corner', kind: 'placeable', css: '#8f6b43', description: 'A sturdy corner join placeholder for two future edge-addressed wall faces.' },
-  roofJoin: { id: 'roofJoin', name: 'Roof Join', kind: 'placeable', css: '#6f4d2f', description: 'A compact roof ridge or eave join that contributes to shelter roof coverage.' },
-  doorKit: { id: 'doorKit', name: 'Door Kit', kind: 'placeable', css: '#9a6335', description: 'The first shelter boundary prop.' },
-  windowFrame: { id: 'windowFrame', name: 'Window Frame', kind: 'placeable', css: '#b8d4df', description: 'A future sand-to-glass shelter prop.' },
-  roofBundle: { id: 'roofBundle', name: 'Roof Bundle', kind: 'placeable', css: '#7f5a35', description: 'A functional roof part for shelter detection.' },
+  rainCistern: { id: 'rainCistern', name: 'Rain Cistern', kind: 'placeable', css: '#5faed2', description: 'A camp basin that catches rain and storm water.' },
+  rootCellar: { id: 'rootCellar', name: 'Root Cellar', kind: 'placeable', css: '#7b6a8f', description: 'A cool home cache for staging preserved food before expeditions.' },
   dockSegment: { id: 'dockSegment', name: 'Dock Segment', kind: 'placeable', css: '#7b6a4a', description: 'A shoreline platform for stronger fishing and coastal travel staging.' },
   fishTrap: { id: 'fishTrap', name: 'Fish Trap', kind: 'placeable', css: '#8bb7c8', description: 'A shore, dock, or sea-cave trap that can be baited and checked after time passes.' },
   shoreNet: { id: 'shoreNet', name: 'Shore Net', kind: 'placeable', css: '#7da65f', description: 'A reed net for shore, dock, and sea-cave camps that gathers fish plus useful waterline scraps.' },
   dryingRack: { id: 'dryingRack', name: 'Drying Rack', kind: 'placeable', css: '#b89458', description: 'A camp food station that preserves fish and forage into trail rations.' },
-  weatherVane: { id: 'weatherVane', name: 'Weather Vane', kind: 'placeable', css: '#9fb8c2', description: 'A camp instrument that reads local wind, storms, and route timing.' },
+  weatherVane: { id: 'weatherVane', name: 'Weather Vane', kind: 'placeable', css: '#9fb8c2', description: 'A camp instrument that reads local wind and storm timing.' },
   lantern: { id: 'lantern', name: 'Lantern', kind: 'placeable', css: '#ffd06f', description: 'A portable light target for caves and storms.' },
   waystone: { id: 'waystone', name: 'Waystone', kind: 'placeable', css: '#87a9d6', description: 'A persistent route marker that can be attuned to home, caves, shores, forage, or survey points.' },
   echoLantern: { id: 'echoLantern', name: 'Echo Lantern', kind: 'tool', css: '#6de2d8', description: 'A crystal-tuned lantern that reads nearby cave resonance.' },
-  horizonChart: { id: 'horizonChart', name: 'Horizon Chart', kind: 'travel', css: '#d7c58f', description: 'A pentagon-awakened chart that points toward the next mystery.' },
   planeFrame: { id: 'planeFrame', name: 'Plane Frame', kind: 'travel', css: '#d6a86a', description: 'A visible recipe path for the craftable wooden plane.' },
 };
 
@@ -199,15 +165,6 @@ export const BASIC_RECIPES: RecipeDef[] = [
     station: 'workbench',
     requires: { sticks: 1, rock: 2 },
     description: 'A compact survival hatchet for faster staged chopping and emergency warding.',
-  },
-  {
-    id: 'stone_blade',
-    name: 'Stone Blade',
-    result: 'stoneBlade',
-    count: 1,
-    station: 'workbench',
-    requires: { sticks: 1, rock: 3, reeds: 1 },
-    description: 'A short defensive blade for close hazard control without turning native life into loot.',
   },
   {
     id: 'stone_axe',
@@ -300,24 +257,6 @@ export const BASIC_RECIPES: RecipeDef[] = [
     description: 'Opens the first fishing interaction target.',
   },
   {
-    id: 'reed_bow',
-    name: 'Reed Bow',
-    result: 'reedBow',
-    count: 1,
-    station: 'workbench',
-    requires: { sticks: 3, wood: 2, reeds: 3 },
-    description: 'Adds a ranged warding tool for territorial native life without creating a kill loop.',
-  },
-  {
-    id: 'whistling_arrows',
-    name: 'Whistling Arrows',
-    result: 'whistlingArrow',
-    count: 6,
-    station: 'workbench',
-    requires: { sticks: 1, reeds: 2, rock: 1 },
-    description: 'Crafts warning arrows that scare bramblebacks from range and spend one per shot.',
-  },
-  {
     id: 'bait',
     name: 'Bait',
     result: 'bait',
@@ -352,31 +291,13 @@ export const BASIC_RECIPES: RecipeDef[] = [
     description: 'A temporary sleep prop until cloth/fiber resources ship.',
   },
   {
-    id: 'crop_plot',
-    name: 'Crop Plot',
-    result: 'cropPlot',
-    count: 1,
-    station: 'workbench',
-    requires: { dirt: 6, wood: 2 },
-    description: 'A first farming prop target.',
-  },
-  {
-    id: 'compost_bin',
-    name: 'Compost Bin',
-    result: 'compostBin',
-    count: 1,
-    station: 'workbench',
-    requires: { wood: 4, dirt: 2, sticks: 2 },
-    description: 'Turns forage, kelp, or fish scraps into compost for fertile berry plots.',
-  },
-  {
     id: 'rain_cistern',
     name: 'Rain Cistern',
     result: 'rainCistern',
     count: 1,
     station: 'workbench',
     requires: { wood: 4, rock: 4, sand: 2 },
-    description: 'Catches rain and storm water so inland crop plots can grow away from shore.',
+    description: 'Catches rain and storm water for the camp.',
   },
   {
     id: 'root_cellar',
@@ -385,106 +306,7 @@ export const BASIC_RECIPES: RecipeDef[] = [
     count: 1,
     station: 'workbench',
     requires: { wood: 5, rock: 5, dirt: 3 },
-    description: 'Stores preserved food and cave forage as home provisions counted by Route Slate prep.',
-  },
-  {
-    id: 'cave_anchor',
-    name: 'Cave Anchor',
-    result: 'caveAnchor',
-    count: 1,
-    station: 'workbench',
-    requires: { rock: 3, sticks: 2, glowCrystal: 1 },
-    description: 'Turns a found cave mouth into a persistent expedition marker for Route Slate and the route ribbon.',
-  },
-  {
-    id: 'floor_foundation',
-    name: 'Floor Foundation',
-    result: 'floorFoundation',
-    count: 2,
-    station: 'workbench',
-    requires: { wood: 2, rock: 4, dirt: 2 },
-    description: 'Builds leveled floor sockets for snug, readable house shells.',
-  },
-  {
-    id: 'wall_panel',
-    name: 'Wall Panel',
-    result: 'wallPanel',
-    count: 2,
-    station: 'workbench',
-    requires: { wood: 5, sticks: 2, rock: 1 },
-    description: 'Builds full wall segments that count toward real shelter enclosure.',
-  },
-  {
-    id: 'wall_half_rail',
-    name: 'Half Rail',
-    result: 'wallHalfRail',
-    count: 2,
-    station: 'workbench',
-    requires: { wood: 3, sticks: 3 },
-    description: 'Builds low porch and loft rails that guide space without sealing the weather out.',
-  },
-  {
-    id: 'wall_door_panel',
-    name: 'Wall Door Panel',
-    result: 'wallDoorPanel',
-    count: 1,
-    station: 'workbench',
-    requires: { wallPanel: 1, doorKit: 1, sticks: 1 },
-    description: 'Combines a full wall and doorway into one shelter-boundary socket.',
-  },
-  {
-    id: 'wall_window_panel',
-    name: 'Wall Window Panel',
-    result: 'wallWindowPanel',
-    count: 1,
-    station: 'workbench',
-    requires: { wallPanel: 1, windowFrame: 1, sand: 2 },
-    description: 'Combines a full wall and window into one shelter-boundary socket.',
-  },
-  {
-    id: 'wall_corner',
-    name: 'Wall Corner',
-    result: 'wallCorner',
-    count: 2,
-    station: 'workbench',
-    requires: { wood: 4, sticks: 2, rock: 1 },
-    description: 'Builds sturdy corner posts for readable house shells before true edge sockets land.',
-  },
-  {
-    id: 'roof_join',
-    name: 'Roof Join',
-    result: 'roofJoin',
-    count: 2,
-    station: 'workbench',
-    requires: { roofBundle: 1, wood: 2, sticks: 2 },
-    description: 'Builds compact roof join pieces that count toward shelter roof coverage.',
-  },
-  {
-    id: 'door_kit',
-    name: 'Door Kit',
-    result: 'doorKit',
-    count: 1,
-    station: 'workbench',
-    requires: { wood: 6, sticks: 2 },
-    description: 'The first actual house boundary target.',
-  },
-  {
-    id: 'window_frame',
-    name: 'Window Frame',
-    result: 'windowFrame',
-    count: 1,
-    station: 'workbench',
-    requires: { sand: 4, wood: 2 },
-    description: 'A readable path toward windows and glass.',
-  },
-  {
-    id: 'roof_bundle',
-    name: 'Roof Bundle',
-    result: 'roofBundle',
-    count: 3,
-    station: 'workbench',
-    requires: { wood: 6 },
-    description: 'A roof-part bundle for future shelter detection.',
+    description: 'Stores preserved food and forage as home provisions for hearth supper.',
   },
   {
     id: 'dock_segment',
@@ -538,7 +360,7 @@ export const BASIC_RECIPES: RecipeDef[] = [
     count: 1,
     station: 'workbench',
     requires: { wood: 3, sticks: 2, rock: 2, sand: 1 },
-    description: 'Reads wind and storm timing so a home can plan safer route departures.',
+    description: 'Reads wind and storm timing so a home can plan safer departures.',
   },
   {
     id: 'lantern',

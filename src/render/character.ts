@@ -21,7 +21,6 @@ const PROP_COLORS: Record<CharacterPropId, number> = {
   sticks: 0xc69254,
   workbench: 0x8d6948,
   stoneHatchet: 0xb6aaa0,
-  stoneBlade: 0xc8c0b4,
   stoneAxe: 0xa5a7ac,
   stonePick: 0x8f939b,
   stoneShovel: 0x9b8974,
@@ -32,8 +31,6 @@ const PROP_COLORS: Record<CharacterPropId, number> = {
   stormCloak: 0x6fa6b4,
   repairKit: 0xc9a56d,
   fishingRod: 0xc8a36b,
-  reedBow: 0x9ab76a,
-  whistlingArrow: 0xd4c06d,
   bait: 0xc98b5a,
   seeds: 0x9abf5a,
   compost: 0x6b5b32,
@@ -51,22 +48,9 @@ const PROP_COLORS: Record<CharacterPropId, number> = {
   campfire: 0xe07a3f,
   chest: 0xa56d3a,
   bedroll: 0x8fb0d0,
-  cropPlot: 0x5f8e4b,
-  compostBin: 0x6b5b32,
   rainCistern: 0x5faed2,
   rootCellar: 0x7b6a8f,
-  caveAnchor: 0x70d6d1,
   waterJar: 0x7dc6e8,
-  floorFoundation: 0x8c806e,
-  wallPanel: 0x9b7448,
-  wallHalfRail: 0xb58b52,
-  wallDoorPanel: 0xa36a3a,
-  wallWindowPanel: 0xa7c8d2,
-  wallCorner: 0x8f6b43,
-  roofJoin: 0x6f4d2f,
-  doorKit: 0x9a6335,
-  windowFrame: 0xb8d4df,
-  roofBundle: 0x7f5a35,
   dockSegment: 0x7b6a4a,
   fishTrap: 0x8bb7c8,
   shoreNet: 0x7da65f,
@@ -75,7 +59,6 @@ const PROP_COLORS: Record<CharacterPropId, number> = {
   lantern: 0xffd06f,
   waystone: 0x87a9d6,
   echoLantern: 0x6de2d8,
-  horizonChart: 0xd7c58f,
   planeFrame: 0xd6a86a,
 };
 
@@ -221,7 +204,11 @@ export class Character {
     this.group = new THREE.Group();
     this.body = new THREE.Group();
 
+    const materialCache = new Map<string, THREE.MeshStandardMaterial>();
     const mat = (color: number, roughness = 0.6, metalness = 0.05, emissive = 0x000000): THREE.MeshStandardMaterial => {
+      const key = `${color}|${roughness}|${metalness}|${emissive}`;
+      const cached = materialCache.get(key);
+      if (cached) return cached;
       const m = new THREE.MeshStandardMaterial({
         color,
         roughness,
@@ -230,6 +217,7 @@ export class Character {
         emissiveIntensity: emissive === 0 ? 0 : 0.65,
         transparent: true,
       });
+      materialCache.set(key, m);
       this.fadeMats.push(m);
       return m;
     };
@@ -293,16 +281,6 @@ export class Character {
       const g = new THREE.Group();
       g.name = `character-prop-${id}`;
       if (id === 'hands') return g;
-      if (id === 'stoneBlade') {
-        g.add(mesh(cyl6, woodMat, [0, 0.18, 0], [0.035, 0.36, 0.035], 'stoneBladeGrip'));
-        g.add(mesh(box, mat(0xc9a56d), [0, 0.34, -0.02], [0.24, 0.045, 0.055], 'stoneBladeGuard'));
-        const blade = mesh(box, metalMat, [0, 0.55, -0.02], [0.105, 0.38, 0.045], 'stoneBladeEdge');
-        blade.rotation.z = 0.02;
-        g.add(blade);
-        g.add(mesh(cone8, metalMat, [0, 0.79, -0.02], [0.105, 0.2, 0.055], 'stoneBladeTip'));
-        g.add(mesh(torus, mat(0xc9a56d), [0, 0.19, -0.005], [0.34, 0.27, 0.34], 'stoneBladeWrap'));
-        return g;
-      }
       if (id === 'stoneHatchet' || id === 'stoneAxe' || id === 'echoAxe') {
         const hatchet = id === 'stoneHatchet';
         g.add(mesh(cyl6, woodMat, [0, hatchet ? 0.22 : 0.28, 0], [hatchet ? 0.038 : 0.045, hatchet ? 0.54 : 0.78, hatchet ? 0.038 : 0.045], hatchet ? 'hatchetHandle' : 'axeHandle'));
@@ -349,31 +327,6 @@ export class Character {
         g.add(handle);
         return g;
       }
-      if (id === 'reedBow') {
-        const grip = mesh(cyl6, woodMat, [0, 0.38, 0], [0.04, 0.32, 0.04], 'reedBowGrip');
-        const upper = mesh(cyl6, mat(0x9ab76a), [0.08, 0.74, 0], [0.03, 0.62, 0.03], 'reedBowUpperLimb');
-        const lower = mesh(cyl6, mat(0x9ab76a), [-0.08, 0.12, 0], [0.03, 0.62, 0.03], 'reedBowLowerLimb');
-        upper.rotation.z = -0.18;
-        lower.rotation.z = -0.18;
-        const string = mesh(box, mat(0xe8dfc8), [-0.16, 0.42, -0.02], [0.014, 0.98, 0.014], 'reedBowString');
-        string.rotation.z = -0.18;
-        const charm = mesh(sphere8, mat(0xd4c06d, 0.48, 0.03, 0xb89324), [0.13, 0.48, -0.035], [0.045, 0.045, 0.045], 'reedBowWhistleCharm');
-        g.add(grip, upper, lower, string, charm);
-        return g;
-      }
-      if (id === 'whistlingArrow') {
-        for (let i = 0; i < 3; i++) {
-          const x = -0.08 + i * 0.08;
-          const shaft = mesh(cyl6, mat(0xd4c06d), [x, 0.38, 0], [0.016, 0.72, 0.016], 'whistlingArrowShaft');
-          shaft.rotation.z = 0.1 - i * 0.1;
-          const tip = mesh(cone8, metalMat, [x + 0.02, 0.77, 0], [0.035, 0.1, 0.035], 'whistlingArrowTip');
-          tip.rotation.z = shaft.rotation.z;
-          const feather = mesh(box, mat(0x7da65f), [x - 0.025, 0.08, 0], [0.065, 0.045, 0.018], 'whistlingArrowFeather');
-          feather.rotation.z = -0.4 + i * 0.18;
-          g.add(shaft, tip, feather);
-        }
-        return g;
-      }
       if (id === 'packFrame') {
         const spine = mesh(cyl6, woodMat, [0, 0.38, -0.02], [0.035, 0.86, 0.035], 'packFrameSpine');
         const left = mesh(cyl6, woodMat, [-0.18, 0.34, -0.02], [0.03, 0.72, 0.03], 'packFrameSideL');
@@ -418,14 +371,11 @@ export class Character {
         g.add(line);
         return g;
       }
-      if (id === 'map' || id === 'horizonChart') {
+      if (id === 'map') {
         const chart = mesh(box, colorMat(id), [0, 0.25, -0.03], [0.42, 0.05, 0.32], 'mapChart');
         chart.rotation.x = -0.5;
         g.add(chart);
         g.add(mesh(box, mat(0x6d4b2d), [-0.23, 0.25, -0.03], [0.035, 0.07, 0.35], 'mapRoll'));
-        if (id === 'horizonChart') {
-          g.add(mesh(sphere8, mat(0x6de2d8, 0.28, 0.02, 0x3bd6cf), [0.17, 0.28, -0.07], [0.045, 0.045, 0.045], 'chartGlow'));
-        }
         return g;
       }
       if (id === 'torch' || id === 'lantern' || id === 'echoLantern') {
@@ -437,17 +387,17 @@ export class Character {
         }
         return g;
       }
+      if (id === 'waterJar') {
+        g.add(mesh(cyl8, mat(0x6f8790, 0.5, 0.06), [0, 0.22, 0], [0.16, 0.3, 0.16], 'waterJarBody'));
+        g.add(mesh(cyl8, mat(0x7dc6e8, 0.22, 0.02, 0x3a9ed0), [0, 0.4, 0], [0.13, 0.035, 0.13], 'waterJarSurface'));
+        g.add(mesh(cyl6, metalMat, [0, 0.5, 0], [0.12, 0.08, 0.12], 'waterJarRim'));
+        return g;
+      }
       if (id === 'glowCrystal') {
         const crystal = mesh(cone8, mat(0x70d6d1, 0.28, 0.04, 0x2bcac3), [0, 0.28, 0], [0.14, 0.38, 0.14], 'glowCrystal');
         crystal.rotation.z = 0.18;
         g.add(crystal);
         g.add(mesh(sphere8, mat(0xa9fff8, 0.32, 0.02, 0x49e3dd), [0, 0.14, 0], [0.09, 0.07, 0.09], 'crystalCore'));
-        return g;
-      }
-      if (id === 'waterJar') {
-        g.add(mesh(cyl8, mat(0x6f8790, 0.5, 0.06), [0, 0.22, 0], [0.16, 0.3, 0.16], 'waterJarBody'));
-        g.add(mesh(cyl8, mat(0x7dc6e8, 0.22, 0.02, 0x3a9ed0), [0, 0.4, 0], [0.13, 0.035, 0.13], 'waterJarSurface'));
-        g.add(mesh(cyl6, metalMat, [0, 0.5, 0], [0.12, 0.08, 0.12], 'waterJarRim'));
         return g;
       }
       if (id === 'workbench') {
@@ -484,40 +434,6 @@ export class Character {
         g.add(mesh(box, strapMat, [0.16, 0.28, -0.25], [0.035, 0.32, 0.035], 'bedrollCarryRightTie'));
         return g;
       }
-      if (id === 'bait' || id === 'seeds' || id === 'compost' || id === 'berries' || id === 'caveMushroom' || id === 'snowHerb' || id === 'kelp' || id === 'rawFish' || id === 'cookedFish' || id === 'campMeal' || id === 'trailRation' || id === 'expeditionStew') {
-        g.add(mesh(sphere8, colorMat(id), [0, 0.2, 0], [0.18, 0.16, 0.18], 'foodBundle'));
-        if (id === 'seeds' || id === 'bait') g.add(mesh(box, mat(0x6c4d2d), [0, 0.12, 0], [0.32, 0.2, 0.12], id === 'bait' ? 'baitPouch' : 'seedPouch'));
-        if (id === 'compost') {
-          g.add(mesh(box, mat(0x4b3a20), [0, 0.14, 0], [0.34, 0.18, 0.18], 'compostWrap'));
-          g.add(mesh(sphere8, mat(0x76a45e), [0.08, 0.33, 0], [0.055, 0.035, 0.055], 'compostSprout'));
-        }
-        if (id === 'snowHerb') g.add(mesh(cone8, mat(0xe8fbff, 0.45, 0.02, 0xbceff5), [0.02, 0.42, 0], [0.07, 0.2, 0.07], 'snowHerbSprig'));
-        if (id === 'kelp') {
-          const strand = mesh(box, mat(0x2d7959), [0.04, 0.32, 0], [0.05, 0.34, 0.025], 'kelpStrand');
-          strand.rotation.z = 0.25;
-          g.add(strand);
-        }
-        if (id === 'trailRation') {
-          g.add(mesh(box, mat(0x6c4d2d), [0, 0.2, -0.02], [0.36, 0.13, 0.16], 'rationWrap'));
-          g.add(mesh(box, mat(0xe2c47a), [0, 0.32, -0.02], [0.3, 0.035, 0.18], 'rationTie'));
-        }
-        if (id === 'expeditionStew') {
-          g.add(mesh(cyl8, mat(0x72503a), [0, 0.17, -0.01], [0.22, 0.16, 0.22], 'stewBowl'));
-          g.add(mesh(cyl8, mat(0xe8a65f, 0.42, 0.02, 0x7b3f1e), [0, 0.3, -0.01], [0.18, 0.035, 0.18], 'stewSurface'));
-          const spoon = mesh(box, metalMat, [0.2, 0.34, -0.02], [0.035, 0.34, 0.025], 'stewSpoon');
-          spoon.rotation.z = -0.55;
-          g.add(spoon);
-          g.add(mesh(box, mat(0xf0d7a2, 0.36, 0.02, 0x9c5c2c), [-0.08, 0.45, -0.02], [0.025, 0.18, 0.025], 'stewSteam'));
-        }
-        return g;
-      }
-      if (id === 'compostBin') {
-        g.add(mesh(box, woodMat, [0, 0.22, 0], [0.42, 0.28, 0.34], 'compostBinCarryBox'));
-        g.add(mesh(box, mat(0x4b3a20), [0, 0.4, 0], [0.34, 0.08, 0.26], 'compostBinCarrySoil'));
-        g.add(mesh(box, mat(0x76a45e), [0.08, 0.48, -0.03], [0.12, 0.035, 0.08], 'compostBinCarryScraps'));
-        g.add(mesh(box, strapMat, [0, 0.22, -0.19], [0.46, 0.045, 0.035], 'compostBinCarryStrap'));
-        return g;
-      }
       if (id === 'rainCistern') {
         g.add(mesh(cyl8, woodMat, [0, 0.22, 0], [0.28, 0.32, 0.28], 'rainCisternCarryBarrel'));
         g.add(mesh(cyl8, mat(0x7dc6e8, 0.25, 0.02, 0x3a9ed0), [0, 0.42, 0], [0.24, 0.035, 0.24], 'rainCisternCarryWater'));
@@ -530,38 +446,6 @@ export class Character {
         g.add(mesh(box, mat(0x7b6a8f, 0.58, 0.04, 0x3a3354), [0, 0.34, -0.02], [0.34, 0.08, 0.26], 'rootCellarCarryCoolStone'));
         g.add(mesh(box, strapMat, [0, 0.22, -0.22], [0.46, 0.045, 0.035], 'rootCellarCarryStrap'));
         g.add(mesh(cyl6, mat(0x8bd0b0, 0.44, 0.02, 0x4fcfa4), [0.12, 0.46, 0], [0.055, 0.14, 0.055], 'rootCellarCarryMushroom'));
-        return g;
-      }
-      if (id === 'caveAnchor') {
-        const coil = mesh(torus, mat(0xc9a56d), [0, 0.28, 0], [1, 1, 1], 'caveAnchorCarryRopeCoil');
-        coil.rotation.x = Math.PI / 2;
-        g.add(coil);
-        const spike = mesh(cone8, metalMat, [0.18, 0.25, -0.02], [0.08, 0.38, 0.08], 'caveAnchorCarrySpike');
-        spike.rotation.z = -0.35;
-        g.add(spike);
-        g.add(mesh(sphere8, mat(0x70d6d1, 0.26, 0.04, 0x2bcac3), [-0.12, 0.38, 0.02], [0.09, 0.09, 0.09], 'caveAnchorCarryCrystal'));
-        g.add(mesh(box, strapMat, [0, 0.15, -0.18], [0.42, 0.045, 0.035], 'caveAnchorCarryStrap'));
-        return g;
-      }
-      if (id === 'dirt' || id === 'rock' || id === 'sand' || id === 'snow' || id === 'wood') {
-        g.add(mesh(box, colorMat(id), [0, 0.2, 0], [0.28, 0.28, 0.28], 'heldBlock'));
-        return g;
-      }
-      if (id === 'sticks') {
-        for (let i = 0; i < 3; i++) {
-          const stick = mesh(cyl6, woodMat, [(i - 1) * 0.05, 0.28, 0], [0.025, 0.62, 0.025], 'stickBundle');
-          stick.rotation.z = (i - 1) * 0.15;
-          g.add(stick);
-        }
-        return g;
-      }
-      if (id === 'reeds') {
-        for (let i = 0; i < 5; i++) {
-          const reed = mesh(cyl6, mat(i % 2 === 0 ? 0x7da65f : 0xb7c66e), [(i - 2) * 0.035, 0.34, 0], [0.018, 0.7 + i * 0.03, 0.018], 'reedBundleStem');
-          reed.rotation.z = (i - 2) * 0.08;
-          g.add(reed);
-        }
-        g.add(mesh(box, strapMat, [0, 0.24, -0.04], [0.28, 0.04, 0.05], 'reedBundleTie'));
         return g;
       }
       if (id === 'dockSegment') {
@@ -637,6 +521,54 @@ export class Character {
         g.add(mesh(sphere8, mat(0x87a9d6, 0.28, 0.04, 0x447fb8), [0, 0.48, -0.02], [0.11, 0.11, 0.09], 'waystoneCarryCore'));
         g.add(mesh(box, mat(0xd7c58f, 0.5, 0.02, 0x9d7f2a), [0, 0.25, -0.14], [0.3, 0.04, 0.03], 'waystoneCarryGlyphBar'));
         g.add(mesh(box, strapMat, [0, 0.15, -0.2], [0.38, 0.045, 0.035], 'waystoneCarryStrap'));
+        return g;
+      }
+      if (id === 'bait' || id === 'seeds' || id === 'compost' || id === 'berries' || id === 'caveMushroom' || id === 'snowHerb' || id === 'kelp' || id === 'rawFish' || id === 'cookedFish' || id === 'campMeal' || id === 'trailRation' || id === 'expeditionStew') {
+        g.add(mesh(sphere8, colorMat(id), [0, 0.2, 0], [0.18, 0.16, 0.18], 'foodBundle'));
+        if (id === 'seeds' || id === 'bait') g.add(mesh(box, mat(0x6c4d2d), [0, 0.12, 0], [0.32, 0.2, 0.12], id === 'bait' ? 'baitPouch' : 'seedPouch'));
+        if (id === 'compost') {
+          g.add(mesh(box, mat(0x4b3a20), [0, 0.14, 0], [0.34, 0.18, 0.18], 'compostWrap'));
+          g.add(mesh(sphere8, mat(0x76a45e), [0.08, 0.33, 0], [0.055, 0.035, 0.055], 'compostSprout'));
+        }
+        if (id === 'snowHerb') g.add(mesh(cone8, mat(0xe8fbff, 0.45, 0.02, 0xbceff5), [0.02, 0.42, 0], [0.07, 0.2, 0.07], 'snowHerbSprig'));
+        if (id === 'kelp') {
+          const strand = mesh(box, mat(0x2d7959), [0.04, 0.32, 0], [0.05, 0.34, 0.025], 'kelpStrand');
+          strand.rotation.z = 0.25;
+          g.add(strand);
+        }
+        if (id === 'trailRation') {
+          g.add(mesh(box, mat(0x6c4d2d), [0, 0.2, -0.02], [0.36, 0.13, 0.16], 'rationWrap'));
+          g.add(mesh(box, mat(0xe2c47a), [0, 0.32, -0.02], [0.3, 0.035, 0.18], 'rationTie'));
+        }
+        if (id === 'expeditionStew') {
+          g.add(mesh(cyl8, mat(0x72503a), [0, 0.17, -0.01], [0.22, 0.16, 0.22], 'stewBowl'));
+          g.add(mesh(cyl8, mat(0xe8a65f, 0.42, 0.02, 0x7b3f1e), [0, 0.3, -0.01], [0.18, 0.035, 0.18], 'stewSurface'));
+          const spoon = mesh(box, metalMat, [0.2, 0.34, -0.02], [0.035, 0.34, 0.025], 'stewSpoon');
+          spoon.rotation.z = -0.55;
+          g.add(spoon);
+          g.add(mesh(box, mat(0xf0d7a2, 0.36, 0.02, 0x9c5c2c), [-0.08, 0.45, -0.02], [0.025, 0.18, 0.025], 'stewSteam'));
+        }
+        return g;
+      }
+      if (id === 'dirt' || id === 'rock' || id === 'sand' || id === 'snow' || id === 'wood') {
+        g.add(mesh(box, colorMat(id), [0, 0.2, 0], [0.28, 0.28, 0.28], 'heldBlock'));
+        return g;
+      }
+      if (id === 'sticks') {
+        for (let i = 0; i < 3; i++) {
+          const stick = mesh(cyl6, woodMat, [(i - 1) * 0.05, 0.28, 0], [0.025, 0.62, 0.025], 'stickBundle');
+          stick.rotation.z = (i - 1) * 0.15;
+          g.add(stick);
+        }
+        return g;
+      }
+      if (id === 'reeds') {
+        for (let i = 0; i < 5; i++) {
+          const reed = mesh(cyl6, mat(i % 2 === 0 ? 0x7da65f : 0xb7c66e), [(i - 2) * 0.035, 0.34, 0], [0.018, 0.7 + i * 0.03, 0.018], 'reedBundleStem');
+          reed.rotation.z = (i - 2) * 0.08;
+          g.add(reed);
+        }
+        g.add(mesh(box, strapMat, [0, 0.24, -0.04], [0.28, 0.04, 0.05], 'reedBundleTie'));
         return g;
       }
       if (id === 'planeFrame') {

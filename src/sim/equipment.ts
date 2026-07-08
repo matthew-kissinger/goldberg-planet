@@ -29,6 +29,7 @@ export const CHARACTER_PROP_IDS: readonly CharacterPropId[] = [
   'hands',
   'map',
   'torch',
+  'waterJar',
   'dirt',
   'rock',
   'sand',
@@ -37,7 +38,6 @@ export const CHARACTER_PROP_IDS: readonly CharacterPropId[] = [
   'sticks',
   'workbench',
   'stoneHatchet',
-  'stoneBlade',
   'stoneAxe',
   'stonePick',
   'stoneShovel',
@@ -48,8 +48,6 @@ export const CHARACTER_PROP_IDS: readonly CharacterPropId[] = [
   'stormCloak',
   'repairKit',
   'fishingRod',
-  'reedBow',
-  'whistlingArrow',
   'bait',
   'seeds',
   'compost',
@@ -67,22 +65,8 @@ export const CHARACTER_PROP_IDS: readonly CharacterPropId[] = [
   'campfire',
   'chest',
   'bedroll',
-  'cropPlot',
-  'compostBin',
   'rainCistern',
   'rootCellar',
-  'caveAnchor',
-  'waterJar',
-  'floorFoundation',
-  'wallPanel',
-  'wallHalfRail',
-  'wallDoorPanel',
-  'wallWindowPanel',
-  'wallCorner',
-  'roofJoin',
-  'doorKit',
-  'windowFrame',
-  'roofBundle',
   'dockSegment',
   'fishTrap',
   'shoreNet',
@@ -91,7 +75,6 @@ export const CHARACTER_PROP_IDS: readonly CharacterPropId[] = [
   'lantern',
   'waystone',
   'echoLantern',
-  'horizonChart',
   'planeFrame',
 ] as const;
 
@@ -139,15 +122,12 @@ export function defaultHeldProp(
 }
 
 export function propForStructureInteraction(item: ItemId, mode?: string): CharacterPropId {
-  if (mode === 'fertilize' || item === 'compostBin' || mode === 'compost') return 'compost';
-  if (item === 'rainCistern' || mode === 'collectWater' || mode === 'irrigate') return 'waterJar';
+  if (item === 'rainCistern' || mode === 'collectWater') return 'waterJar';
   if (item === 'rootCellar' || mode === 'cache' || mode === 'withdrawProvision') return 'trailRation';
-  if (item === 'caveAnchor' || mode === 'anchor') return 'caveAnchor';
-  if (item === 'cropPlot' || mode === 'plant' || mode === 'plantReeds' || mode === 'tend' || mode === 'harvest') return mode === 'plantReeds' ? 'reeds' : mode === 'harvest' ? 'berries' : 'seeds';
   if (item === 'campfire' && mode === 'cook') return 'campMeal';
   if (item === 'dryingRack') return mode === 'preserve' ? 'trailRation' : 'dryingRack';
   if (item === 'fishTrap') return mode === 'collectTrap' ? 'rawFish' : mode === 'setTrap' ? 'bait' : 'fishTrap';
-  if (item === 'shoreNet') return mode === 'collectNet' ? 'rawFish' : mode === 'setNet' || mode === 'checkNet' ? 'shoreNet' : 'shoreNet';
+  if (item === 'shoreNet') return mode === 'collectNet' ? 'rawFish' : 'shoreNet';
   if (item === 'weatherVane' || mode === 'forecast') return 'weatherVane';
   if (item === 'campfire' || item === 'lantern' || item === 'echoLantern' || mode === 'lit' || mode === 'unlit') return 'torch';
   if (item === 'bedroll' || mode === 'home') return 'bedroll';
@@ -161,24 +141,9 @@ export function pickupPropForItem(item: ItemId): CharacterPropId {
   return item;
 }
 
-export function nativeDefenseActionForProp(prop: CharacterPropId): CharacterAction {
-  if (prop === 'reedBow' || prop === 'whistlingArrow') return 'shoot';
-  if (prop === 'stormCloak') return 'brace';
-  if (
-    prop === 'stoneBlade'
-    || prop === 'stoneHatchet'
-    || prop === 'stoneAxe'
-    || prop === 'echoAxe'
-    || prop === 'lantern'
-    || prop === 'echoLantern'
-    || prop === 'torch'
-  ) return 'ward';
-  return 'interact';
-}
-
 export function backPropsForInventory(hasItem: (id: ItemId) => boolean): CharacterPropId[] {
   const props: CharacterPropId[] = [];
-  for (const id of ['packFrame', 'stormCloak', 'echoAxe', 'echoPick', 'echoShovel', 'stoneAxe', 'stoneHatchet', 'stoneBlade', 'stonePick', 'stoneShovel', 'repairKit', 'fishingRod', 'reedBow', 'whistlingArrow', 'fishTrap', 'shoreNet', 'reeds', 'lantern', 'echoLantern', 'horizonChart', 'waystone', 'weatherVane', 'rootCellar', 'caveAnchor', 'expeditionStew'] as const) {
+  for (const id of ['packFrame', 'stormCloak', 'echoAxe', 'echoPick', 'echoShovel', 'stoneAxe', 'stoneHatchet', 'stonePick', 'stoneShovel', 'repairKit', 'fishingRod', 'fishTrap', 'shoreNet', 'reeds', 'lantern', 'echoLantern', 'waystone', 'weatherVane', 'rootCellar', 'expeditionStew'] as const) {
     if (hasItem(id)) props.push(id);
   }
   return props;

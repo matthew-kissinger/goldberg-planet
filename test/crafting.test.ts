@@ -28,7 +28,7 @@ describe('Hearth and Horizon crafting rules', () => {
     expect(materials[1]).toBe(5);
   });
 
-  it('crafts a compact stone hatchet as the first warding and chopping sidearm', () => {
+  it('crafts a compact stone hatchet as the first chopping sidearm', () => {
     const materials = [0, 2, 0, 0, 0];
     const crafted: InventoryItems = { sticks: 1 };
 
@@ -38,37 +38,6 @@ describe('Hearth and Horizon crafting rules', () => {
     expect(result).toMatchObject({ ok: true, result: 'stoneHatchet', count: 1 });
     expect(crafted).toEqual({ stoneHatchet: 1 });
     expect(materials).toEqual([0, 0, 0, 0, 0]);
-  });
-
-  it('crafts a stone blade as the first close-control defensive tool', () => {
-    const materials = [0, 3, 0, 0, 0];
-    const crafted: InventoryItems = { sticks: 1, reeds: 1 };
-
-    expect(craftRecipe('stone_blade', materials, crafted).stationMissing?.item).toBe('workbench');
-
-    const result = craftRecipe('stone_blade', materials, crafted, { workbench: 1 });
-    expect(result).toMatchObject({ ok: true, result: 'stoneBlade', count: 1 });
-    expect(crafted).toEqual({ stoneBlade: 1 });
-    expect(materials).toEqual([0, 0, 0, 0, 0]);
-  });
-
-  it('crafts a reed bow and whistling arrows for ranged native-life warding', () => {
-    const bowMaterials = [0, 0, 0, 0, 2];
-    const bowItems: InventoryItems = { sticks: 3, reeds: 3 };
-
-    expect(craftRecipe('reed_bow', bowMaterials, bowItems).stationMissing?.item).toBe('workbench');
-
-    const bow = craftRecipe('reed_bow', bowMaterials, bowItems, { workbench: 1 });
-    expect(bow).toMatchObject({ ok: true, result: 'reedBow', count: 1 });
-    expect(bowItems).toEqual({ reedBow: 1 });
-    expect(bowMaterials).toEqual([0, 0, 0, 0, 0]);
-
-    const arrowMaterials = [0, 1, 0, 0, 0];
-    const arrowItems: InventoryItems = { sticks: 1, reeds: 2 };
-    const arrows = craftRecipe('whistling_arrows', arrowMaterials, arrowItems, { workbench: 1 });
-    expect(arrows).toMatchObject({ ok: true, result: 'whistlingArrow', count: 6 });
-    expect(arrowItems).toEqual({ whistlingArrow: 6 });
-    expect(arrowMaterials).toEqual([0, 0, 0, 0, 0]);
   });
 
   it('allows placed stations to unlock recipes after the station leaves inventory', () => {
@@ -85,8 +54,8 @@ describe('Hearth and Horizon crafting rules', () => {
   });
 
   it('reports recipe readiness and drops unknown or empty saved items', () => {
-    const crafted = normalizeInventory({ workbench: 1, sticks: 0, stoneHatchet: 1, stoneBlade: 1, stonePick: 2, echoPick: 1, packFrame: 1, stormCloak: 1, repairKit: 1, reedBow: 1, whistlingArrow: 5, bait: 2, compost: 2, berries: 3, caveMushroom: 1, snowHerb: 1, kelp: 2, reeds: 3, rawFish: 1, trailRation: 2, expeditionStew: 1, glowCrystal: 2, compostBin: 1, rainCistern: 1, rootCellar: 1, caveAnchor: 1, fishTrap: 1, shoreNet: 1, dryingRack: 1, weatherVane: 1, waystone: 2, echoLantern: 1, horizonChart: 1, nope: 5 } as InventoryItems);
-    expect(crafted).toEqual({ workbench: 1, stoneHatchet: 1, stoneBlade: 1, stonePick: 2, echoPick: 1, packFrame: 1, stormCloak: 1, repairKit: 1, reedBow: 1, whistlingArrow: 5, bait: 2, compost: 2, berries: 3, caveMushroom: 1, snowHerb: 1, kelp: 2, reeds: 3, rawFish: 1, trailRation: 2, expeditionStew: 1, glowCrystal: 2, compostBin: 1, rainCistern: 1, rootCellar: 1, caveAnchor: 1, fishTrap: 1, shoreNet: 1, dryingRack: 1, weatherVane: 1, waystone: 2, echoLantern: 1, horizonChart: 1 });
+    const crafted = normalizeInventory({ workbench: 1, sticks: 0, stoneHatchet: 1, stonePick: 2, echoPick: 1, packFrame: 1, stormCloak: 1, repairKit: 1, bait: 2, compost: 2, berries: 3, caveMushroom: 1, snowHerb: 1, kelp: 2, reeds: 3, rawFish: 1, trailRation: 2, expeditionStew: 1, glowCrystal: 2, echoLantern: 1, nope: 5 } as InventoryItems);
+    expect(crafted).toEqual({ workbench: 1, stoneHatchet: 1, stonePick: 2, echoPick: 1, packFrame: 1, stormCloak: 1, repairKit: 1, bait: 2, compost: 2, berries: 3, caveMushroom: 1, snowHerb: 1, kelp: 2, reeds: 3, rawFish: 1, trailRation: 2, expeditionStew: 1, glowCrystal: 2, echoLantern: 1 });
 
     const statuses = allRecipeStatuses([0, 8, 0, 0, 4], { workbench: 1, sticks: 4 });
     const pick = statuses.find((status) => status.recipe.id === 'stone_pick');
@@ -97,7 +66,7 @@ describe('Hearth and Horizon crafting rules', () => {
     ]);
   });
 
-  it('turns a workbench, lantern, and cave crystals into an echo lantern', () => {
+  it('turns a workbench, a lantern, and cave crystals into an echo lantern', () => {
     const materials = [0, 0, 0, 0, 0];
     const crafted: InventoryItems = { lantern: 1, glowCrystal: 2 };
 
@@ -106,6 +75,16 @@ describe('Hearth and Horizon crafting rules', () => {
     const result = craftRecipe('echo_lantern', materials, crafted, { workbench: 1 });
     expect(result.ok).toBe(true);
     expect(crafted).toEqual({ echoLantern: 1 });
+  });
+
+  it('crafts a lantern from a workbench and terrain materials', () => {
+    const materials = [0, 5, 4, 0, 3];
+    const crafted: InventoryItems = {};
+
+    const result = craftRecipe('lantern', materials, crafted, { workbench: 1 });
+    expect(result.ok).toBe(true);
+    expect(crafted).toEqual({ lantern: 1 });
+    expect(materials).toEqual([0, 2, 2, 0, 2]);
   });
 
   it('turns harvested berries into bait for stronger fishing', () => {
@@ -175,155 +154,4 @@ describe('Hearth and Horizon crafting rules', () => {
     expect(shovelMaterials).toEqual([0, 0, 0, 0, 0]);
   });
 
-  it('crafts waystones as persistent route markers', () => {
-    const materials = [0, 5, 1, 0, 1];
-    const crafted: InventoryItems = { sticks: 1 };
-
-    expect(craftRecipe('waystone', materials, crafted).stationMissing?.item).toBe('workbench');
-
-    const result = craftRecipe('waystone', materials, crafted, { workbench: 1 });
-    expect(result.ok).toBe(true);
-    expect(crafted).toEqual({ waystone: 2 });
-    expect(materials).toEqual([0, 0, 0, 0, 1]);
-  });
-
-  it('crafts dock segments as shoreline building props', () => {
-    const materials = [0, 2, 0, 0, 8];
-    const crafted: InventoryItems = { sticks: 2 };
-
-    expect(craftRecipe('dock_segment', materials, crafted).stationMissing?.item).toBe('workbench');
-
-    const result = craftRecipe('dock_segment', materials, crafted, { workbench: 1 });
-    expect(result.ok).toBe(true);
-    expect(crafted).toEqual({ dockSegment: 1 });
-    expect(materials).toEqual([0, 0, 0, 0, 0]);
-  });
-
-  it('crafts fish traps as passive shore and cave food props', () => {
-    const materials = [0, 0, 0, 0, 4];
-    const crafted: InventoryItems = { sticks: 4, kelp: 1 };
-
-    expect(craftRecipe('fish_trap', materials, crafted).stationMissing?.item).toBe('workbench');
-
-    const result = craftRecipe('fish_trap', materials, crafted, { workbench: 1 });
-    expect(result.ok).toBe(true);
-    expect(crafted).toEqual({ fishTrap: 1 });
-    expect(materials).toEqual([0, 0, 0, 0, 0]);
-  });
-
-  it('crafts reed fish traps from waterline harvests', () => {
-    const materials = [0, 0, 0, 0, 2];
-    const crafted: InventoryItems = { sticks: 2, reeds: 3 };
-
-    const result = craftRecipe('reed_fish_trap', materials, crafted, { workbench: 1 });
-    expect(result.ok).toBe(true);
-    expect(crafted).toEqual({ fishTrap: 1 });
-    expect(materials).toEqual([0, 0, 0, 0, 0]);
-  });
-
-  it('crafts shore nets from reed-bed materials', () => {
-    const materials = [0, 0, 0, 0, 1];
-    const crafted: InventoryItems = { sticks: 3, reeds: 4 };
-
-    const result = craftRecipe('shore_net', materials, crafted, { workbench: 1 });
-    expect(result.ok).toBe(true);
-    expect(result.result).toBe('shoreNet');
-    expect(crafted).toEqual({ shoreNet: 1 });
-    expect(materials).toEqual([0, 0, 0, 0, 0]);
-  });
-
-  it('crafts drying racks as preserved-food stations', () => {
-    const materials = [0, 1, 0, 0, 5];
-    const crafted: InventoryItems = { sticks: 3 };
-
-    expect(craftRecipe('drying_rack', materials, crafted).stationMissing?.item).toBe('workbench');
-
-    const result = craftRecipe('drying_rack', materials, crafted, { workbench: 1 });
-    expect(result.ok).toBe(true);
-    expect(crafted).toEqual({ dryingRack: 1 });
-    expect(materials).toEqual([0, 0, 0, 0, 0]);
-  });
-
-  it('crafts compost bins as farm fertility stations', () => {
-    const materials = [2, 0, 0, 0, 4];
-    const crafted: InventoryItems = { sticks: 2 };
-
-    expect(craftRecipe('compost_bin', materials, crafted).stationMissing?.item).toBe('workbench');
-
-    const result = craftRecipe('compost_bin', materials, crafted, { workbench: 1 });
-    expect(result.ok).toBe(true);
-    expect(crafted).toEqual({ compostBin: 1 });
-    expect(materials).toEqual([0, 0, 0, 0, 0]);
-  });
-
-  it('crafts rain cisterns as storm-water farm stations', () => {
-    const materials = [0, 4, 2, 0, 4];
-    const crafted: InventoryItems = {};
-
-    expect(craftRecipe('rain_cistern', materials, crafted).stationMissing?.item).toBe('workbench');
-
-    const result = craftRecipe('rain_cistern', materials, crafted, { workbench: 1 });
-    expect(result.ok).toBe(true);
-    expect(crafted).toEqual({ rainCistern: 1 });
-    expect(materials).toEqual([0, 0, 0, 0, 0]);
-  });
-
-  it('crafts root cellars as home expedition caches', () => {
-    const materials = [3, 5, 0, 0, 5];
-    const crafted: InventoryItems = {};
-
-    expect(craftRecipe('root_cellar', materials, crafted).stationMissing?.item).toBe('workbench');
-
-    const result = craftRecipe('root_cellar', materials, crafted, { workbench: 1 });
-    expect(result.ok).toBe(true);
-    expect(crafted).toEqual({ rootCellar: 1 });
-    expect(materials).toEqual([0, 0, 0, 0, 0]);
-  });
-
-  it('crafts cave anchors as crystal-tuned expedition markers', () => {
-    const materials = [0, 3, 0, 0, 0];
-    const crafted: InventoryItems = { sticks: 2, glowCrystal: 1 };
-
-    expect(craftRecipe('cave_anchor', materials, crafted).stationMissing?.item).toBe('workbench');
-
-    const result = craftRecipe('cave_anchor', materials, crafted, { workbench: 1 });
-    expect(result.ok).toBe(true);
-    expect(crafted).toEqual({ caveAnchor: 1 });
-    expect(materials).toEqual([0, 0, 0, 0, 0]);
-  });
-
-  it('crafts integrated wall-shell pieces from the code-owned socket kit', () => {
-    const doorMaterials = [0, 0, 0, 0, 0];
-    const doorItems: InventoryItems = { wallPanel: 1, doorKit: 1, sticks: 1 };
-    expect(craftRecipe('wall_door_panel', doorMaterials, doorItems, { workbench: 1 })).toMatchObject({ ok: true, result: 'wallDoorPanel' });
-    expect(doorItems).toEqual({ wallDoorPanel: 1 });
-
-    const windowMaterials = [0, 0, 2, 0, 0];
-    const windowItems: InventoryItems = { wallPanel: 1, windowFrame: 1 };
-    expect(craftRecipe('wall_window_panel', windowMaterials, windowItems, { workbench: 1 })).toMatchObject({ ok: true, result: 'wallWindowPanel' });
-    expect(windowItems).toEqual({ wallWindowPanel: 1 });
-    expect(windowMaterials).toEqual([0, 0, 0, 0, 0]);
-
-    const cornerMaterials = [0, 1, 0, 0, 4];
-    const cornerItems: InventoryItems = { sticks: 2 };
-    expect(craftRecipe('wall_corner', cornerMaterials, cornerItems, { workbench: 1 })).toMatchObject({ ok: true, result: 'wallCorner', count: 2 });
-    expect(cornerItems).toEqual({ wallCorner: 2 });
-
-    const roofMaterials = [0, 0, 0, 0, 2];
-    const roofItems: InventoryItems = { roofBundle: 1, sticks: 2 };
-    expect(craftRecipe('roof_join', roofMaterials, roofItems, { workbench: 1 })).toMatchObject({ ok: true, result: 'roofJoin', count: 2 });
-    expect(roofItems).toEqual({ roofJoin: 2 });
-  });
-
-  it('crafts weather vanes as route-planning camp instruments', () => {
-    const materials = [0, 2, 1, 0, 3];
-    const crafted: InventoryItems = { sticks: 2 };
-
-    expect(craftRecipe('weather_vane', materials, crafted).stationMissing?.item).toBe('workbench');
-
-    const result = craftRecipe('weather_vane', materials, crafted, { workbench: 1 });
-    expect(result.ok).toBe(true);
-    expect(crafted).toEqual({ weatherVane: 1 });
-    expect(materials).toEqual([0, 0, 0, 0, 0]);
-  });
 });

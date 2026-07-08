@@ -9,6 +9,14 @@ export interface ResourceDropSave {
   tile: number;
   offsetA: number;
   offsetB: number;
+  /**
+   * World-space radius (distance from the planet center) of the ground the drop rests
+   * on, captured once at spawn time. Rendering must read this cached value instead of
+   * recomputing it from live terrain every frame — otherwise mining/building near a
+   * drop makes it visibly snap to the new height. 0 means "not cached yet" (legacy save
+   * data); callers should backfill it once from current terrain, then leave it fixed.
+   */
+  groundRadius: number;
   age: number;
   source: ResourceDropSource;
 }
@@ -18,7 +26,15 @@ export interface DropCollectResult {
   collected: ResourceDropSave[];
 }
 
+export interface DropDespawnResult {
+  remaining: ResourceDropSave[];
+  despawned: ResourceDropSave[];
+}
+
 export const RESOURCE_DROP_PICKUP_DELAY = 0.9;
+
+/** Uncollected drops disappear after this many seconds of real time (~8 minutes). */
+export const RESOURCE_DROP_DESPAWN_AGE = 480;
 
 function finite(n: unknown): n is number {
   return typeof n === 'number' && Number.isFinite(n);
@@ -55,6 +71,7 @@ function normalizeDrop(raw: unknown, tileCount: number): ResourceDropSave | null
     tile,
     offsetA: finite(v.offsetA) ? Math.max(-2.4, Math.min(2.4, v.offsetA)) : 0,
     offsetB: finite(v.offsetB) ? Math.max(-2.4, Math.min(2.4, v.offsetB)) : 0,
+    groundRadius: finite(v.groundRadius) && v.groundRadius > 0 ? v.groundRadius : 0,
     age: finite(v.age) ? Math.max(0, Math.min(3600, v.age)) : 0,
     source: sourceId(v.source),
   };
@@ -82,6 +99,7 @@ export function nextResourceDropId(drops: readonly ResourceDropSave[]): number {
 export function spawnItemDrops(
   tile: number,
   startId: number,
+  groundRadius: number,
   item: ItemId,
   total = 1,
   source: ResourceDropSource = 'debug',
@@ -92,6 +110,7 @@ export function spawnItemDrops(
   const drops: ResourceDropSave[] = [];
   let remaining = count;
   let nextId = Math.max(1, Math.trunc(startId));
+  const groundR = finite(groundRadius) && groundRadius > 0 ? groundRadius : 0;
   const itemSalt = item.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
   for (let i = 0; i < stacks; i++) {
     const stack = Math.ceil(remaining / (stacks - i));
@@ -105,6 +124,7 @@ export function spawnItemDrops(
       tile: Math.max(0, Math.trunc(tile)),
       offsetA: Math.cos(angle) * radius,
       offsetB: Math.sin(angle) * radius,
+      groundRadius: groundR,
       age: 0,
       source,
     });
@@ -112,12 +132,12 @@ export function spawnItemDrops(
   return { drops, nextId };
 }
 
-export function spawnTreeWoodDrops(tile: number, startId: number, total = 6): { drops: ResourceDropSave[]; nextId: number } {
-  return spawnItemDrops(tile, startId, 'wood', total, 'tree', 3);
+export function spawnTreeWoodDrops(tile: number, startId: number, groundRadius: number, total = 6): { drops: ResourceDropSave[]; nextId: number } {
+  return spawnItemDrops(tile, startId, groundRadius, 'wood', total, 'tree', 3);
 }
 
-export function spawnMinedItemDrops(tile: number, startId: number, item: ItemId, total = 1): { drops: ResourceDropSave[]; nextId: number } {
-  return spawnItemDrops(tile, startId, item, total, 'mine', Math.min(3, Math.max(1, Math.trunc(total))));
+export function spawnMinedItemDrops(tile: number, startId: number, groundRadius: number, item: ItemId, total = 1): { drops: ResourceDropSave[]; nextId: number } {
+  return spawnItemDrops(tile, startId, groundRadius, item, total, 'mine', Math.min(3, Math.max(1, Math.trunc(total))));
 }
 
 export function ageResourceDrops(drops: readonly ResourceDropSave[], dt: number): ResourceDropSave[] {
@@ -140,4 +160,18 @@ export function collectReadyResourceDrops(
     else remaining.push(drop);
   }
   return { remaining, collected };
+}
+
+/** Removes drops that have sat uncollected for `maxAge` seconds so the world doesn't accumulate clutter. */
+export function despawnAgedResourceDrops(
+  drops: readonly ResourceDropSave[],
+  maxAge = RESOURCE_DROP_DESPAWN_AGE,
+): DropDespawnResult {
+  const remaining: ResourceDropSave[] = [];
+  const despawned: ResourceDropSave[] = [];
+  for (const drop of drops) {
+    if (drop.age >= maxAge) despawned.push(drop);
+    else remaining.push(drop);
+  }
+  return { remaining, despawned };
 }

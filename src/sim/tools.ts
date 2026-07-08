@@ -1,10 +1,10 @@
 import type { InventoryItems, ItemId, MaterialItemId } from './crafting';
 
-export const TOOL_ITEM_IDS = ['stoneHatchet', 'stoneBlade', 'stoneAxe', 'stonePick', 'stoneShovel', 'echoAxe', 'echoPick', 'echoShovel', 'reedBow'] as const;
+export const TOOL_ITEM_IDS = ['stoneHatchet', 'stoneAxe', 'stonePick', 'stoneShovel', 'echoAxe', 'echoPick', 'echoShovel'] as const;
 
 export type ToolItemId = typeof TOOL_ITEM_IDS[number];
 export type ToolWear = Partial<Record<ToolItemId, number>>;
-export type ToolTarget = 'wood' | 'rock' | 'soil' | 'defense' | 'rangedDefense' | 'hands';
+export type ToolTarget = 'wood' | 'rock' | 'soil' | 'hands';
 
 export interface ToolProfile {
   id: ToolItemId;
@@ -40,14 +40,12 @@ export const REPAIR_KIT_RESTORE = 18;
 
 export const TOOL_PROFILES: Record<ToolItemId, ToolProfile> = {
   stoneHatchet: { id: 'stoneHatchet', name: 'Stone Hatchet', target: 'wood', reachBonus: 0.75, cooldown: 0.085, durability: 24, tier: 0 },
-  stoneBlade: { id: 'stoneBlade', name: 'Stone Blade', target: 'defense', reachBonus: 0.45, cooldown: 0.075, durability: 30, tier: 1 },
   stoneAxe: { id: 'stoneAxe', name: 'Stone Axe', target: 'wood', reachBonus: 1.15, cooldown: 0.1, durability: 32, tier: 1 },
   stonePick: { id: 'stonePick', name: 'Stone Pick', target: 'rock', reachBonus: 1.35, cooldown: 0.12, durability: 38, tier: 1 },
   stoneShovel: { id: 'stoneShovel', name: 'Stone Shovel', target: 'soil', reachBonus: 1.2, cooldown: 0.11, durability: 34, tier: 1 },
   echoAxe: { id: 'echoAxe', name: 'Echo Axe', target: 'wood', reachBonus: 1.65, cooldown: 0.085, durability: 58, tier: 2 },
   echoPick: { id: 'echoPick', name: 'Echo Pick', target: 'rock', reachBonus: 1.95, cooldown: 0.095, durability: 66, tier: 2 },
   echoShovel: { id: 'echoShovel', name: 'Echo Shovel', target: 'soil', reachBonus: 1.7, cooldown: 0.09, durability: 60, tier: 2 },
-  reedBow: { id: 'reedBow', name: 'Reed Bow', target: 'rangedDefense', reachBonus: 4.5, cooldown: 0.13, durability: 36, tier: 1 },
 };
 
 const HANDS: ToolEffect = {
@@ -125,14 +123,6 @@ export function bestToolForTree(craftedItems: InventoryItems, wear: ToolWear = {
   return bestToolForTarget('wood', craftedItems, wear);
 }
 
-export function bestToolForDefense(craftedItems: InventoryItems, wear: ToolWear = {}): ToolEffect {
-  return bestToolForTarget('defense', craftedItems, wear);
-}
-
-export function bestToolForRangedDefense(craftedItems: InventoryItems, wear: ToolWear = {}): ToolEffect {
-  return bestToolForTarget('rangedDefense', craftedItems, wear);
-}
-
 export function maxReachBonus(craftedItems: InventoryItems): number {
   let reach = 0;
   for (const id of TOOL_ITEM_IDS) {
@@ -140,15 +130,6 @@ export function maxReachBonus(craftedItems: InventoryItems): number {
     if ((profile.target === 'wood' || profile.target === 'rock' || profile.target === 'soil') && hasTool(craftedItems, id)) reach = Math.max(reach, profile.reachBonus);
   }
   return reach;
-}
-
-export function hasToolForTarget(craftedItems: InventoryItems, target: Exclude<ToolTarget, 'hands'>): boolean {
-  return bestToolForTarget(target, craftedItems).tool !== null;
-}
-
-export function bestToolLabelForTarget(craftedItems: InventoryItems, target: Exclude<ToolTarget, 'hands'>): string {
-  const tool = bestToolForTarget(target, craftedItems);
-  return tool.tool ? tool.name.toLowerCase() : target === 'rock' ? 'pick' : target === 'wood' ? 'axe' : target === 'defense' ? 'blade' : target === 'rangedDefense' ? 'bow' : 'shovel';
 }
 
 export function useTool(tool: ToolItemId | null, craftedItems: InventoryItems, wear: ToolWear, creative = false): ToolUseResult {

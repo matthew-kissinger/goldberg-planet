@@ -110,41 +110,74 @@ describe('character renderer Soft-Facet Wayfarer readability', () => {
       { x: 0, y: 0, z: 0 },
       3.5,
       1 / 60,
-      visualState('discover', 'horizonChart', ['horizonChart', 'packFrame', 'stormCloak', 'reedBow', 'caveAnchor']),
+      visualState('discover', 'waystone', ['waystone', 'packFrame', 'stormCloak', 'echoLantern']),
     );
 
     const stats = character.stats();
     expect(character.state().action).toBe('discover');
     expect(stats.visible).toBe(true);
-    expect(stats.heldProp).toBe('horizonChart');
+    expect(stats.heldProp).toBe('waystone');
     expect(stats.heldPropMeshes).toBeGreaterThanOrEqual(3);
-    expect(stats.backPropsVisible).toEqual(expect.arrayContaining(['packFrame', 'stormCloak', 'reedBow', 'caveAnchor']));
-    expect(stats.backPropsVisible).not.toContain('horizonChart');
+    expect(stats.backPropsVisible).toEqual(expect.arrayContaining(['packFrame', 'stormCloak', 'echoLantern']));
+    expect(stats.backPropsVisible).not.toContain('waystone');
     expect(stats.backPropMeshes).toBeGreaterThan(10);
   });
 
-  it('covers survival, travel, pickup, and native-defense action poses through renderer state', () => {
+  it('covers survival, travel, pickup, and rest action poses through renderer state', () => {
     const scene = new THREE.Scene();
     const character = new Character(scene);
     const scenarios: [CharacterVisualState['action'], CharacterPropId][] = [
       ['chop', 'stoneHatchet'],
       ['mine', 'echoPick'],
-      ['build', 'waystone'],
+      ['build', 'chest'],
       ['fish', 'fishingRod'],
       ['pickup', 'glowCrystal'],
-      ['ward', 'stoneBlade'],
-      ['shoot', 'reedBow'],
+      ['ward', 'hands'],
+      ['shoot', 'hands'],
       ['brace', 'stormCloak'],
       ['stagger', 'hands'],
     ];
 
     for (const [action, held] of scenarios) {
-      character.update(fakePlayer(), { x: 0, y: 0, z: 0 }, 3.5, 1 / 60, visualState(action, held, ['packFrame', 'stormCloak', 'stoneBlade', 'reedBow']));
+      character.update(fakePlayer(), { x: 0, y: 0, z: 0 }, 3.5, 1 / 60, visualState(action, held, ['packFrame', 'stormCloak']));
       const stats = character.stats();
       expect(character.state().action).toBe(action);
       expect(stats.heldProp).toBe(held);
       expect(stats.supportedActions).toContain(action);
       expect(stats.normalDistanceReady).toBe(true);
     }
+  });
+
+  it('interns materials by color so unrelated props with matching accent colors share one instance', () => {
+    const scene = new THREE.Scene();
+    const character = new Character(scene);
+
+    const meshesByName = new Map<string, THREE.Mesh[]>();
+    let totalMeshCount = 0;
+    const uniqueMaterials = new Set<THREE.Material>();
+    character.group.traverse((part) => {
+      const mesh = part as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      totalMeshCount++;
+      if (mesh.material && !Array.isArray(mesh.material)) uniqueMaterials.add(mesh.material as THREE.Material);
+      const list = meshesByName.get(mesh.name) ?? [];
+      list.push(mesh);
+      meshesByName.set(mesh.name, list);
+    });
+
+    // hatchetWrap (stoneHatchet), repairKitLashing (repairKit), and packFrameShoulderLoop (packFrame)
+    // are unrelated prop items that all use the same reed-lashing accent color and material params.
+    // They must reuse a single interned THREE.MeshStandardMaterial instance rather than each
+    // allocating their own, even though they belong to entirely different held/back prop groups.
+    const reedLashingNames = ['hatchetWrap', 'repairKitLashing', 'packFrameShoulderLoop'];
+    const reedLashingMaterials = reedLashingNames.flatMap((name) => meshesByName.get(name) ?? []).map((mesh) => mesh.material);
+    expect(reedLashingMaterials.length).toBeGreaterThanOrEqual(reedLashingNames.length * 2); // held + back copy of each
+    const first = reedLashingMaterials[0];
+    for (const material of reedLashingMaterials) expect(material).toBe(first);
+
+    // Sanity check that interning is working broadly, not just for the color above: with ~50 prop
+    // ids each built twice (held + back), a naive per-mesh material allocator would produce close to
+    // one material per mesh. Interning should collapse that down to a small fraction of the mesh count.
+    expect(uniqueMaterials.size).toBeLessThan(totalMeshCount / 3);
   });
 });

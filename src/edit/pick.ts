@@ -8,7 +8,6 @@
 import type { Goldberg } from '../geo/goldberg';
 import type { Layers } from '../world/layers';
 import type { Columns } from '../world/columns';
-import type { NativeCreatureKind, NativeCreatureSite } from '../sim/nativeLife';
 import { treeTangentFrame, type Trees } from '../world/trees';
 
 export interface PickResult {
@@ -27,25 +26,7 @@ export interface TreePick {
   dist: number;
 }
 
-export interface NativeCreaturePick {
-  site: NativeCreatureSite;
-  tile: number;
-  dist: number;
-}
-
 const treeFrame = new Float64Array(6);
-
-const nativeCreatureProfile: Record<NativeCreatureKind, { radius: number; height: number }> = {
-  mossPuff: { radius: 1.05, height: 1.75 },
-  shellSkitter: { radius: 0.92, height: 1.2 },
-  reedbackGrazer: { radius: 1.18, height: 1.95 },
-  caveBlinker: { radius: 1.02, height: 1.72 },
-  tideLurker: { radius: 1.22, height: 1.52 },
-  caveBelljaw: { radius: 1.2, height: 1.85 },
-  screeSnapper: { radius: 1.12, height: 1.42 },
-  stormBurr: { radius: 1.06, height: 1.72 },
-  brambleback: { radius: 1.26, height: 2.05 },
-};
 
 /**
  * Ray test against live trees: march the ray to discover candidate tiles (sample tile +
@@ -102,55 +83,6 @@ export function pickTree(
         : p.spread * (1 - (along - trunkTop) / Math.max(0.001, p.canopy)) + 0.3;
       if (rad <= allowed && (!best || tt < best.dist)) best = { tile: id, dist: tt };
     }
-  }
-  return best;
-}
-
-/**
- * Ray test against visible native life. Roaming actors use their current tile, while older
- * static sites stay anchored to their owning hex. The capsule is intentionally a little
- * generous because the GLB skins bob, graze, and now walk between neighboring hexes.
- */
-export function pickNativeCreature(
-  geo: Goldberg, layers: Layers, columns: Columns,
-  sites: readonly NativeCreatureSite[],
-  ox: number, oy: number, oz: number,
-  dx: number, dy: number, dz: number,
-  maxDist: number,
-): NativeCreaturePick | null {
-  const c = geo.centers;
-  let best: NativeCreaturePick | null = null;
-  for (const site of sites) {
-    const tile = Math.max(0, Math.min(geo.count - 1, Math.trunc(site.motion?.currentTile ?? site.tile)));
-    const profile = nativeCreatureProfile[site.kind];
-    const ux = c[tile * 3];
-    const uy = c[tile * 3 + 1];
-    const uz = c[tile * 3 + 2];
-    const ground = layers.topRadius(columns.groundLayerBelow(tile, layers.bounds[0]));
-    const bx = ux * (ground + 0.08);
-    const by = uy * (ground + 0.08);
-    const bz = uz * (ground + 0.08);
-    const w0x = ox - bx;
-    const w0y = oy - by;
-    const w0z = oz - bz;
-    const bdot = dx * ux + dy * uy + dz * uz;
-    const d0 = dx * w0x + dy * w0y + dz * w0z;
-    const e = ux * w0x + uy * w0y + uz * w0z;
-    const denom = 1 - bdot * bdot;
-    let s = denom > 1e-6 ? e + bdot * ((bdot * e - d0) / denom) : -e;
-    s = Math.max(-0.35, Math.min(profile.height, s));
-    let tt = bdot * s - d0;
-    tt = Math.max(0, Math.min(maxDist, tt));
-    const qx = ox + dx * tt - bx;
-    const qy = oy + dy * tt - by;
-    const qz = oz + dz * tt - bz;
-    const along = qx * ux + qy * uy + qz * uz;
-    if (along < -0.45 || along > profile.height + 0.35) continue;
-    const offx = qx - ux * along;
-    const offy = qy - uy * along;
-    const offz = qz - uz * along;
-    const radius = Math.hypot(offx, offy, offz);
-    if (radius <= profile.radius && (!best || tt < best.dist)) best = { site, tile, dist: tt };
   }
   return best;
 }

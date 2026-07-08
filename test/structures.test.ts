@@ -2,34 +2,28 @@ import { describe, expect, it } from 'vitest';
 import {
   addStructure,
   canPlaceStructure,
-  caveAnchorKindLabel,
   chestStorageView,
-  consumeWaterlineRouteResupply,
   dismantleStructure,
   homeScore,
-  houseKitSocketCatalog,
   interactStructure,
-  k4UtilitySocketCatalog,
   normalizeStructureSaves,
   normalizeStructureYaw,
   relocateStructure,
-  rotateStructure,
   rootCellarProvisionCapacity,
   rootCellarProvisionCount,
+  rotateStructure,
   shelterReport,
-  spendRootCellarProvision,
   spendPlacedItem,
+  spendRootCellarProvision,
   STRUCTURE_YAW_STEP,
+  structureSocketCatalog,
   structureSocketOccupancy,
   structureSocketPlacement,
   structureSocketSpec,
-  structureTraversalBlocker,
   structureYawTurn,
   structureStationInventory,
   transferChestMaterial,
-  wallShellSocketCatalog,
   waystoneMarkLabel,
-  type CropPlotEnvironment,
   type StructureTopology,
   type StructureSave,
 } from '../src/sim/structures';
@@ -41,102 +35,26 @@ describe('Hearth and Horizon structures', () => {
     neighbor: (tile, edge) => (tile === 100 ? 101 + edge : 100),
   };
 
-  const multiRoomTopology: StructureTopology = (() => {
-    const links = new Map<string, number>();
-    const set = (tile: number, edge: number, neighbor: number) => {
-      links.set(`${tile}:${edge}`, neighbor);
-    };
-    const addExterior = (tile: number, edge: number) => {
-      const exterior = tile * 10 + edge;
-      set(tile, edge, exterior);
-      set(exterior, (edge + 3) % 6, tile);
-    };
-    for (const tile of [100, 101, 102, 103]) {
-      for (let edge = 0; edge < 6; edge++) addExterior(tile, edge);
-    }
-    set(100, 0, 101);
-    set(101, 3, 100);
-    set(100, 2, 103);
-    set(103, 5, 100);
-    set(100, 3, 102);
-    set(102, 0, 100);
-    return {
-      degreeOf: () => 6,
-      neighbor: (tile, edge) => links.get(`${tile}:${edge}`) ?? tile,
-    };
-  })();
-
-  const irregularRoomTopology: StructureTopology = (() => {
-    const links = new Map<string, number>();
-    const set = (tile: number, edge: number, neighbor: number) => {
-      links.set(`${tile}:${edge}`, neighbor);
-    };
-    const addExterior = (tile: number, edge: number) => {
-      const exterior = tile * 10 + edge;
-      set(tile, edge, exterior);
-      set(exterior, (edge + 3) % 6, tile);
-    };
-    for (const tile of [200, 201, 202, 203, 204, 205]) {
-      for (let edge = 0; edge < 6; edge++) addExterior(tile, edge);
-    }
-    set(200, 0, 201);
-    set(201, 3, 200);
-    set(200, 2, 202);
-    set(202, 5, 200);
-    set(201, 1, 203);
-    set(203, 4, 201);
-    set(201, 5, 204);
-    set(204, 2, 201);
-    set(202, 3, 205);
-    set(205, 0, 202);
-    return {
-      degreeOf: () => 6,
-      neighbor: (tile, edge) => links.get(`${tile}:${edge}`) ?? tile,
-    };
-  })();
-
-  it('normalizes save data and rejects invalid or duplicate placed props', () => {
+  it('normalizes save data and rejects unknown, invalid, or duplicate placed props', () => {
     const raw = [
       { id: 4, item: 'campfire', tile: 10, layer: 3, yaw: 0.5 },
       { id: 4, item: 'chest', tile: 11, layer: 4, yaw: 1, state: { storage: { wood: 3, nope: 9 } } },
-      { id: 12, item: 'floorFoundation', tile: 12, layer: 4, yaw: 0.2, state: { lit: true } },
-      { id: 13, item: 'wallPanel', tile: 13, layer: 4, yaw: 0.4, state: { storage: { wood: 5 } } },
-      { id: 14, item: 'wallHalfRail', tile: 14, layer: 4, yaw: 0.6 },
-      { id: 15, item: 'wallDoorPanel', tile: 15, layer: 4, yaw: 0.8, state: { lit: true } },
-      { id: 16, item: 'wallWindowPanel', tile: 16, layer: 4, yaw: 1, state: { storage: { wood: 1 } } },
-      { id: 17, item: 'wallCorner', tile: 17, layer: 4, yaw: 1.2, state: { home: true } },
-      { id: 18, item: 'roofJoin', tile: 18, layer: 4, yaw: 1.4, state: { water: 3 } },
-      { id: 19, item: 'wallPanel', tile: 20, layer: 4, yaw: 0 },
-      { id: 20, item: 'wallWindowPanel', tile: 20, layer: 4, yaw: STRUCTURE_YAW_STEP },
-      { id: 21, item: 'wallDoorPanel', tile: 20, layer: 4, yaw: 0 },
       { id: 7, item: 'missingThing', tile: 12, layer: 4, yaw: 1 },
       { id: 8, item: 'bedroll', tile: 10, layer: 4, yaw: 1 },
-      { id: 9, item: 'lantern', tile: 999, layer: 4, yaw: 1 },
+      { id: 9, item: 'workbench', tile: 999, layer: 4, yaw: 1 },
+      { id: 10, item: 'workbench', tile: 12, layer: 4, yaw: 1, state: { lit: true, home: true, storage: { wood: 1 }, rested: 2 } },
     ];
 
     const structures = normalizeStructureSaves(raw, 100, 20);
     expect(structures).toEqual([
       { id: 4, item: 'campfire', tile: 10, layer: 3, yaw: 0.5 },
       { id: 5, item: 'chest', tile: 11, layer: 4, yaw: 1, state: { storage: { wood: 3 } } },
-      { id: 12, item: 'floorFoundation', tile: 12, layer: 4, yaw: 0.2 },
-      { id: 13, item: 'wallPanel', tile: 13, layer: 4, yaw: 0.4 },
-      { id: 14, item: 'wallHalfRail', tile: 14, layer: 4, yaw: 0.6 },
-      { id: 15, item: 'wallDoorPanel', tile: 15, layer: 4, yaw: 0.8 },
-      { id: 16, item: 'wallWindowPanel', tile: 16, layer: 4, yaw: 1 },
-      { id: 17, item: 'wallCorner', tile: 17, layer: 4, yaw: 1.2 },
-      { id: 18, item: 'roofJoin', tile: 18, layer: 4, yaw: 1.4 },
-      { id: 19, item: 'wallPanel', tile: 20, layer: 4, yaw: 0 },
-      { id: 20, item: 'wallWindowPanel', tile: 20, layer: 4, yaw: STRUCTURE_YAW_STEP },
+      { id: 10, item: 'workbench', tile: 12, layer: 4, yaw: 1 },
     ]);
-    expect(structureSocketOccupancy(structures.find((entry) => entry.id === 19)!)).toMatchObject({
-      kind: 'edge',
-      tile: 20,
-      occupancyKeys: ['20:edge:0'],
-    });
-    expect(structureSocketOccupancy(structures.find((entry) => entry.id === 20)!)).toMatchObject({
-      kind: 'edge',
-      tile: 20,
-      occupancyKeys: ['20:edge:1'],
+    expect(structureSocketOccupancy(structures[0])).toMatchObject({
+      kind: 'center',
+      tile: 10,
+      occupancyKeys: ['10:center'],
     });
   });
 
@@ -170,191 +88,95 @@ describe('Hearth and Horizon structures', () => {
     expect(spendPlacedItem(items, 'campfire')).toBe(false);
   });
 
-  it('allows same-tile building edges when sockets do not overlap', () => {
+  it('only allows one placeable prop per hex tile', () => {
     const structures: StructureSave[] = [];
-    const foundation = addStructure(structures, { item: 'floorFoundation', tile: 30, layer: 2, yaw: 0 })!;
-    const wall = addStructure(structures, { item: 'wallPanel', tile: 30, layer: 2, yaw: 0 })!;
-    const window = addStructure(structures, { item: 'wallWindowPanel', tile: 30, layer: 2, yaw: STRUCTURE_YAW_STEP })!;
-
-    expect(foundation).toMatchObject({ item: 'floorFoundation', tile: 30 });
-    expect(structureSocketPlacement(foundation)).toMatchObject({ kind: 'floor', occupies: ['floor'] });
-    expect(structureSocketPlacement(wall)).toMatchObject({ kind: 'edge', edge: 0, occupies: ['edge:0'] });
-    expect(structureSocketPlacement(window)).toMatchObject({ kind: 'edge', edge: 1, occupies: ['edge:1'] });
-    const campfire = addStructure(structures, { item: 'campfire', tile: 30, layer: 2, yaw: 0 });
-    expect(campfire).toMatchObject({ item: 'campfire', tile: 30 });
-    expect(addStructure(structures, { item: 'workbench', tile: 30, layer: 2, yaw: 0 })).toBeNull();
-    expect(addStructure(structures, { item: 'floorFoundation', tile: 30, layer: 2, yaw: 0 })).toBeNull();
-    expect(addStructure(structures, { item: 'wallDoorPanel', tile: 30, layer: 2, yaw: 0 })).toBeNull();
-    expect(addStructure(structures, { item: 'wallCorner', tile: 30, layer: 2, yaw: STRUCTURE_YAW_STEP })).toBeNull();
-
-    const corner = addStructure(structures, { item: 'wallCorner', tile: 30, layer: 2, yaw: STRUCTURE_YAW_STEP * 2 })!;
-    expect(structureSocketPlacement(corner)).toMatchObject({ kind: 'edge', edge: 2, occupies: ['edge:2', 'edge:3'] });
-    expect(canPlaceStructure(structures, 30, 'wallHalfRail', STRUCTURE_YAW_STEP * 4)).toBe(true);
-    expect(canPlaceStructure(structures, 30, 'wallHalfRail', STRUCTURE_YAW_STEP * 2)).toBe(false);
+    const bench = addStructure(structures, { item: 'workbench', tile: 30, layer: 2, yaw: 0 })!;
+    expect(bench).toMatchObject({ item: 'workbench', tile: 30 });
+    expect(structureSocketPlacement(bench)).toMatchObject({ kind: 'center', occupies: ['center'] });
+    expect(addStructure(structures, { item: 'campfire', tile: 30, layer: 2, yaw: 0 })).toBeNull();
+    expect(addStructure(structures, { item: 'chest', tile: 31, layer: 2, yaw: 0 })).not.toBeNull();
+    expect(canPlaceStructure(structures, 30, 'bedroll')).toBe(false);
+    expect(canPlaceStructure(structures, 32, 'bedroll')).toBe(true);
   });
 
-  it('blocks wall-shell sockets that point past a pentagon tile degree', () => {
-    const pentagonTopology: StructureTopology = {
-      degreeOf: (tile) => (tile === 50 || tile === 51 ? 5 : 6),
-      neighbor: (tile, edge) => tile * 10 + edge,
-    };
-    const structures: StructureSave[] = [];
-
-    expect(canPlaceStructure(structures, 50, 'wallPanel', STRUCTURE_YAW_STEP * 4, pentagonTopology)).toBe(true);
-    expect(canPlaceStructure(structures, 50, 'wallPanel', STRUCTURE_YAW_STEP * 5, pentagonTopology)).toBe(false);
-    expect(canPlaceStructure(structures, 50, 'wallCorner', STRUCTURE_YAW_STEP * 3, pentagonTopology)).toBe(true);
-    expect(canPlaceStructure(structures, 50, 'wallCorner', STRUCTURE_YAW_STEP * 4, pentagonTopology)).toBe(false);
-
-    const wall = addStructure(structures, { item: 'wallPanel', tile: 50, layer: 2, yaw: STRUCTURE_YAW_STEP * 4 }, pentagonTopology)!;
-    expect(addStructure(structures, { item: 'wallPanel', tile: 50, layer: 2, yaw: STRUCTURE_YAW_STEP * 5 }, pentagonTopology)).toBeNull();
-    expect(rotateStructure(structures, wall.id, 1, pentagonTopology)).toMatchObject({
-      ok: false,
-      blockers: ['invalid edge socket'],
-      message: 'wall panel needs a real hex edge',
-    });
-    expect(relocateStructure(structures, wall.id, { tile: 51, layer: 2, yaw: STRUCTURE_YAW_STEP * 5 }, pentagonTopology)).toMatchObject({
-      ok: false,
-      blockers: ['invalid edge socket'],
-      message: 'wall panel needs a real hex edge',
-    });
-  });
-
-  it('blocks player traversal across full wall-shell edge sockets', () => {
-    const topology: StructureTopology = {
-      degreeOf: () => 6,
-      neighbor: (tile, edge) => {
-        if (tile === 30 && edge === 0) return 31;
-        if (tile === 30 && edge === 1) return 32;
-        if (tile === 30 && edge === 2) return 33;
-        if (tile === 31 && edge === 3) return 30;
-        if (tile === 32 && edge === 4) return 30;
-        if (tile === 33 && edge === 5) return 30;
-        return tile * 10 + edge;
-      },
-    };
-    const structures: StructureSave[] = [
-      { id: 1, item: 'floorFoundation', tile: 30, layer: 2, yaw: 0 },
-      { id: 2, item: 'wallPanel', tile: 30, layer: 2, yaw: 0 },
-      { id: 3, item: 'wallWindowPanel', tile: 30, layer: 2, yaw: STRUCTURE_YAW_STEP },
-      { id: 4, item: 'wallDoorPanel', tile: 30, layer: 2, yaw: STRUCTURE_YAW_STEP * 2 },
-    ];
-
-    expect(structureTraversalBlocker(structures, topology, 30, 31)).toMatchObject({
-      item: 'wallPanel',
-      tile: 30,
-      edge: 0,
-      slot: 'edge:0',
-      message: 'wall panel blocks that edge',
-    });
-    expect(structureTraversalBlocker(structures, topology, 31, 30)).toMatchObject({
-      item: 'wallPanel',
-      tile: 30,
-      edge: 0,
-      slot: 'edge:0',
-    });
-    expect(structureTraversalBlocker(structures, topology, 30, 32)).toMatchObject({
-      item: 'wallWindowPanel',
-      edge: 1,
-      slot: 'edge:1',
-    });
-    expect(structureTraversalBlocker(structures, topology, 30, 33)).toBeNull();
-  });
-
-  it('treats door panels and rails as passable while corners block both owned edges', () => {
-    const topology: StructureTopology = {
-      degreeOf: () => 6,
-      neighbor: (tile, edge) => {
-        if (tile === 40 && edge === 0) return 41;
-        if (tile === 40 && edge === 1) return 42;
-        if (tile === 40 && edge === 2) return 43;
-        if (tile === 41 && edge === 3) return 40;
-        if (tile === 42 && edge === 4) return 40;
-        if (tile === 43 && edge === 5) return 40;
-        return tile * 10 + edge;
-      },
-    };
-
-    expect(structureTraversalBlocker([
-      { id: 1, item: 'wallDoorPanel', tile: 40, layer: 2, yaw: 0 },
-      { id: 2, item: 'wallHalfRail', tile: 40, layer: 2, yaw: STRUCTURE_YAW_STEP },
-    ], topology, 40, 41)).toBeNull();
-    expect(structureTraversalBlocker([
-      { id: 1, item: 'wallDoorPanel', tile: 40, layer: 2, yaw: 0 },
-      { id: 2, item: 'wallHalfRail', tile: 40, layer: 2, yaw: STRUCTURE_YAW_STEP },
-    ], topology, 40, 42)).toBeNull();
-
-    const cornerStructures: StructureSave[] = [
-      { id: 3, item: 'wallCorner', tile: 40, layer: 2, yaw: 0 },
-    ];
-    expect(structureTraversalBlocker(cornerStructures, topology, 40, 41)).toMatchObject({ item: 'wallCorner', edge: 0, slot: 'edge:0' });
-    expect(structureTraversalBlocker(cornerStructures, topology, 40, 42)).toMatchObject({ item: 'wallCorner', edge: 1, slot: 'edge:1' });
-    expect(structureTraversalBlocker(cornerStructures, topology, 40, 43)).toBeNull();
+  it('defines code-owned socket dimensions for the surviving core props', () => {
+    const workbench = structureSocketSpec('workbench');
+    expect(workbench).toMatchObject({ item: 'workbench', role: 'crafting-station', pivot: 'center', collider: 'hex-cell' });
+    const campfire = structureSocketSpec('campfire');
+    expect(campfire).toMatchObject({ role: 'warmth-station' });
+    const chest = structureSocketSpec('chest');
+    expect(chest).toMatchObject({ role: 'storage-station' });
+    const bedroll = structureSocketSpec('bedroll');
+    expect(bedroll).toMatchObject({ role: 'home-rest' });
+    expect(structureSocketCatalog().map((spec) => spec.item)).toEqual([
+      'workbench', 'campfire', 'chest', 'bedroll',
+      'rainCistern', 'rootCellar', 'dockSegment', 'fishTrap', 'shoreNet', 'dryingRack', 'weatherVane', 'lantern', 'waystone',
+    ]);
   });
 
   it('normalizes and rotates placed props in hex-facing steps', () => {
     const structures: StructureSave[] = [];
-    const door = addStructure(structures, { item: 'doorKit', tile: 6, layer: 2, yaw: -STRUCTURE_YAW_STEP })!;
-    expect(door.yaw).toBeCloseTo(Math.PI * 2 - STRUCTURE_YAW_STEP);
-    expect(structureYawTurn(door.yaw)).toBe(5);
+    const bench = addStructure(structures, { item: 'workbench', tile: 6, layer: 2, yaw: -STRUCTURE_YAW_STEP })!;
+    expect(bench.yaw).toBeCloseTo(Math.PI * 2 - STRUCTURE_YAW_STEP);
+    expect(structureYawTurn(bench.yaw)).toBe(5);
 
-    expect(rotateStructure(structures, door.id, 2)).toMatchObject({
+    expect(rotateStructure(structures, bench.id, 2)).toMatchObject({
       ok: true,
-      id: door.id,
-      item: 'doorKit',
+      id: bench.id,
+      item: 'workbench',
       turn: 1,
-      message: 'rotated door kit to hex face 2',
+      message: 'rotated workbench to hex face 2',
     });
-    expect(door.yaw).toBeCloseTo(STRUCTURE_YAW_STEP);
-    expect(rotateStructure(structures, door.id, -1)).toMatchObject({ ok: true, turn: 0 });
-    expect(door.yaw).toBeCloseTo(0);
+    expect(bench.yaw).toBeCloseTo(STRUCTURE_YAW_STEP);
+    expect(rotateStructure(structures, bench.id, -1)).toMatchObject({ ok: true, turn: 0 });
+    expect(bench.yaw).toBeCloseTo(0);
     expect(rotateStructure(structures, 999, 1)).toEqual({ ok: false, message: 'no structure' });
 
-    const normalized = normalizeStructureSaves([{ id: 4, item: 'windowFrame', tile: 8, layer: 2, yaw: Math.PI * 3 }], 20, 8);
+    const normalized = normalizeStructureSaves([{ id: 4, item: 'chest', tile: 8, layer: 2, yaw: Math.PI * 3 }], 20, 8);
     expect(normalized[0].yaw).toBeCloseTo(Math.PI);
     expect(normalizeStructureYaw(Number.NaN)).toBe(0);
   });
 
-  it('relocates only inactive props across the snap grid while preserving identity and state', () => {
+  it('relocates props across the snap grid while preserving identity and state', () => {
     const structures: StructureSave[] = [];
-    const door = addStructure(structures, { item: 'doorKit', tile: 6, layer: 2, yaw: STRUCTURE_YAW_STEP })!;
-    const window = addStructure(structures, { item: 'windowFrame', tile: 6, layer: 2, yaw: 0 })!;
+    const bench = addStructure(structures, { item: 'workbench', tile: 6, layer: 2, yaw: STRUCTURE_YAW_STEP })!;
+    const other = addStructure(structures, { item: 'campfire', tile: 9, layer: 2, yaw: 0 })!;
     const chest = addStructure(structures, { item: 'chest', tile: 8, layer: 2, yaw: 0 })!;
     chest.state = { storage: { wood: 2 } };
 
-    expect(relocateStructure(structures, door.id, { tile: 6, layer: 2, yaw: 0 })).toMatchObject({
+    expect(relocateStructure(structures, bench.id, { tile: 9, layer: 2 })).toMatchObject({
       ok: false,
-      id: door.id,
-      item: 'doorKit',
+      id: bench.id,
+      item: 'workbench',
       fromTile: 6,
-      toTile: 6,
-      message: 'door kit edge is occupied',
-      blockers: ['occupied edge socket'],
+      toTile: 9,
+      message: 'that hex already has a prop',
+      blockers: ['occupied snap target'],
     });
-    expect(relocateStructure(structures, door.id, { tile: 6, layer: 2 })).toMatchObject({
+    expect(relocateStructure(structures, bench.id, { tile: 6, layer: 2, yaw: STRUCTURE_YAW_STEP })).toMatchObject({
       ok: false,
-      id: door.id,
-      item: 'doorKit',
+      id: bench.id,
+      item: 'workbench',
       fromTile: 6,
       toTile: 6,
-      message: 'door kit already on that snap hex',
+      message: 'workbench already on that snap hex',
       blockers: ['same snap target'],
     });
 
-    const moved = relocateStructure(structures, door.id, { tile: 10, layer: 3 });
+    const moved = relocateStructure(structures, bench.id, { tile: 10, layer: 3 });
     expect(moved).toMatchObject({
       ok: true,
-      id: door.id,
-      item: 'doorKit',
+      id: bench.id,
+      item: 'workbench',
       fromTile: 6,
       fromLayer: 2,
       toTile: 10,
       toLayer: 3,
       turn: 1,
-      message: 'moved door kit to snap hex',
+      message: 'moved workbench to snap hex',
     });
-    expect(door).toMatchObject({ id: 1, item: 'doorKit', tile: 10, layer: 3 });
-    expect(door.yaw).toBeCloseTo(STRUCTURE_YAW_STEP);
-    expect(window).toMatchObject({ id: 2, item: 'windowFrame', tile: 6 });
+    expect(bench).toMatchObject({ id: 1, item: 'workbench', tile: 10, layer: 3 });
+    expect(other).toMatchObject({ id: 2, item: 'campfire', tile: 9 });
 
     expect(relocateStructure(structures, chest.id, { tile: 12, layer: 2 })).toMatchObject({
       ok: false,
@@ -365,743 +187,6 @@ describe('Hearth and Horizon structures', () => {
       message: 'chest cannot be moved · empty chest first',
     });
     expect(chest).toMatchObject({ tile: 8, layer: 2, state: { storage: { wood: 2 } } });
-  });
-
-  it('defines code-owned house-kit socket dimensions before modular GLB snapping', () => {
-    const catalog = houseKitSocketCatalog();
-    expect(catalog.map((entry) => entry.item)).toEqual(['doorKit', 'windowFrame', 'roofBundle']);
-    expect(structureSocketSpec('doorKit')).toMatchObject({
-      role: 'wall-opening',
-      modularKit: true,
-      gridWidth: 1,
-      collider: 'thin-wall',
-      loadBearing: 'code-socket',
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-    expect(structureSocketSpec('windowFrame')).toMatchObject({
-      role: 'wall-light',
-      openingHeight: 0.52,
-      pivot: 'wall-center',
-    });
-    expect(structureSocketSpec('roofBundle')).toMatchObject({
-      role: 'roof-cap',
-      collider: 'roof-shell',
-      gridDepth: 1.12,
-    });
-  });
-
-  it('defines K3 functional prop sockets as code-owned decorative GLB targets', () => {
-    expect(structureSocketSpec('workbench')).toMatchObject({
-      role: 'crafting-station',
-      gridWidth: 1.34,
-      gridDepth: 0.74,
-      loadBearing: 'code-socket',
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-    expect(structureSocketSpec('campfire')).toMatchObject({
-      role: 'warmth-station',
-      height: 0.22,
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-    expect(structureSocketSpec('chest')).toMatchObject({
-      role: 'storage-station',
-      gridDepth: 0.72,
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-    expect(structureSocketSpec('bedroll')).toMatchObject({
-      role: 'home-rest',
-      gridWidth: 1.18,
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-    expect(structureSocketSpec('cropPlot')).toMatchObject({
-      role: 'food-plot',
-      gridWidth: 1.32,
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-    expect(structureSocketSpec('dryingRack')).toMatchObject({
-      role: 'food-preserve',
-      height: 1.05,
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-    expect(structureSocketSpec('weatherVane')).toMatchObject({
-      role: 'weather-readback',
-      gridWidth: 0.5,
-      height: 1.25,
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-  });
-
-  it('defines K4 utility and waterline sockets as code-owned decorative GLB targets', () => {
-    const catalog = k4UtilitySocketCatalog();
-    expect(catalog.map((entry) => entry.item)).toEqual(['compostBin', 'rainCistern', 'rootCellar', 'dockSegment', 'fishTrap', 'shoreNet', 'lantern']);
-    expect(structureSocketSpec('compostBin')).toMatchObject({
-      role: 'compost-station',
-      gridWidth: 1.08,
-      loadBearing: 'code-socket',
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-    expect(structureSocketSpec('rainCistern')).toMatchObject({
-      role: 'water-cistern',
-      height: 1.05,
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-    expect(structureSocketSpec('rootCellar')).toMatchObject({
-      role: 'provision-cache',
-      gridDepth: 1.12,
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-    expect(structureSocketSpec('dockSegment')).toMatchObject({
-      role: 'shore-edge',
-      pivot: 'shore-center',
-      collider: 'edge-strip',
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-    expect(structureSocketSpec('fishTrap')).toMatchObject({
-      role: 'shore-edge',
-      pivot: 'shore-center',
-      collider: 'edge-strip',
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-    expect(structureSocketSpec('shoreNet')).toMatchObject({
-      role: 'shore-edge',
-      gridDepth: 0.22,
-      visualScale: 'normalize approved GLB along one waterline edge with a 90-degree visual correction',
-    });
-    expect(structureSocketSpec('lantern')).toMatchObject({
-      role: 'light-post',
-      height: 1.25,
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-    expect(structureSocketPlacement({ item: 'fishTrap', yaw: STRUCTURE_YAW_STEP * 2 })).toMatchObject({
-      kind: 'edge',
-      edge: 2,
-      occupies: ['edge:2'],
-    });
-    expect(structureSocketPlacement({ item: 'compostBin', yaw: STRUCTURE_YAW_STEP * 2 })).toMatchObject({
-      kind: 'center',
-      occupies: ['center'],
-    });
-  });
-
-  it('defines code-owned wall-shell sockets separately from decorative house-kit inserts', () => {
-    const catalog = wallShellSocketCatalog();
-    expect(catalog.map((entry) => entry.item)).toEqual(['floorFoundation', 'wallPanel', 'wallDoorPanel', 'wallWindowPanel', 'wallCorner', 'wallHalfRail', 'roofJoin']);
-    expect(structureSocketSpec('floorFoundation')).toMatchObject({
-      role: 'foundation',
-      modularKit: true,
-      pivot: 'center',
-      collider: 'hex-cell',
-      loadBearing: 'code-socket',
-      glbPolicy: 'procedural-only',
-    });
-    expect(structureSocketSpec('wallPanel')).toMatchObject({
-      role: 'wall-panel',
-      modularKit: true,
-      pivot: 'wall-center',
-      collider: 'thin-wall',
-      loadBearing: 'code-socket',
-    });
-    expect(structureSocketSpec('wallDoorPanel')).toMatchObject({
-      role: 'wall-opening',
-      modularKit: true,
-      openingHeight: 1.55,
-      pivot: 'wall-center',
-      collider: 'thin-wall',
-      glbPolicy: 'procedural-only',
-    });
-    expect(structureSocketSpec('wallWindowPanel')).toMatchObject({
-      role: 'wall-light',
-      modularKit: true,
-      openingWidth: 0.58,
-      collider: 'thin-wall',
-    });
-    expect(structureSocketSpec('wallCorner')).toMatchObject({
-      role: 'wall-corner',
-      modularKit: true,
-      gridDepth: 0.72,
-      collider: 'thin-wall',
-    });
-    expect(structureSocketSpec('wallHalfRail')).toMatchObject({
-      role: 'half-rail',
-      pivot: 'wall-center',
-      collider: 'thin-wall',
-      visualScale: 'procedural rail stays visibly lower than full walls',
-    });
-    expect(structureSocketSpec('roofJoin')).toMatchObject({
-      role: 'roof-join',
-      modularKit: true,
-      collider: 'roof-shell',
-      loadBearing: 'code-socket',
-    });
-  });
-
-  it('saves dock segments and identifies them as fishing platforms', () => {
-    const structures: StructureSave[] = [];
-    const dock = addStructure(structures, { item: 'dockSegment', tile: 8, layer: 2, yaw: 0.4 })!;
-
-    expect(dock).toMatchObject({ id: 1, item: 'dockSegment', tile: 8, layer: 2 });
-    expect(interactStructure(structures, dock.id, [0, 0, 0, 0, 0])).toMatchObject({
-      ok: true,
-      mode: 'inspect',
-      message: 'dock segment ready · cast here with a fishing rod',
-    });
-
-    const normalized = normalizeStructureSaves([{ id: 4, item: 'dockSegment', tile: 9, layer: 3, yaw: 0.2 }], 20, 8);
-    expect(normalized).toEqual([{ id: 4, item: 'dockSegment', tile: 9, layer: 3, yaw: 0.2 }]);
-  });
-
-  it('sets, checks, collects, and normalizes fish traps', () => {
-    const structures: StructureSave[] = [];
-    const trap = addStructure(structures, { item: 'fishTrap', tile: 15, layer: 2, yaw: 0.1 })!;
-    const materials = [0, 0, 0, 0, 0];
-    const food: InventoryItems = { bait: 1 };
-    const context = (minute: number) => ({
-      day: 2,
-      minute,
-      nearWater: true,
-      school: {
-        kind: 'dock' as const,
-        label: 'baited dock run',
-        strength: 0.72,
-        catchCount: 2,
-        baitUseful: true,
-        usesBait: true,
-        message: 'baited dock catch',
-      },
-    });
-
-    expect(interactStructure(structures, trap.id, materials, food, undefined, undefined, undefined, undefined, undefined, undefined, context(60))).toMatchObject({
-      ok: true,
-      mode: 'setTrap',
-      message: 'baited fish trap set · baited dock run · check after 3h',
-    });
-    expect(food).toEqual({});
-    expect(trap.state).toMatchObject({ trapSetDay: 2, trapSetMinute: 60, trapBaited: true });
-    expect(dismantleStructure(structures, trap.id)).toMatchObject({ ok: false, blockers: ['fish trap is set'] });
-
-    expect(interactStructure(structures, trap.id, materials, food, undefined, undefined, undefined, undefined, undefined, undefined, context(120))).toMatchObject({
-      ok: true,
-      mode: 'checkTrap',
-      message: 'fish trap soaking · 120m until first check · baited dock run',
-    });
-    expect(trap.state).toMatchObject({ trapSetDay: 2, trapSetMinute: 60, trapBaited: true });
-
-    expect(interactStructure(structures, trap.id, materials, food, undefined, undefined, undefined, undefined, undefined, undefined, context(450))).toMatchObject({
-      ok: true,
-      mode: 'collectTrap',
-      moved: { rawFish: 3 },
-      message: 'fish trap hauled raw fish 3 · baited dock run',
-    });
-    expect(food).toEqual({ rawFish: 3 });
-    expect(trap.state).toEqual({ trapChecks: 1 });
-
-    const normalized = normalizeStructureSaves([
-      { id: 8, item: 'fishTrap', tile: 16, layer: 3, yaw: 0.5, state: { trapSetDay: 1.8, trapSetMinute: 89.9, trapBaited: true, trapChecks: 2.4 } },
-    ], 50, 8);
-    expect(normalized).toEqual([{ id: 8, item: 'fishTrap', tile: 16, layer: 3, yaw: 0.5, state: { trapSetDay: 1, trapSetMinute: 89, trapBaited: true, trapChecks: 2 } }]);
-  });
-
-  it('sets, combs, collects, blocks packing, and normalizes shore nets', () => {
-    const structures: StructureSave[] = [];
-    const net = addStructure(structures, { item: 'shoreNet', tile: 17, layer: 2, yaw: 0.15 })!;
-    const materials = [0, 0, 0, 0, 0];
-    const food: InventoryItems = {};
-    const context = (minute: number) => ({
-      day: 3,
-      minute,
-      nearWater: true,
-      school: {
-        kind: 'run' as const,
-        label: 'reed-water fish run',
-        strength: 0.68,
-        catchCount: 2,
-        baitUseful: true,
-        usesBait: false,
-        message: 'reed-water run',
-      },
-    });
-
-    expect(interactStructure(structures, net.id, materials, food, undefined, undefined, undefined, undefined, undefined, undefined, context(40))).toMatchObject({
-      ok: true,
-      mode: 'setNet',
-      message: 'shore net set · reed-water fish run · comb after 150m',
-    });
-    expect(net.state).toMatchObject({ netSetDay: 3, netSetMinute: 40 });
-    expect(dismantleStructure(structures, net.id)).toMatchObject({ ok: false, blockers: ['shore net is set'] });
-
-    expect(interactStructure(structures, net.id, materials, food, undefined, undefined, undefined, undefined, undefined, undefined, context(80))).toMatchObject({
-      ok: true,
-      mode: 'checkNet',
-      message: 'shore net soaking · 110m until first comb · reed-water fish run',
-    });
-    expect(food).toEqual({});
-
-    expect(interactStructure(structures, net.id, materials, food, undefined, undefined, undefined, undefined, undefined, undefined, context(230))).toMatchObject({
-      ok: true,
-      mode: 'collectNet',
-      moved: { rawFish: 2, reeds: 1, bait: 1 },
-      message: 'shore net hauled raw fish 2, reeds 1, bait 1 · reed-water fish run',
-    });
-    expect(food).toEqual({ rawFish: 2, reeds: 1, bait: 1 });
-    expect(net.state).toEqual({ netChecks: 1 });
-
-    const normalized = normalizeStructureSaves([
-      { id: 9, item: 'shoreNet', tile: 18, layer: 3, yaw: 0.5, state: { netSetDay: 2.8, netSetMinute: 70.9, netChecks: 3.5 } },
-    ], 50, 8);
-    expect(normalized).toEqual([{ id: 9, item: 'shoreNet', tile: 18, layer: 3, yaw: 0.5, state: { netSetDay: 2, netSetMinute: 70, netChecks: 3 } }]);
-  });
-
-  it('consumes staged waterline route sources without awarding duplicate inventory', () => {
-    const structures: StructureSave[] = [
-      { id: 1, item: 'fishTrap', tile: 10, layer: 2, yaw: 0, state: { trapSetDay: 4, trapSetMinute: 120, trapBaited: true, trapChecks: 2 } },
-      { id: 2, item: 'shoreNet', tile: 11, layer: 2, yaw: 0, state: { netSetDay: 4, netSetMinute: 130, netChecks: 1 } },
-      { id: 3, item: 'fishTrap', tile: 12, layer: 2, yaw: 0, state: { trapSetDay: 4, trapSetMinute: 140, trapBaited: true, trapChecks: 0 } },
-      { id: 4, item: 'shoreNet', tile: 13, layer: 2, yaw: 0 },
-    ];
-    const food: InventoryItems = {};
-
-    const result = consumeWaterlineRouteResupply(structures, [
-      { id: 1, kind: 'fishTrap' },
-      { id: 2, kind: 'shoreNet' },
-      { id: 2, kind: 'shoreNet' },
-      { id: 3, kind: 'shoreNet' },
-      { id: 4, kind: 'shoreNet' },
-    ]);
-
-    expect(result).toEqual({ consumed: 2, traps: 1, nets: 1, sourceIds: [1, 2] });
-    expect(food).toEqual({});
-    expect(structures[0].state).toEqual({ trapChecks: 3 });
-    expect(structures[1].state).toEqual({ netChecks: 2 });
-    expect(structures[2].state).toEqual({ trapSetDay: 4, trapSetMinute: 140, trapBaited: true, trapChecks: 0 });
-    expect(structures[3].state).toBeUndefined();
-  });
-
-  it('uses drying racks to preserve fish into trail rations', () => {
-    const structures: StructureSave[] = [];
-    const rack = addStructure(structures, { item: 'dryingRack', tile: 18, layer: 2, yaw: 0 })!;
-    const materials = [0, 0, 0, 0, 0];
-    const food: InventoryItems = { rawFish: 2, kelp: 1, snowHerb: 1 };
-
-    expect(interactStructure(structures, rack.id, materials, food)).toMatchObject({
-      ok: true,
-      mode: 'preserve',
-      moved: { trailRation: 2 },
-      message: 'dried trail rations 2 · kelp',
-    });
-    expect(food).toEqual({ rawFish: 1, snowHerb: 1, trailRation: 2 });
-    expect(rack.state).toMatchObject({ preserves: 1 });
-
-    expect(interactStructure(structures, rack.id, materials, food)).toMatchObject({
-      ok: true,
-      mode: 'preserve',
-      moved: { trailRation: 2 },
-      message: 'dried trail rations 2 · snow herb',
-    });
-    expect(food).toEqual({ trailRation: 4 });
-    expect(rack.state).toMatchObject({ preserves: 2 });
-
-    expect(interactStructure(structures, rack.id, materials, food)).toMatchObject({
-      ok: false,
-      mode: 'inspect',
-      message: 'drying rack needs raw fish',
-    });
-
-    const normalized = normalizeStructureSaves([
-      { id: 7, item: 'dryingRack', tile: 19, layer: 3, yaw: 0.5, state: { preserves: 2.8 } },
-    ], 20, 8);
-    expect(normalized).toEqual([{ id: 7, item: 'dryingRack', tile: 19, layer: 3, yaw: 0.5, state: { preserves: 2 } }]);
-  });
-
-  it('uses reeds as drying-rack wraps for trail rations', () => {
-    const structures: StructureSave[] = [];
-    const rack = addStructure(structures, { item: 'dryingRack', tile: 20, layer: 2, yaw: 0 })!;
-    const food: InventoryItems = { rawFish: 1, reeds: 1 };
-
-    expect(interactStructure(structures, rack.id, [0, 0, 0, 0, 0], food)).toMatchObject({
-      ok: true,
-      mode: 'preserve',
-      moved: { trailRation: 2 },
-      message: 'dried trail rations 2 · reeds',
-    });
-    expect(food).toEqual({ trailRation: 2 });
-    expect(rack.state).toMatchObject({ preserves: 1 });
-  });
-
-  it('reads and normalizes weather vanes as forecast instruments', () => {
-    const structures: StructureSave[] = [];
-    const vane = addStructure(structures, { item: 'weatherVane', tile: 23, layer: 2, yaw: 0.2 })!;
-
-    const result = interactStructure(structures, vane.id, [0, 0, 0, 0, 0], undefined, undefined, undefined, undefined, {
-      kind: 'storm',
-      label: 'storm front',
-      intensity: 0.84,
-    });
-    expect(result).toMatchObject({
-      ok: true,
-      mode: 'forecast',
-      message: 'weather vane reads storm front · storm timing marked',
-    });
-    expect(vane.state).toMatchObject({
-      forecastReads: 1,
-      forecastKind: 'storm',
-      forecastLabel: 'storm front',
-      forecastIntensity: 0.84,
-    });
-
-    const normalized = normalizeStructureSaves([
-      { id: 11, item: 'weatherVane', tile: 24, layer: 3, yaw: 0.5, state: { forecastReads: 2.8, forecastKind: 'cold', forecastLabel: ' ridge cold ', forecastIntensity: 1.5 } },
-    ], 50, 8);
-    expect(normalized).toEqual([{ id: 11, item: 'weatherVane', tile: 24, layer: 3, yaw: 0.5, state: { forecastReads: 2, forecastKind: 'cold', forecastLabel: 'ridge cold', forecastIntensity: 1 } }]);
-  });
-
-  it('turns scraps into compost and feeds crop fertility', () => {
-    const structures: StructureSave[] = [];
-    const bin = addStructure(structures, { item: 'compostBin', tile: 25, layer: 2, yaw: 0 })!;
-    const plot = addStructure(structures, { item: 'cropPlot', tile: 26, layer: 2, yaw: 0 })!;
-    const materials = [0, 0, 0, 0, 0];
-    const food: InventoryItems = { kelp: 1, seeds: 1 };
-
-    expect(interactStructure(structures, bin.id, materials, food)).toMatchObject({
-      ok: true,
-      mode: 'compost',
-      moved: { compost: 2 },
-      message: 'turned kelp into compost 2',
-    });
-    expect(food).toEqual({ seeds: 1, compost: 2 });
-    expect(bin.state).toMatchObject({ composts: 1 });
-
-    expect(interactStructure(structures, plot.id, materials, food)).toMatchObject({ ok: true, mode: 'plant' });
-    expect(food).toEqual({ compost: 2 });
-    expect(plot.state).toMatchObject({ crop: 'berries', growth: 1 });
-
-    expect(interactStructure(structures, plot.id, materials, food)).toMatchObject({
-      ok: true,
-      mode: 'fertilize',
-      moved: { compost: 1 },
-      message: 'fed compost to berry plot · fertility 1/2',
-    });
-    expect(food).toEqual({ compost: 1 });
-    expect(plot.state).toMatchObject({ fertility: 1 });
-
-    expect(interactStructure(structures, plot.id, materials, food, undefined, {
-      watered: false,
-      sheltered: false,
-      protected: false,
-      lit: true,
-      warm: false,
-      cold: false,
-      storm: false,
-      highAltitude: false,
-      label: 'dry composted plot',
-    })).toMatchObject({ ok: true, mode: 'fertilize' });
-    expect(food).toEqual({});
-    expect(plot.state).toMatchObject({ fertility: 2 });
-
-    expect(interactStructure(structures, plot.id, materials, food, undefined, {
-      watered: false,
-      sheltered: false,
-      protected: false,
-      lit: true,
-      warm: false,
-      cold: false,
-      storm: false,
-      highAltitude: false,
-      label: 'dry composted plot',
-    })).toMatchObject({ ok: true, mode: 'tend' });
-    expect(plot.state?.growth).toBe(3);
-
-    const harvest = interactStructure(structures, plot.id, materials, food, undefined, {
-      watered: true,
-      sheltered: true,
-      protected: true,
-      lit: true,
-      warm: true,
-      cold: false,
-      storm: false,
-      highAltitude: false,
-      label: 'watered protected fertile plot',
-    });
-    expect(harvest).toMatchObject({ ok: true, mode: 'harvest', moved: { berries: 6, seeds: 3 } });
-    expect(food).toEqual({ berries: 6, seeds: 3 });
-    expect(plot.state).toMatchObject({ crop: 'berries', growth: 1, fertility: 1, harvests: 1 });
-
-    const normalized = normalizeStructureSaves([
-      { id: 12, item: 'compostBin', tile: 27, layer: 3, yaw: 0.5, state: { composts: 2.8 } },
-      { id: 13, item: 'cropPlot', tile: 28, layer: 3, yaw: 0.5, state: { crop: 'berries', growth: 3, fertility: 2.9, harvests: 1 } },
-    ], 50, 8);
-    expect(normalized).toEqual([
-      { id: 12, item: 'compostBin', tile: 27, layer: 3, yaw: 0.5, state: { composts: 2 } },
-      { id: 13, item: 'cropPlot', tile: 28, layer: 3, yaw: 0.5, state: { crop: 'berries', growth: 3, fertility: 2, harvests: 1 } },
-    ]);
-  });
-
-  it('plants waterline reed beds as crop variety and harvests reeds plus bait scraps', () => {
-    const structures: StructureSave[] = [];
-    const plot = addStructure(structures, { item: 'cropPlot', tile: 32, layer: 2, yaw: 0 })!;
-    const materials = [0, 0, 0, 0, 0];
-    const food: InventoryItems = { reeds: 1, compost: 1 };
-    const shoreEnv: CropPlotEnvironment = {
-      watered: true,
-      naturalWater: true,
-      sheltered: false,
-      protected: false,
-      lit: true,
-      warm: false,
-      cold: true,
-      storm: true,
-      highAltitude: false,
-      label: 'shore storm water',
-    };
-
-    expect(interactStructure(structures, plot.id, materials, food, undefined, shoreEnv)).toMatchObject({
-      ok: true,
-      mode: 'plantReeds',
-      message: 'planted reed slips · shore storm water · reed bed',
-    });
-    expect(food).toEqual({ compost: 1 });
-    expect(plot.state).toMatchObject({ crop: 'reeds', growth: 1 });
-
-    expect(interactStructure(structures, plot.id, materials, food, undefined, shoreEnv)).toMatchObject({
-      ok: true,
-      mode: 'fertilize',
-      moved: { compost: 1 },
-      message: 'fed compost to reed bed · fertility 1/2',
-    });
-    expect(interactStructure(structures, plot.id, materials, food, undefined, shoreEnv)).toMatchObject({
-      ok: true,
-      mode: 'tend',
-      message: 'reed bed ready to harvest · shore storm water · reed bed · composted',
-    });
-
-    const harvest = interactStructure(structures, plot.id, materials, food, undefined, shoreEnv);
-    expect(harvest).toMatchObject({
-      ok: true,
-      mode: 'harvest',
-      moved: { reeds: 5, bait: 1 },
-      message: 'cut reeds 5 · bait 1 · shore storm water · reed bed · composted',
-    });
-    expect(food).toEqual({ reeds: 5, bait: 1 });
-    expect(plot.state).toMatchObject({ crop: 'reeds', growth: 1, harvests: 1 });
-
-    const normalized = normalizeStructureSaves([
-      { id: 14, item: 'cropPlot', tile: 33, layer: 3, yaw: 0.5, state: { crop: 'reeds', growth: 2.8, fertility: 1, harvests: 3 } },
-    ], 50, 8);
-    expect(normalized).toEqual([
-      { id: 14, item: 'cropPlot', tile: 33, layer: 3, yaw: 0.5, state: { crop: 'reeds', growth: 2, fertility: 1, harvests: 3 } },
-    ]);
-  });
-
-  it('catches storm water and irrigates dry inland crop plots', () => {
-    const structures: StructureSave[] = [];
-    const plot = addStructure(structures, { item: 'cropPlot', tile: 40, layer: 2, yaw: 0 })!;
-    const cistern = addStructure(structures, { item: 'rainCistern', tile: 41, layer: 2, yaw: 0 })!;
-    const localTopology: StructureTopology = {
-      degreeOf: (tile) => (tile === 40 || tile === 41 ? 1 : 0),
-      neighbor: (tile) => (tile === 40 ? 41 : 40),
-    };
-    const materials = [0, 0, 0, 0, 0];
-    const food: InventoryItems = { seeds: 1 };
-
-    expect(interactStructure(structures, cistern.id, materials, food, localTopology, undefined, undefined, undefined, {
-      kind: 'storm',
-      label: 'storm front',
-      intensity: 0.9,
-    })).toMatchObject({
-      ok: true,
-      mode: 'collectWater',
-      message: 'rain cistern caught storm front water · water 2/4',
-    });
-    expect(cistern.state).toMatchObject({ water: 2, fills: 1 });
-
-    const cisternEnv: CropPlotEnvironment = {
-      watered: true,
-      naturalWater: false,
-      cisternWater: 2,
-      sheltered: false,
-      protected: false,
-      lit: true,
-      warm: false,
-      cold: false,
-      storm: false,
-      highAltitude: false,
-      label: 'cistern-watered · open',
-    };
-
-    expect(interactStructure(structures, plot.id, materials, food, localTopology, cisternEnv)).toMatchObject({
-      ok: true,
-      mode: 'plant',
-    });
-    expect(food).toEqual({});
-    expect(plot.state).toMatchObject({ crop: 'berries', growth: 1 });
-
-    expect(interactStructure(structures, plot.id, materials, food, localTopology, cisternEnv)).toMatchObject({
-      ok: true,
-      mode: 'irrigate',
-      message: 'tended berry plot 2/3 · cistern-watered · open · cistern water 1/4',
-    });
-    expect(plot.state?.growth).toBe(2);
-    expect(cistern.state).toMatchObject({ water: 1, fills: 1 });
-
-    expect(interactStructure(structures, plot.id, materials, food, localTopology, { ...cisternEnv, cisternWater: 1 })).toMatchObject({
-      ok: true,
-      mode: 'irrigate',
-      message: 'berry plot ready to harvest · cistern-watered · open · cistern water 0/4',
-    });
-    expect(plot.state?.growth).toBe(3);
-    expect(cistern.state?.water).toBeUndefined();
-
-    const normalized = normalizeStructureSaves([
-      { id: 14, item: 'rainCistern', tile: 42, layer: 3, yaw: 0.5, state: { water: 7.8, fills: 2.8 } },
-    ], 50, 8);
-    expect(normalized).toEqual([{ id: 14, item: 'rainCistern', tile: 42, layer: 3, yaw: 0.5, state: { water: 4, fills: 2 } }]);
-  });
-
-  it('lets rain cisterns tap nearby dry-cave spring seeps', () => {
-    const structures: StructureSave[] = [];
-    const cistern = addStructure(structures, { item: 'rainCistern', tile: 43, layer: 2, yaw: 0 })!;
-    const dry = addStructure(structures, { item: 'rainCistern', tile: 44, layer: 2, yaw: 0 })!;
-    const materials = [0, 0, 0, 0, 0];
-    const clear = { kind: 'clear' as const, label: 'clear', intensity: 0.1, exposureRate: -0.2, staminaRegen: 1 };
-
-    expect(interactStructure(structures, cistern.id, materials, undefined, undefined, undefined, undefined, undefined, {
-      ...clear,
-      spring: { spring: true, label: 'spring seep', distance: 1 },
-    })).toMatchObject({
-      ok: true,
-      mode: 'collectWater',
-      message: 'rain cistern tapped spring seep · water 1/4',
-    });
-    expect(cistern.state).toMatchObject({ water: 1, fills: 1 });
-
-    expect(interactStructure(structures, dry.id, materials, undefined, undefined, undefined, undefined, undefined, clear)).toMatchObject({
-      ok: true,
-      mode: 'inspect',
-      message: 'rain cistern dry · wait for rain, storm, or a cave spring',
-    });
-  });
-
-  it('caches root-cellar provisions for home expedition prep', () => {
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
-    ];
-    const cellar = addStructure(structures, { item: 'rootCellar', tile: 101, layer: 2, yaw: 0 })!;
-    const materials = [0, 0, 0, 0, 0];
-    const food: InventoryItems = { trailRation: 1, caveMushroom: 2 };
-
-    expect(interactStructure(structures, cellar.id, materials, food, hubTopology)).toMatchObject({
-      ok: true,
-      mode: 'cache',
-      moved: { trailRation: 1 },
-      message: 'root cellar cached trail ration · provisions 1/6',
-    });
-    expect(food).toEqual({ caveMushroom: 2 });
-    expect(cellar.state).toMatchObject({ provisions: 1, caches: 1 });
-
-    expect(interactStructure(structures, cellar.id, materials, food, hubTopology)).toMatchObject({
-      ok: true,
-      mode: 'cache',
-      moved: { caveMushroom: 2 },
-      message: 'root cellar cached cave mushrooms · provisions 2/6',
-    });
-    expect(food).toEqual({});
-    expect(rootCellarProvisionCount(structures, hubTopology)).toBe(2);
-    expect(homeScore(structures, hubTopology).shelter).toMatchObject({
-      hasCellar: true,
-      cellarProvisions: 2,
-    });
-
-    expect(interactStructure(structures, cellar.id, materials, food, hubTopology)).toMatchObject({
-      ok: true,
-      mode: 'withdrawProvision',
-      moved: { trailRation: 1 },
-      message: 'pulled trail ration from root cellar · provisions 1/6',
-    });
-    expect(food).toEqual({ trailRation: 1 });
-    expect(rootCellarProvisionCount(structures, hubTopology)).toBe(1);
-    const remote = addStructure(structures, { item: 'rootCellar', tile: 200, layer: 2, yaw: 0 })!;
-    remote.state = { provisions: 3, caches: 3 };
-    expect(rootCellarProvisionCount(structures, hubTopology)).toBe(1);
-
-    const spent = spendRootCellarProvision(structures, hubTopology);
-    expect(spent).toMatchObject({ ok: true, cellarId: cellar.id, remaining: 0 });
-    expect(cellar.state?.provisions).toBeUndefined();
-    expect(remote.state).toMatchObject({ provisions: 3 });
-    expect(rootCellarProvisionCount(structures, hubTopology)).toBe(0);
-    expect(spendRootCellarProvision(structures, hubTopology)).toMatchObject({ ok: false, remaining: 0 });
-
-    const normalized = normalizeStructureSaves([
-      { id: 15, item: 'rootCellar', tile: 43, layer: 3, yaw: 0.5, state: { provisions: 99, caches: 2.8 } },
-    ], 50, 8);
-    expect(normalized).toEqual([{ id: 15, item: 'rootCellar', tile: 43, layer: 3, yaw: 0.5, state: { provisions: rootCellarProvisionCapacity(), caches: 2 } }]);
-  });
-
-  it('counts root cellars in the wider home support ring, outside the shelter footprint', () => {
-    const chainTopology: StructureTopology = {
-      degreeOf: (tile) => tile === 10 ? 1 : tile === 11 ? 2 : tile === 12 ? 1 : 0,
-      neighbor: (tile, edge) => {
-        if (tile === 10) return 11;
-        if (tile === 11) return edge === 0 ? 10 : 12;
-        return 11;
-      },
-    };
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: 10, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'rootCellar', tile: 12, layer: 2, yaw: 0, state: { provisions: 1 } },
-    ];
-
-    const shelter = shelterReport(structures, chainTopology);
-    expect(shelter.tiles).toEqual([10, 11]);
-    expect(shelter.cellarProvisions).toBe(1);
-    expect(rootCellarProvisionCount(structures, chainTopology)).toBe(1);
-
-    expect(spendRootCellarProvision(structures, chainTopology)).toMatchObject({ ok: true, cellarId: 2, remaining: 0 });
-    expect(rootCellarProvisionCount(structures, chainTopology)).toBe(0);
-  });
-
-  it('sets and normalizes cave anchors as persistent cave expedition markers', () => {
-    const structures: StructureSave[] = [];
-    const anchor = addStructure(structures, { item: 'caveAnchor', tile: 31, layer: 5, yaw: 0.1 })!;
-    const materials = [0, 0, 0, 0, 0];
-
-    expect(interactStructure(structures, anchor.id, materials)).toMatchObject({
-      ok: false,
-      mode: 'inspect',
-      message: 'cave anchor needs a nearby cave mouth or arch',
-    });
-
-    const result = interactStructure(structures, anchor.id, materials, undefined, undefined, undefined, undefined, undefined, undefined, {
-      tile: 34,
-      kind: 'dryCave',
-      label: 'basalt throat',
-      depth: 12.75,
-      flooded: false,
-      spring: true,
-      clearance: 4,
-      distance: 1,
-      mouth: true,
-    });
-    expect(result).toMatchObject({
-      ok: true,
-      mode: 'anchor',
-      message: 'cave anchor set · basalt throat 1 ring away · depth 12.8 m · clearance 4 cells · spring seep',
-    });
-    expect(anchor.state).toMatchObject({
-      anchorUses: 1,
-      anchorKind: 'dryCave',
-      anchorLabel: 'basalt throat',
-      anchorDepth: 12.75,
-      anchorDistance: 1,
-      anchorFlooded: false,
-      anchorSpring: true,
-      anchorClearance: 4,
-      anchorTile: 34,
-    });
-    expect(caveAnchorKindLabel(anchor.state?.anchorKind)).toBe('dry cave');
-
-    const normalized = normalizeStructureSaves([
-      { id: 16, item: 'caveAnchor', tile: 44, layer: 3, yaw: 0.5, state: { anchorUses: 2.8, anchorKind: 'seaCave', anchorLabel: ' blue wash ', anchorDepth: 999, anchorDistance: 6.8, anchorFlooded: true, anchorSpring: true, anchorClearance: 80, anchorTile: 45.9 } },
-    ], 50, 8);
-    expect(normalized).toEqual([{ id: 16, item: 'caveAnchor', tile: 44, layer: 3, yaw: 0.5, state: { anchorUses: 2, anchorKind: 'seaCave', anchorLabel: 'blue wash', anchorDepth: 128, anchorDistance: 6, anchorFlooded: true, anchorSpring: true, anchorClearance: 64, anchorTile: 45 } }]);
   });
 
   it('uses a chest as quick material storage and retrieval', () => {
@@ -1190,11 +275,6 @@ describe('Hearth and Horizon structures', () => {
       { id: 2, item: 'chest', tile: 11, layer: 2, yaw: 0, state: { storage: { wood: 3 } } },
       { id: 3, item: 'campfire', tile: 12, layer: 2, yaw: 0, state: { lit: true } },
       { id: 4, item: 'bedroll', tile: 13, layer: 2, yaw: 0, state: { home: true } },
-      { id: 5, item: 'cropPlot', tile: 14, layer: 2, yaw: 0, state: { crop: 'berries', growth: 2 } },
-      { id: 6, item: 'rainCistern', tile: 15, layer: 2, yaw: 0, state: { water: 2 } },
-      { id: 7, item: 'rootCellar', tile: 16, layer: 2, yaw: 0, state: { provisions: 1 } },
-      { id: 8, item: 'waystone', tile: 17, layer: 2, yaw: 0, state: { waystone: 'home' } },
-      { id: 9, item: 'caveAnchor', tile: 18, layer: 2, yaw: 0, state: { anchorKind: 'dryCave' } },
     ];
 
     expect(dismantleStructure(structures, 1)).toEqual({
@@ -1208,970 +288,102 @@ describe('Hearth and Horizon structures', () => {
     expect(dismantleStructure(structures, 2)).toMatchObject({ ok: false, blockers: ['empty chest first'] });
     expect(dismantleStructure(structures, 3)).toMatchObject({ ok: false, blockers: ['douse light first'] });
     expect(dismantleStructure(structures, 4)).toMatchObject({ ok: false, blockers: ['home bedroll is set'] });
-    expect(dismantleStructure(structures, 5)).toMatchObject({ ok: false, blockers: ['clear crop first'] });
-    expect(dismantleStructure(structures, 6)).toMatchObject({ ok: false, blockers: ['empty water first'] });
-    expect(dismantleStructure(structures, 7)).toMatchObject({ ok: false, blockers: ['empty provisions first'] });
-    expect(dismantleStructure(structures, 8)).toMatchObject({ ok: false, blockers: ['waystone is attuned'] });
-    expect(dismantleStructure(structures, 9)).toMatchObject({ ok: false, blockers: ['cave anchor is set'] });
   });
 
-  it('recognizes a functional shelter as a local cluster around the home bedroll', () => {
+  it('recognizes a functional camp as a local cluster of warmth, station, and storage around the home bedroll', () => {
     const structures: StructureSave[] = [
       { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'roofBundle', tile: 101, layer: 2, yaw: 0 },
-      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
-      { id: 4, item: 'doorKit', tile: 103, layer: 2, yaw: 0 },
-      { id: 5, item: 'campfire', tile: 104, layer: 2, yaw: 0, state: { lit: true } },
-      { id: 6, item: 'workbench', tile: 105, layer: 2, yaw: 0 },
-      { id: 7, item: 'chest', tile: 106, layer: 2, yaw: 0 },
-      { id: 8, item: 'windowFrame', tile: 200, layer: 2, yaw: 0 },
+      { id: 2, item: 'campfire', tile: 104, layer: 2, yaw: 0, state: { lit: true } },
+      { id: 3, item: 'workbench', tile: 105, layer: 2, yaw: 0 },
+      { id: 4, item: 'chest', tile: 106, layer: 2, yaw: 0 },
     ];
 
     const shelter = shelterReport(structures, hubTopology);
     expect(shelter).toMatchObject({
       centerTile: 100,
-      roofPieces: 2,
-      hasDoor: true,
       hasWarmth: true,
       hasStation: true,
       hasStorage: true,
-      hasWindow: false,
+      hasLight: true,
       protected: true,
       functional: true,
-      label: 'shelter alive',
-      enclosure: {
-        roofTiles: [101, 102],
-        openingTiles: [103],
-        utilityTiles: [104, 105, 106],
-        roofCoverage: 1,
-        utilityCoverage: 1,
-        doorOnBoundary: true,
-        warmthInside: true,
-        workbenchInside: true,
-        storageInside: true,
-        enclosed: true,
-        serviceReady: true,
-        comfortTier: 'working',
-        label: 'working shelter room',
-      },
+      comfort: 3,
+      comfortTier: 'ready',
+      missing: [],
+      label: 'camp ready',
     });
-    expect(shelter.tiles).toEqual([100, 101, 102, 103, 104, 105, 106]);
-    expect(shelter.enclosure.boundaryTiles).toEqual([101, 102, 103, 104, 105, 106]);
-    expect(shelter.enclosure.boundaryCoverage).toBeCloseTo(0.75);
-    expect(homeScore(structures, hubTopology)).toMatchObject({ functional: true, label: 'shelter alive' });
+    expect(shelter.tiles.sort((a, b) => a - b)).toEqual([100, 101, 102, 103, 104, 105, 106]);
+    expect(homeScore(structures, hubTopology)).toMatchObject({ functional: true, label: 'camp ready' });
   });
 
-  it('keeps the empty shelter enclosure stable when no home bedroll exists', () => {
+  it('keeps the shelter report empty and non-functional when no home bedroll exists', () => {
     const shelter = shelterReport([], hubTopology);
 
     expect(shelter).toMatchObject({
       centerTile: null,
+      tiles: [],
+      hasWarmth: false,
+      hasStation: false,
+      hasStorage: false,
       functional: false,
       protected: false,
+      comfort: 0,
+      comfortTier: 'none',
       missing: ['home bedroll'],
-      enclosure: {
-        roomTiles: [],
-        boundaryTiles: [],
-        supportTiles: [],
-        roofTiles: [],
-        openingTiles: [],
-        utilityTiles: [],
-        enclosed: false,
-        serviceReady: false,
-        comfortTier: 'none',
-        label: 'no room',
-      },
+      label: 'no home bedroll',
     });
   });
 
-  it('keeps global hearth scoring from bypassing topology-aware room validation', () => {
+  it('keeps global hearth scoring from bypassing topology-aware local shelter validation', () => {
     const structures: StructureSave[] = [
       { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
       { id: 2, item: 'campfire', tile: 104, layer: 2, yaw: 0, state: { lit: true } },
       { id: 3, item: 'workbench', tile: 200, layer: 2, yaw: 0 },
       { id: 4, item: 'chest', tile: 201, layer: 2, yaw: 0 },
-      { id: 5, item: 'doorKit', tile: 202, layer: 2, yaw: 0 },
-      { id: 6, item: 'roofBundle', tile: 203, layer: 2, yaw: 0 },
-      { id: 7, item: 'roofBundle', tile: 204, layer: 2, yaw: 0 },
     ];
 
     expect(homeScore(structures)).toMatchObject({ functional: true, label: 'hearth alive' });
     const local = homeScore(structures, hubTopology);
-    expect(local).toMatchObject({ functional: false, label: 'shelter needs roof 0/2' });
-    expect(local.shelter.enclosure).toMatchObject({
-      roofTiles: [],
-      openingTiles: [],
-      utilityTiles: [104],
-      enclosed: false,
-      serviceReady: false,
-      utilityCoverage: 1 / 3,
+    expect(local).toMatchObject({ functional: false, label: 'warm camp' });
+    expect(local.shelter).toMatchObject({
+      hasWarmth: true,
+      hasStation: false,
+      hasStorage: false,
+      comfort: 1,
+      comfortTier: 'rough',
+      missing: ['workbench', 'chest'],
     });
   });
 
-  it('separates spatial enclosure from warmth and utility readiness', () => {
+  it('reports rough shelter comfort with warmth alone before workbench and chest arrive', () => {
     const structures: StructureSave[] = [
       { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'roofBundle', tile: 101, layer: 2, yaw: 0 },
-      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
-      { id: 4, item: 'doorKit', tile: 103, layer: 2, yaw: 0 },
-      { id: 5, item: 'workbench', tile: 104, layer: 2, yaw: 0 },
-      { id: 6, item: 'chest', tile: 105, layer: 2, yaw: 0 },
+      { id: 2, item: 'campfire', tile: 101, layer: 2, yaw: 0, state: { lit: true } },
     ];
 
     const shelter = shelterReport(structures, hubTopology);
-    expect(shelter.protected).toBe(false);
+    expect(shelter.protected).toBe(true);
     expect(shelter.functional).toBe(false);
-    expect(shelter.missing).toContain('lit campfire');
-    expect(shelter.enclosure).toMatchObject({
-      enclosed: true,
-      serviceReady: false,
-      warmthInside: false,
-      workbenchInside: true,
-      storageInside: true,
-      comfortTier: 'rough',
-      label: 'open room needs lit campfire',
-    });
-  });
-
-  it('recognizes a weather-safe room before it becomes a functional workshop', () => {
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'roofBundle', tile: 101, layer: 2, yaw: 0 },
-      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
-      { id: 4, item: 'doorKit', tile: 103, layer: 2, yaw: 0 },
-      { id: 5, item: 'campfire', tile: 104, layer: 2, yaw: 0, state: { lit: true } },
-    ];
-
-    const shelter = shelterReport(structures, hubTopology);
-    expect(shelter).toMatchObject({
-      protected: true,
-      functional: false,
-      label: 'weather safe',
-      enclosure: {
-        enclosed: true,
-        serviceReady: false,
-        warmthInside: true,
-        workbenchInside: false,
-        storageInside: false,
-        comfortTier: 'weather-safe',
-        label: 'weather-safe room',
-      },
-    });
     expect(shelter.missing).toEqual(['workbench', 'chest']);
+    expect(shelter.comfortTier).toBe('rough');
   });
 
-  it('counts full wall panels as the first C6 shell boundary authority', () => {
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'roofBundle', tile: 101, layer: 2, yaw: 0 },
-      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
-      { id: 4, item: 'doorKit', tile: 103, layer: 2, yaw: 0 },
-      { id: 5, item: 'wallPanel', tile: 104, layer: 2, yaw: 0 },
-      { id: 6, item: 'wallPanel', tile: 105, layer: 2, yaw: 0 },
-      { id: 7, item: 'campfire', tile: 106, layer: 2, yaw: 0, state: { lit: true } },
-      { id: 8, item: 'floorFoundation', tile: 200, layer: 2, yaw: 0 },
-    ];
-
-    const shelter = shelterReport(structures, hubTopology);
-    expect(shelter).toMatchObject({
-      protected: true,
-      functional: false,
-      label: 'weather safe',
-      enclosure: {
-        wallTiles: [104, 105],
-        railTiles: [],
-        foundationTiles: [],
-        roofTiles: [101, 102],
-        openingTiles: [103],
-        boundaryCoverage: 0.75,
-        enclosed: true,
-        comfortTier: 'weather-safe',
-      },
-    });
-    expect(shelter.missing).toEqual(['workbench', 'chest']);
-  });
-
-  it('counts home-tile edge wall sockets toward shelter boundary coverage', () => {
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'roofBundle', tile: 101, layer: 2, yaw: 0 },
-      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
-      { id: 4, item: 'wallDoorPanel', tile: 100, layer: 2, yaw: 0 },
-      { id: 5, item: 'wallPanel', tile: 100, layer: 2, yaw: STRUCTURE_YAW_STEP },
-      { id: 6, item: 'wallWindowPanel', tile: 100, layer: 2, yaw: STRUCTURE_YAW_STEP * 2 },
-      { id: 7, item: 'wallCorner', tile: 100, layer: 2, yaw: STRUCTURE_YAW_STEP * 3 },
-      { id: 8, item: 'campfire', tile: 106, layer: 2, yaw: 0, state: { lit: true } },
-    ];
-
-    const shelter = shelterReport(structures, hubTopology);
-    expect(shelter).toMatchObject({
-      protected: true,
-      functional: false,
-      label: 'weather safe',
-      hasDoor: true,
-      hasWindow: true,
-      enclosure: {
-        boundaryCoverageMode: 'edge',
-        boundaryCoverage: 1,
-        boundaryCoverageNeed: 4,
-        boundaryEdgeCount: 6,
-        perimeterCoverage: 5 / 6,
-        doorOnBoundary: true,
-        enclosed: true,
-        comfortTier: 'weather-safe',
-      },
-    });
-    expect(shelter.enclosure.boundaryEdges).toEqual([
-      '100:edge:0',
-      '100:edge:1',
-      '100:edge:2',
-      '100:edge:3',
-      '100:edge:4',
-      '100:edge:5',
-    ]);
-    expect(shelter.enclosure.coveredBoundaryEdges).toEqual([
-      '100:edge:0',
-      '100:edge:1',
-      '100:edge:2',
-      '100:edge:3',
-      '100:edge:4',
-    ]);
-    expect(shelter.enclosure.doorBoundaryEdges).toEqual(['100:edge:0']);
-    expect(shelter.enclosure.windowBoundaryEdges).toEqual(['100:edge:2']);
-    expect(shelter.missing).toEqual(['workbench', 'chest']);
-  });
-
-  it('does not let a wrong-facing wall edge satisfy the room boundary', () => {
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'roofBundle', tile: 101, layer: 2, yaw: 0 },
-      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
-      { id: 4, item: 'wallDoorPanel', tile: 103, layer: 2, yaw: 0 },
-      { id: 5, item: 'wallPanel', tile: 104, layer: 2, yaw: STRUCTURE_YAW_STEP },
-      { id: 6, item: 'wallPanel', tile: 105, layer: 2, yaw: 0 },
-      { id: 7, item: 'campfire', tile: 106, layer: 2, yaw: 0, state: { lit: true } },
-    ];
-
-    const shelter = shelterReport(structures, hubTopology);
-    expect(shelter.protected).toBe(false);
-    expect(shelter.missing).toContain('room boundary');
-    expect(shelter.enclosure).toMatchObject({
-      boundaryCoverageMode: 'edge',
-      boundaryCoverage: 0.5,
-      boundaryCoverageNeed: 4,
-      boundaryEdgeCount: 6,
-      perimeterCoverage: 2 / 6,
-      coveredBoundaryEdges: ['100:edge:2', '100:edge:4'],
-      wallBoundaryEdges: ['100:edge:2', '100:edge:4'],
-      doorBoundaryEdges: ['100:edge:2'],
-      enclosed: false,
-    });
-  });
-
-  it('counts integrated wall door/window panels, corners, and roof joins without double-counting tiles', () => {
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'roofJoin', tile: 101, layer: 2, yaw: 0 },
-      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
-      { id: 4, item: 'wallDoorPanel', tile: 103, layer: 2, yaw: 0 },
-      { id: 5, item: 'wallWindowPanel', tile: 104, layer: 2, yaw: 0 },
-      { id: 6, item: 'wallCorner', tile: 105, layer: 2, yaw: 0 },
-      { id: 7, item: 'campfire', tile: 106, layer: 2, yaw: 0, state: { lit: true } },
-    ];
-
-    const shelter = shelterReport(structures, hubTopology);
-    expect(shelter).toMatchObject({
-      roofPieces: 2,
-      hasDoor: true,
-      hasWindow: true,
-      hasWarmth: true,
-      protected: true,
-      functional: false,
-      comfort: 4,
-      enclosure: {
-        wallTiles: [103, 104, 105],
-        cornerTiles: [105],
-        roofTiles: [101, 102],
-        roofJoinTiles: [101],
-        openingTiles: [103, 104],
-        boundaryCoverage: 0.75,
-        doorOnBoundary: true,
-        enclosed: true,
-        comfortTier: 'weather-safe',
-      },
-    });
-    expect(shelter.missing).toEqual(['workbench', 'chest']);
-  });
-
-  it('turns a serviced wall-shell room into a functional lived-in shelter', () => {
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'roofJoin', tile: 101, layer: 2, yaw: 0 },
-      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
-      { id: 4, item: 'wallDoorPanel', tile: 103, layer: 2, yaw: 0 },
-      { id: 5, item: 'wallWindowPanel', tile: 104, layer: 2, yaw: 0 },
-      { id: 6, item: 'wallCorner', tile: 105, layer: 2, yaw: 0 },
-      { id: 7, item: 'campfire', tile: 106, layer: 2, yaw: 0, state: { lit: true } },
-      { id: 8, item: 'workbench', tile: 104, layer: 2, yaw: 0 },
-      { id: 9, item: 'chest', tile: 105, layer: 2, yaw: 0 },
-    ];
-
-    const shelter = shelterReport(structures, hubTopology);
-    expect(shelter).toMatchObject({
-      roofPieces: 2,
-      hasDoor: true,
-      hasWindow: true,
-      hasWarmth: true,
-      hasStation: true,
-      hasStorage: true,
-      protected: true,
-      functional: true,
-      comfort: 6,
-      label: 'shelter alive',
-      enclosure: {
-        wallTiles: [103, 104, 105],
-        cornerTiles: [105],
-        roofTiles: [101, 102],
-        roofJoinTiles: [101],
-        openingTiles: [103, 104],
-        utilityTiles: [106, 104, 105],
-        boundaryCoverageMode: 'edge',
-        boundaryCoverage: 0.75,
-        utilityCoverage: 1,
-        doorOnBoundary: true,
-        warmthInside: true,
-        workbenchInside: true,
-        storageInside: true,
-        enclosed: true,
-        serviceReady: true,
-        comfortTier: 'lived-in',
-        label: 'lived-in shelter room',
-      },
-    });
-    expect(shelter.enclosure.boundaryEdges).toEqual([
-      '100:edge:0',
-      '100:edge:1',
-      '100:edge:2',
-      '100:edge:3',
-      '100:edge:4',
-      '100:edge:5',
-    ]);
-    expect(shelter.enclosure.coveredBoundaryEdges).toEqual([
-      '100:edge:2',
-      '100:edge:3',
-      '100:edge:4',
-    ]);
-    expect(shelter.enclosure.wallBoundaryEdges).toEqual([
-      '100:edge:2',
-      '100:edge:3',
-      '100:edge:4',
-    ]);
-    expect(shelter.enclosure.doorBoundaryEdges).toEqual(['100:edge:2']);
-    expect(shelter.enclosure.windowBoundaryEdges).toEqual(['100:edge:3']);
-    expect(shelter.enclosure.boundaryEdgeCount).toBe(6);
-    expect(shelter.enclosure.perimeterCoverage).toBe(0.5);
-    expect(shelter.missing).toEqual([]);
-    expect(homeScore(structures, hubTopology)).toMatchObject({ functional: true, label: 'shelter alive' });
-  });
-
-  it('proves a full six-edge wall-shell room without treating it as multi-room shelter', () => {
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'roofJoin', tile: 100, layer: 2, yaw: STRUCTURE_YAW_STEP * 5 },
-      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
-      { id: 4, item: 'wallDoorPanel', tile: 101, layer: 2, yaw: 0 },
-      { id: 5, item: 'wallPanel', tile: 102, layer: 2, yaw: 0 },
-      { id: 6, item: 'wallWindowPanel', tile: 103, layer: 2, yaw: 0 },
-      { id: 7, item: 'wallPanel', tile: 104, layer: 2, yaw: 0 },
-      { id: 8, item: 'wallCorner', tile: 105, layer: 2, yaw: 0 },
-      { id: 9, item: 'wallPanel', tile: 106, layer: 2, yaw: 0 },
-      { id: 10, item: 'campfire', tile: 104, layer: 2, yaw: 0, state: { lit: true } },
-      { id: 11, item: 'workbench', tile: 105, layer: 2, yaw: 0 },
-      { id: 12, item: 'chest', tile: 106, layer: 2, yaw: 0 },
-      { id: 13, item: 'floorFoundation', tile: 103, layer: 2, yaw: 0 },
-    ];
-
-    const occupancy = structures.flatMap((structure) => structureSocketOccupancy(structure).occupancyKeys);
-    expect(new Set(occupancy).size).toBe(occupancy.length);
-
-    const shelter = shelterReport(structures, hubTopology);
-    expect(shelter).toMatchObject({
-      centerTile: 100,
-      tiles: [100, 101, 102, 103, 104, 105, 106],
-      roofPieces: 2,
-      hasDoor: true,
-      hasWindow: true,
-      hasWarmth: true,
-      hasStation: true,
-      hasStorage: true,
-      protected: true,
-      functional: true,
-      comfort: 7,
-      label: 'shelter alive',
-      enclosure: {
-        roomTiles: [100, 101, 102, 103, 104, 105, 106],
-        boundaryTiles: [101, 102, 103, 104, 105, 106],
-        wallTiles: [101, 102, 103, 104, 105, 106],
-        railTiles: [],
-        cornerTiles: [105],
-        roofTiles: [100, 102],
-        roofJoinTiles: [100],
-        openingTiles: [101, 103],
-        utilityTiles: [104, 105, 106],
-        foundationTiles: [103],
-        boundaryCoverageMode: 'edge',
-        boundaryCoverage: 1,
-        boundaryCoverageNeed: 4,
-        boundaryEdgeCount: 6,
-        perimeterCoverage: 1,
-        utilityCoverage: 1,
-        doorOnBoundary: true,
-        warmthInside: true,
-        workbenchInside: true,
-        storageInside: true,
-        enclosed: true,
-        serviceReady: true,
-        comfortTier: 'lived-in',
-        label: 'lived-in shelter room',
-      },
-    });
-    expect(shelter.enclosure.boundaryEdges).toEqual([
-      '100:edge:0',
-      '100:edge:1',
-      '100:edge:2',
-      '100:edge:3',
-      '100:edge:4',
-      '100:edge:5',
-    ]);
-    expect(shelter.enclosure.coveredBoundaryEdges).toEqual(shelter.enclosure.boundaryEdges);
-    expect(shelter.enclosure.wallBoundaryEdges).toEqual(shelter.enclosure.boundaryEdges);
-    expect(shelter.enclosure.openingBoundaryEdges).toEqual(['100:edge:0', '100:edge:2']);
-    expect(shelter.enclosure.doorBoundaryEdges).toEqual(['100:edge:0']);
-    expect(shelter.enclosure.windowBoundaryEdges).toEqual(['100:edge:2']);
-    expect(shelter.enclosure.railBoundaryEdges).toEqual([]);
-    expect(shelter.missing).toEqual([]);
-    expect(homeScore(structures, hubTopology)).toMatchObject({ functional: true, label: 'shelter alive' });
-  });
-
-  it('derives an outer perimeter for connected foundation-backed room tiles', () => {
-    const outerEdges: Array<{
-      tile: number;
-      edge: number;
-      item?: 'wallDoorPanel' | 'wallWindowPanel' | 'wallPanel';
-      placeTile?: number;
-      placeEdge?: number;
-    }> = [
-      { tile: 100, edge: 1, item: 'wallDoorPanel' },
-      { tile: 100, edge: 4 },
-      { tile: 100, edge: 5 },
-      { tile: 101, edge: 0 },
-      { tile: 101, edge: 1 },
-      { tile: 101, edge: 2 },
-      { tile: 101, edge: 4 },
-      { tile: 101, edge: 5, placeTile: 1015, placeEdge: 2 },
-      { tile: 102, edge: 1 },
-      { tile: 102, edge: 2 },
-      { tile: 102, edge: 3 },
-      { tile: 102, edge: 4 },
-      { tile: 102, edge: 5 },
-      { tile: 103, edge: 0, item: 'wallWindowPanel' },
-      { tile: 103, edge: 1 },
-      { tile: 103, edge: 2 },
-      { tile: 103, edge: 3 },
-      { tile: 103, edge: 4 },
-    ];
-    const wallShells: StructureSave[] = outerEdges.map((entry, index) => ({
-      id: 20 + index,
-      item: entry.item ?? 'wallPanel',
-      tile: entry.placeTile ?? entry.tile,
-      layer: 2,
-      yaw: STRUCTURE_YAW_STEP * (entry.placeEdge ?? entry.edge),
-    }));
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'floorFoundation', tile: 101, layer: 2, yaw: 0 },
-      { id: 3, item: 'floorFoundation', tile: 102, layer: 2, yaw: 0 },
-      { id: 4, item: 'floorFoundation', tile: 103, layer: 2, yaw: 0 },
-      { id: 5, item: 'roofBundle', tile: 101, layer: 2, yaw: 0 },
-      { id: 6, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
-      { id: 7, item: 'campfire', tile: 101, layer: 2, yaw: 0, state: { lit: true } },
-      { id: 8, item: 'workbench', tile: 102, layer: 2, yaw: 0 },
-      { id: 9, item: 'chest', tile: 103, layer: 2, yaw: 0 },
-      { id: 10, item: 'wallDoorPanel', tile: 100, layer: 2, yaw: 0 },
-      ...wallShells,
-    ];
-
-    const shelter = shelterReport(structures, multiRoomTopology);
-    const expectedBoundaryEdges = outerEdges.map((entry) => `${entry.tile}:edge:${entry.edge}`);
-
-    expect(shelter).toMatchObject({
-      centerTile: 100,
-      tiles: [100, 101, 102, 103],
-      protected: true,
-      functional: true,
-      label: 'shelter alive',
-      enclosure: {
-        roomTiles: [100, 101, 102, 103],
-        foundationTiles: [101, 102, 103],
-        roofTiles: [101, 102],
-        utilityTiles: [101, 102, 103],
-        boundaryCoverageMode: 'edge',
-        boundaryCoverageNeed: expectedBoundaryEdges.length,
-        boundaryEdgeCount: expectedBoundaryEdges.length,
-        boundaryCoverage: 1,
-        perimeterCoverage: 1,
-        doorOnBoundary: true,
-        enclosed: true,
-        serviceReady: true,
-      },
-    });
-    expect(shelter.enclosure.boundaryEdges).toEqual(expectedBoundaryEdges);
-    expect(shelter.enclosure.coveredBoundaryEdges).toEqual(expectedBoundaryEdges);
-    expect(shelter.enclosure.wallBoundaryEdges).toEqual(expectedBoundaryEdges);
-    expect(shelter.enclosure.doorBoundaryEdges).toEqual(['100:edge:1']);
-    expect(shelter.enclosure.windowBoundaryEdges).toEqual(['103:edge:0']);
-    expect(shelter.enclosure.wallBoundaryEdges).toContain('101:edge:5');
-    expect(shelter.enclosure.boundaryEdges).not.toContain('100:edge:0');
-    expect(shelter.enclosure.boundaryEdges).not.toContain('101:edge:3');
-    expect(shelter.enclosure.boundaryEdges).not.toContain('100:edge:3');
-    expect(shelter.enclosure.boundaryEdges).not.toContain('102:edge:0');
-    expect(shelter.enclosure.boundaryEdges).not.toContain('100:edge:2');
-    expect(shelter.enclosure.boundaryEdges).not.toContain('103:edge:5');
-    expect(shelter.missing).toEqual([]);
-
-    const weakened = shelterReport(
-      structures.filter((entry) => !(entry.tile === 102 && structureYawTurn(entry.yaw) === 5)),
-      multiRoomTopology,
-    );
-    expect(weakened.protected).toBe(false);
-    expect(weakened.functional).toBe(false);
-    expect(weakened.missing).toContain('room boundary');
-    expect(weakened.enclosure.boundaryEdgeCount).toBe(expectedBoundaryEdges.length);
-    expect(weakened.enclosure.coveredBoundaryEdges).not.toContain('102:edge:5');
-
-    const withoutDivider = shelterReport(
-      structures.filter((entry) => !(entry.item === 'wallDoorPanel' && entry.tile === 100 && structureYawTurn(entry.yaw) === 0)),
-      multiRoomTopology,
-    );
-    expect(withoutDivider.protected).toBe(true);
-    expect(withoutDivider.enclosure.coveredBoundaryEdges).toEqual(expectedBoundaryEdges);
-  });
-
-  it('keeps irregular connected foundation rooms sealed only by their outer perimeter', () => {
-    const expectedBoundaryEdges = [
-      '200:edge:1',
-      '200:edge:3',
-      '200:edge:4',
-      '200:edge:5',
-      '201:edge:0',
-      '201:edge:2',
-      '201:edge:4',
-      '202:edge:0',
-      '202:edge:1',
-      '202:edge:2',
-      '202:edge:4',
-      '203:edge:0',
-      '203:edge:1',
-      '203:edge:2',
-      '203:edge:3',
-      '203:edge:5',
-      '204:edge:0',
-      '204:edge:1',
-      '204:edge:3',
-      '204:edge:4',
-      '204:edge:5',
-      '205:edge:1',
-      '205:edge:2',
-      '205:edge:3',
-      '205:edge:4',
-      '205:edge:5',
-    ];
-    const expectedInteriorSeams = [
-      '200:edge:0',
-      '200:edge:2',
-      '201:edge:1',
-      '201:edge:3',
-      '201:edge:5',
-      '202:edge:3',
-      '202:edge:5',
-      '203:edge:4',
-      '204:edge:2',
-      '205:edge:0',
-    ];
-    const wallShells: StructureSave[] = expectedBoundaryEdges.map((key, index) => {
-      const [, tileRaw, edgeRaw] = /^(\d+):edge:(\d+)$/.exec(key) ?? [];
-      const tile = Number(tileRaw);
-      const edge = Number(edgeRaw);
-      return {
-        id: 30 + index,
-        item: key === '200:edge:1' ? 'wallDoorPanel' : key === '205:edge:5' ? 'wallWindowPanel' : 'wallPanel',
-        tile,
-        layer: 2,
-        yaw: STRUCTURE_YAW_STEP * edge,
-      };
-    });
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: 200, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'floorFoundation', tile: 201, layer: 2, yaw: 0 },
-      { id: 3, item: 'floorFoundation', tile: 202, layer: 2, yaw: 0 },
-      { id: 4, item: 'floorFoundation', tile: 203, layer: 2, yaw: 0 },
-      { id: 5, item: 'floorFoundation', tile: 204, layer: 2, yaw: 0 },
-      { id: 6, item: 'floorFoundation', tile: 205, layer: 2, yaw: 0 },
-      { id: 7, item: 'roofJoin', tile: 201, layer: 2, yaw: STRUCTURE_YAW_STEP * 3 },
-      { id: 8, item: 'roofJoin', tile: 202, layer: 2, yaw: STRUCTURE_YAW_STEP * 5 },
-      { id: 9, item: 'roofJoin', tile: 203, layer: 2, yaw: STRUCTURE_YAW_STEP * 4 },
-      { id: 10, item: 'roofJoin', tile: 204, layer: 2, yaw: STRUCTURE_YAW_STEP * 2 },
-      { id: 11, item: 'roofJoin', tile: 205, layer: 2, yaw: 0 },
-      { id: 12, item: 'campfire', tile: 203, layer: 2, yaw: 0, state: { lit: true } },
-      { id: 13, item: 'workbench', tile: 204, layer: 2, yaw: 0 },
-      { id: 14, item: 'chest', tile: 205, layer: 2, yaw: 0 },
-      { id: 15, item: 'wallDoorPanel', tile: 200, layer: 2, yaw: 0 },
-      ...wallShells,
-    ];
-
-    const shelter = shelterReport(structures, irregularRoomTopology);
-
-    expect(shelter).toMatchObject({
-      centerTile: 200,
-      tiles: [200, 201, 202, 203, 204, 205],
-      protected: true,
-      functional: true,
-      label: 'shelter alive',
-      enclosure: {
-        footprintMode: 'connected-foundation',
-        roomTileCount: 6,
-        roomTiles: [200, 201, 202, 203, 204, 205],
-        foundationTiles: [201, 202, 203, 204, 205],
-        roofTiles: [201, 202, 203, 204, 205],
-        utilityTiles: [203, 204, 205],
-        boundaryCoverageMode: 'edge',
-        boundaryCoverageNeed: expectedBoundaryEdges.length,
-        boundaryEdgeCount: expectedBoundaryEdges.length,
-        boundaryCoverage: 1,
-        perimeterCoverage: 1,
-        doorBoundaryEdges: ['200:edge:1'],
-        windowBoundaryEdges: ['205:edge:5'],
-        serviceReady: true,
-      },
-    });
-    expect(shelter.enclosure.boundaryEdges).toEqual(expectedBoundaryEdges);
-    expect(shelter.enclosure.coveredBoundaryEdges).toEqual(expectedBoundaryEdges);
-    expect(shelter.enclosure.wallBoundaryEdges).toEqual(expectedBoundaryEdges);
-    expect(shelter.enclosure.interiorSeamEdges).toEqual(expectedInteriorSeams);
-    for (const seam of expectedInteriorSeams) {
-      expect(shelter.enclosure.boundaryEdges).not.toContain(seam);
-    }
-    expect(shelter.enclosure.doorBoundaryEdges).not.toContain('200:edge:0');
-    expect(shelter.missing).toEqual([]);
-
-    const weakened = shelterReport(
-      structures.filter((entry) => !(entry.tile === 203 && structureYawTurn(entry.yaw) === 5)),
-      irregularRoomTopology,
-    );
-    expect(weakened.protected).toBe(false);
-    expect(weakened.functional).toBe(false);
-    expect(weakened.missing).toContain('room boundary');
-    expect(weakened.enclosure.coveredBoundaryEdges).not.toContain('203:edge:5');
-
-    const withoutInteriorDoor = shelterReport(
-      structures.filter((entry) => !(entry.item === 'wallDoorPanel' && entry.tile === 200 && structureYawTurn(entry.yaw) === 0)),
-      irregularRoomTopology,
-    );
-    expect(withoutInteriorDoor.protected).toBe(true);
-    expect(withoutInteriorDoor.functional).toBe(true);
-    expect(withoutInteriorDoor.enclosure.coveredBoundaryEdges).toEqual(expectedBoundaryEdges);
-  });
-
-  it('keeps connected foundation rooms valid when the home room is a pentagon tile', () => {
-    const pentagonRoomTopology: StructureTopology = (() => {
-      const links = new Map<string, number>();
-      const set = (tile: number, edge: number, neighbor: number) => {
-        links.set(`${tile}:${edge}`, neighbor);
-      };
-      const addExterior = (tile: number, edge: number, degree: number) => {
-        const exterior = tile * 10 + edge;
-        set(tile, edge, exterior);
-        set(exterior, (edge + Math.floor(degree / 2)) % 6, tile);
-      };
-      for (let edge = 0; edge < 5; edge++) addExterior(500, edge, 5);
-      for (const tile of [501, 502]) {
-        for (let edge = 0; edge < 6; edge++) addExterior(tile, edge, 6);
-      }
-      set(500, 0, 501);
-      set(501, 3, 500);
-      set(500, 2, 502);
-      set(502, 5, 500);
-      return {
-        degreeOf: (tile) => (tile === 500 ? 5 : 6),
-        neighbor: (tile, edge) => links.get(`${tile}:${edge}`) ?? tile,
-      };
-    })();
-    const outerEdges: Array<{ tile: number; edge: number; item?: 'wallDoorPanel' | 'wallWindowPanel' | 'wallPanel' }> = [
-      { tile: 500, edge: 1, item: 'wallDoorPanel' },
-      { tile: 500, edge: 3 },
-      { tile: 500, edge: 4 },
-      { tile: 501, edge: 0 },
-      { tile: 501, edge: 1 },
-      { tile: 501, edge: 2 },
-      { tile: 501, edge: 4 },
-      { tile: 501, edge: 5 },
-      { tile: 502, edge: 0, item: 'wallWindowPanel' },
-      { tile: 502, edge: 1 },
-      { tile: 502, edge: 2 },
-      { tile: 502, edge: 3 },
-      { tile: 502, edge: 4 },
-    ];
-    const wallShells: StructureSave[] = outerEdges.map((entry, index) => ({
-      id: 20 + index,
-      item: entry.item ?? 'wallPanel',
-      tile: entry.tile,
-      layer: 2,
-      yaw: STRUCTURE_YAW_STEP * entry.edge,
-    }));
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: 500, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'floorFoundation', tile: 501, layer: 2, yaw: 0 },
-      { id: 3, item: 'floorFoundation', tile: 502, layer: 2, yaw: 0 },
-      { id: 4, item: 'roofJoin', tile: 501, layer: 2, yaw: 0 },
-      { id: 5, item: 'roofJoin', tile: 502, layer: 2, yaw: 0 },
-      { id: 6, item: 'campfire', tile: 501, layer: 2, yaw: 0, state: { lit: true } },
-      { id: 7, item: 'workbench', tile: 502, layer: 2, yaw: 0 },
-      { id: 8, item: 'chest', tile: 502, layer: 2, yaw: 0 },
-      ...wallShells,
-    ];
-
-    const shelter = shelterReport(structures, pentagonRoomTopology);
-    const expectedBoundaryEdges = outerEdges.map((entry) => `${entry.tile}:edge:${entry.edge}`);
-
-    expect(shelter).toMatchObject({
-      centerTile: 500,
-      tiles: [500, 501, 502],
-      protected: true,
-      functional: true,
-      label: 'shelter alive',
-      enclosure: {
-        footprintMode: 'connected-foundation',
-        roomTileCount: 3,
-        pentagonRoomTiles: [500],
-        boundaryCoverageMode: 'edge',
-        boundaryCoverageNeed: expectedBoundaryEdges.length,
-        boundaryEdgeCount: expectedBoundaryEdges.length,
-        boundaryCoverage: 1,
-        perimeterCoverage: 1,
-        doorBoundaryEdges: ['500:edge:1'],
-        windowBoundaryEdges: ['502:edge:0'],
-        serviceReady: true,
-      },
-    });
-    expect(shelter.enclosure.boundaryEdges).toEqual(expectedBoundaryEdges);
-    expect(shelter.enclosure.coveredBoundaryEdges).toEqual(expectedBoundaryEdges);
-    expect(shelter.enclosure.interiorSeamEdges).toEqual(['500:edge:0', '500:edge:2', '501:edge:3', '502:edge:5']);
-    for (const seam of shelter.enclosure.interiorSeamEdges) {
-      expect(shelter.enclosure.boundaryEdges).not.toContain(seam);
-    }
-  });
-
-  it('does not double-count an integrated door panel as two boundary tiles', () => {
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'roofJoin', tile: 101, layer: 2, yaw: 0 },
-      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
-      { id: 4, item: 'wallDoorPanel', tile: 103, layer: 2, yaw: 0 },
-      { id: 5, item: 'campfire', tile: 104, layer: 2, yaw: 0, state: { lit: true } },
-    ];
-
-    const shelter = shelterReport(structures, hubTopology);
-    expect(shelter.hasDoor).toBe(true);
-    expect(shelter.enclosure.boundaryCoverage).toBeCloseTo(0.25);
-    expect(shelter.protected).toBe(false);
-    expect(shelter.missing).toContain('room boundary');
-  });
-
-  it('does not let an integrated window panel satisfy the required door', () => {
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'roofJoin', tile: 101, layer: 2, yaw: 0 },
-      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
-      { id: 4, item: 'wallWindowPanel', tile: 103, layer: 2, yaw: 0 },
-      { id: 5, item: 'wallPanel', tile: 104, layer: 2, yaw: 0 },
-      { id: 6, item: 'wallCorner', tile: 105, layer: 2, yaw: 0 },
-      { id: 7, item: 'campfire', tile: 106, layer: 2, yaw: 0, state: { lit: true } },
-    ];
-
-    const shelter = shelterReport(structures, hubTopology);
-    expect(shelter.hasWindow).toBe(true);
-    expect(shelter.hasDoor).toBe(false);
-    expect(shelter.protected).toBe(false);
-    expect(shelter.enclosure.boundaryCoverage).toBeCloseTo(0.75);
-    expect(shelter.missing).toContain('door');
-  });
-
-  it('keeps foundations and half rails from pretending to be sealed walls', () => {
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
-      { id: 2, item: 'roofBundle', tile: 101, layer: 2, yaw: 0 },
-      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
-      { id: 4, item: 'doorKit', tile: 103, layer: 2, yaw: 0 },
-      { id: 5, item: 'wallHalfRail', tile: 104, layer: 2, yaw: 0 },
-      { id: 6, item: 'floorFoundation', tile: 105, layer: 2, yaw: 0 },
-      { id: 7, item: 'campfire', tile: 106, layer: 2, yaw: 0, state: { lit: true } },
-    ];
-
-    const shelter = shelterReport(structures, hubTopology);
-    expect(shelter.protected).toBe(false);
-    expect(shelter.missing).toContain('room boundary');
-    expect(shelter.enclosure).toMatchObject({
-      wallTiles: [],
-      railTiles: [104],
-      foundationTiles: [105],
-      boundaryCoverage: 0.25,
-      enclosed: false,
-      comfortTier: 'rough',
-      label: 'open room needs room boundary',
-    });
-  });
-
-  it('keeps incomplete or distant shelter props from granting full shelter rest', () => {
-    const structures: StructureSave[] = [
+  it('grants a stronger rest message inside a complete camp than a bare bedroll', () => {
+    const bareStructures: StructureSave[] = [
       { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0 },
-      { id: 2, item: 'roofBundle', tile: 101, layer: 2, yaw: 0 },
-      { id: 3, item: 'doorKit', tile: 103, layer: 2, yaw: 0 },
-      { id: 4, item: 'campfire', tile: 104, layer: 2, yaw: 0, state: { lit: true } },
-      { id: 5, item: 'workbench', tile: 200, layer: 2, yaw: 0 },
-      { id: 6, item: 'chest', tile: 201, layer: 2, yaw: 0 },
     ];
+    const bareRest = interactStructure(bareStructures, 1, [0, 0, 0, 0, 0], undefined, hubTopology);
+    expect(bareRest).toMatchObject({ ok: true, mode: 'home', message: 'home set · rested until dawn' });
 
-    const rest = interactStructure(structures, 1, [0, 0, 0, 0, 0], undefined, hubTopology);
-    expect(rest).toMatchObject({ ok: true, mode: 'home', message: 'home set · rested until dawn' });
-    const shelter = homeScore(structures, hubTopology).shelter;
-    expect(shelter.functional).toBe(false);
-    expect(shelter.missing).toContain('roof 1/2');
-    expect(shelter.missing).toContain('workbench');
-    expect(shelter.missing).toContain('chest');
-    expect(shelter.enclosure).toMatchObject({
-      enclosed: false,
-      serviceReady: false,
-      roofCoverage: 0.5,
-      utilityCoverage: 1 / 3,
-      comfortTier: 'rough',
-      label: 'open room needs roof 1/2',
-    });
-  });
-
-  it('grants a stronger rest message inside a complete shelter', () => {
-    const structures: StructureSave[] = [
+    const fullStructures: StructureSave[] = [
       { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0 },
-      { id: 2, item: 'roofBundle', tile: 101, layer: 2, yaw: 0 },
-      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
-      { id: 4, item: 'doorKit', tile: 103, layer: 2, yaw: 0 },
-      { id: 5, item: 'campfire', tile: 104, layer: 2, yaw: 0, state: { lit: true } },
-      { id: 6, item: 'workbench', tile: 105, layer: 2, yaw: 0 },
-      { id: 7, item: 'chest', tile: 106, layer: 2, yaw: 0 },
+      { id: 2, item: 'campfire', tile: 104, layer: 2, yaw: 0, state: { lit: true } },
+      { id: 3, item: 'workbench', tile: 105, layer: 2, yaw: 0 },
+      { id: 4, item: 'chest', tile: 106, layer: 2, yaw: 0 },
     ];
-
-    expect(interactStructure(structures, 1, [0, 0, 0, 0, 0], undefined, hubTopology)).toMatchObject({
-      ok: true,
-      mode: 'home',
-      message: 'shelter rest · warmth, storage, and workbench ready',
-    });
-    expect(structures[0].state).toMatchObject({ home: true, rested: 2 });
-  });
-
-  it('plants, tends, and harvests crop plots into food inventory', () => {
-    const structures: StructureSave[] = [];
-    const plot = addStructure(structures, { item: 'cropPlot', tile: 12, layer: 2, yaw: 0 })!;
-    const materials = [0, 0, 0, 0, 0];
-    const food: InventoryItems = { seeds: 1 };
-
-    expect(interactStructure(structures, plot.id, materials, food)).toMatchObject({ ok: true, mode: 'plant' });
-    expect(food.seeds).toBeUndefined();
-    expect(plot.state).toMatchObject({ crop: 'berries', growth: 1 });
-
-    expect(interactStructure(structures, plot.id, materials, food)).toMatchObject({ ok: true, mode: 'tend' });
-    expect(plot.state?.growth).toBe(2);
-    expect(interactStructure(structures, plot.id, materials, food)).toMatchObject({ ok: true, mode: 'tend' });
-    expect(plot.state?.growth).toBe(3);
-
-    expect(interactStructure(structures, plot.id, materials, food)).toMatchObject({ ok: true, mode: 'harvest' });
-    expect(food).toEqual({ berries: 3, seeds: 1 });
-    expect(plot.state).toMatchObject({ crop: 'berries', growth: 1, harvests: 1 });
-  });
-
-  it('makes crop plots wait when dry, cold, dark, or storm exposed', () => {
-    const structures: StructureSave[] = [];
-    const plot = addStructure(structures, { item: 'cropPlot', tile: 12, layer: 2, yaw: 0 })!;
-    const materials = [0, 0, 0, 0, 0];
-    const food: InventoryItems = { seeds: 1 };
-    const dry: CropPlotEnvironment = {
-      watered: false,
-      sheltered: false,
-      protected: false,
-      lit: true,
-      warm: false,
-      cold: false,
-      storm: false,
-      highAltitude: false,
-      label: 'dry open',
-    };
-
-    expect(interactStructure(structures, plot.id, materials, food, undefined, dry)).toMatchObject({ ok: true, mode: 'plant' });
-    expect(plot.state).toMatchObject({ crop: 'berries', growth: 1 });
-
-    const dryWait = interactStructure(structures, plot.id, materials, food, undefined, dry);
-    expect(dryWait.message).toContain('needs nearby water');
-    expect(plot.state?.growth).toBe(1);
-
-    const coldWait = interactStructure(structures, plot.id, materials, food, undefined, {
-      ...dry,
-      watered: true,
-      cold: true,
-      highAltitude: true,
-      label: 'watered cold ridge',
-    });
-    expect(coldWait.message).toContain('needs ridge warmth');
-    expect(plot.state?.growth).toBe(1);
-
-    const stormWait = interactStructure(structures, plot.id, materials, food, undefined, {
-      ...dry,
-      watered: true,
-      storm: true,
-      label: 'watered storm open',
-    });
-    expect(stormWait.message).toContain('needs storm cover');
-    expect(plot.state?.growth).toBe(1);
-
-    const grow = interactStructure(structures, plot.id, materials, food, undefined, {
-      ...dry,
-      watered: true,
-      protected: true,
-      storm: true,
-      label: 'watered protected storm plot',
-    });
-    expect(grow).toMatchObject({ ok: true, mode: 'tend' });
-    expect(plot.state?.growth).toBe(2);
-  });
-
-  it('gives protected watered crop plots a better harvest', () => {
-    const structures: StructureSave[] = [
-      { id: 1, item: 'cropPlot', tile: 12, layer: 2, yaw: 0, state: { crop: 'berries', growth: 3 } },
-    ];
-    const food: InventoryItems = {};
-    const env: CropPlotEnvironment = {
-      watered: true,
-      sheltered: true,
-      protected: true,
-      lit: true,
-      warm: true,
-      cold: false,
-      storm: true,
-      highAltitude: false,
-      label: 'watered protected warm storm plot',
-    };
-
-    const harvest = interactStructure(structures, 1, [0, 0, 0, 0, 0], food, undefined, env);
-    expect(harvest).toMatchObject({ ok: true, mode: 'harvest', moved: { berries: 4, seeds: 2 } });
-    expect(food).toEqual({ berries: 4, seeds: 2 });
-    expect(structures[0].state).toMatchObject({ crop: 'berries', growth: 1, harvests: 1 });
+    const fullRest = interactStructure(fullStructures, 1, [0, 0, 0, 0, 0], undefined, hubTopology);
+    expect(fullRest).toMatchObject({ ok: true, mode: 'home', message: 'shelter rest · warmth, storage, and workbench ready' });
+    expect(fullStructures[0].state?.rested).toBeGreaterThanOrEqual(2);
   });
 
   it('uses lit campfires for fish and camp-meal cooking before dousing', () => {
@@ -2222,19 +434,300 @@ describe('Hearth and Horizon structures', () => {
     expect(herbFood).toEqual({ expeditionStew: 1 });
   });
 
+  it('toggles a lantern on and off like a campfire', () => {
+    const structures: StructureSave[] = [];
+    const lantern = addStructure(structures, { item: 'lantern', tile: 21, layer: 2, yaw: 0 })!;
+    expect(interactStructure(structures, lantern.id, [0, 0, 0, 0, 0])).toMatchObject({ ok: true, mode: 'lit' });
+    expect(lantern.state?.lit).toBe(true);
+    expect(dismantleStructure(structures, lantern.id)).toMatchObject({ ok: false, blockers: ['douse light first'] });
+    expect(interactStructure(structures, lantern.id, [0, 0, 0, 0, 0])).toMatchObject({ ok: true, mode: 'unlit' });
+    expect(lantern.state?.lit).toBe(false);
+  });
+
+  it('lets a lit lantern light an otherwise dark camp', () => {
+    const structures: StructureSave[] = [
+      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
+      { id: 2, item: 'lantern', tile: 101, layer: 2, yaw: 0, state: { lit: true } },
+    ];
+    expect(shelterReport(structures, hubTopology)).toMatchObject({ hasWarmth: false, hasLight: true });
+  });
+
+  it('saves dock segments and identifies them as fishing platforms', () => {
+    const structures: StructureSave[] = [];
+    const dock = addStructure(structures, { item: 'dockSegment', tile: 8, layer: 2, yaw: 0.4 })!;
+
+    expect(dock).toMatchObject({ id: 1, item: 'dockSegment', tile: 8, layer: 2 });
+    expect(interactStructure(structures, dock.id, [0, 0, 0, 0, 0])).toMatchObject({
+      ok: true,
+      mode: 'inspect',
+      message: 'dock segment ready · cast here with a fishing rod',
+    });
+
+    const normalized = normalizeStructureSaves([{ id: 4, item: 'dockSegment', tile: 9, layer: 3, yaw: 0.2 }], 20, 8);
+    expect(normalized).toEqual([{ id: 4, item: 'dockSegment', tile: 9, layer: 3, yaw: 0.2 }]);
+  });
+
+  it('sets, checks, collects, and normalizes fish traps', () => {
+    const structures: StructureSave[] = [];
+    const trap = addStructure(structures, { item: 'fishTrap', tile: 15, layer: 2, yaw: 0.1 })!;
+    const materials = [0, 0, 0, 0, 0];
+    const food: InventoryItems = { bait: 1 };
+    const context = (minute: number) => ({
+      day: 2,
+      minute,
+      nearWater: true,
+      school: {
+        kind: 'dock' as const,
+        label: 'baited dock run',
+        strength: 0.72,
+        catchCount: 2,
+        baitUseful: true,
+        usesBait: true,
+        message: 'baited dock catch',
+      },
+    });
+
+    expect(interactStructure(structures, trap.id, materials, food, undefined, undefined, undefined, undefined, context(60))).toMatchObject({
+      ok: true,
+      mode: 'setTrap',
+      message: 'baited fish trap set · baited dock run · check after 3h',
+    });
+    expect(food).toEqual({});
+    expect(trap.state).toMatchObject({ trapSetDay: 2, trapSetMinute: 60, trapBaited: true });
+    expect(dismantleStructure(structures, trap.id)).toMatchObject({ ok: false, blockers: ['fish trap is set'] });
+
+    expect(interactStructure(structures, trap.id, materials, food, undefined, undefined, undefined, undefined, context(120))).toMatchObject({
+      ok: true,
+      mode: 'checkTrap',
+      message: 'fish trap soaking · 120m until first check · baited dock run',
+    });
+    expect(trap.state).toMatchObject({ trapSetDay: 2, trapSetMinute: 60, trapBaited: true });
+
+    expect(interactStructure(structures, trap.id, materials, food, undefined, undefined, undefined, undefined, context(450))).toMatchObject({
+      ok: true,
+      mode: 'collectTrap',
+      moved: { rawFish: 3 },
+      message: 'fish trap hauled raw fish 3 · baited dock run',
+    });
+    expect(food).toEqual({ rawFish: 3 });
+    expect(trap.state).toEqual({ trapChecks: 1 });
+
+    const normalized = normalizeStructureSaves([
+      { id: 8, item: 'fishTrap', tile: 16, layer: 3, yaw: 0.5, state: { trapSetDay: 1.8, trapSetMinute: 89.9, trapBaited: true, trapChecks: 2.4 } },
+    ], 50, 8);
+    expect(normalized).toEqual([{ id: 8, item: 'fishTrap', tile: 16, layer: 3, yaw: 0.5, state: { trapSetDay: 1, trapSetMinute: 89, trapBaited: true, trapChecks: 2 } }]);
+  });
+
+  it('sets, combs, collects, blocks packing, and normalizes shore nets', () => {
+    const structures: StructureSave[] = [];
+    const net = addStructure(structures, { item: 'shoreNet', tile: 17, layer: 2, yaw: 0.15 })!;
+    const materials = [0, 0, 0, 0, 0];
+    const food: InventoryItems = {};
+    const context = (minute: number) => ({
+      day: 3,
+      minute,
+      nearWater: true,
+      school: {
+        kind: 'run' as const,
+        label: 'reed-water fish run',
+        strength: 0.68,
+        catchCount: 2,
+        baitUseful: true,
+        usesBait: false,
+        message: 'reed-water run',
+      },
+    });
+
+    expect(interactStructure(structures, net.id, materials, food, undefined, undefined, undefined, undefined, context(40))).toMatchObject({
+      ok: true,
+      mode: 'setNet',
+      message: 'shore net set · reed-water fish run · comb after 150m',
+    });
+    expect(net.state).toMatchObject({ netSetDay: 3, netSetMinute: 40 });
+    expect(dismantleStructure(structures, net.id)).toMatchObject({ ok: false, blockers: ['shore net is set'] });
+
+    expect(interactStructure(structures, net.id, materials, food, undefined, undefined, undefined, undefined, context(80))).toMatchObject({
+      ok: true,
+      mode: 'checkNet',
+      message: 'shore net soaking · 110m until first comb · reed-water fish run',
+    });
+    expect(food).toEqual({});
+
+    expect(interactStructure(structures, net.id, materials, food, undefined, undefined, undefined, undefined, context(230))).toMatchObject({
+      ok: true,
+      mode: 'collectNet',
+      moved: { rawFish: 2, reeds: 1, bait: 1 },
+      message: 'shore net hauled raw fish 2, reeds 1, bait 1 · reed-water fish run',
+    });
+    expect(food).toEqual({ rawFish: 2, reeds: 1, bait: 1 });
+    expect(net.state).toEqual({ netChecks: 1 });
+
+    const normalized = normalizeStructureSaves([
+      { id: 9, item: 'shoreNet', tile: 18, layer: 3, yaw: 0.5, state: { netSetDay: 2.8, netSetMinute: 70.9, netChecks: 3.5 } },
+    ], 50, 8);
+    expect(normalized).toEqual([{ id: 9, item: 'shoreNet', tile: 18, layer: 3, yaw: 0.5, state: { netSetDay: 2, netSetMinute: 70, netChecks: 3 } }]);
+  });
+
+  it('uses drying racks to preserve fish into trail rations', () => {
+    const structures: StructureSave[] = [];
+    const rack = addStructure(structures, { item: 'dryingRack', tile: 18, layer: 2, yaw: 0 })!;
+    const materials = [0, 0, 0, 0, 0];
+    const food: InventoryItems = { rawFish: 2, kelp: 1, snowHerb: 1 };
+
+    expect(interactStructure(structures, rack.id, materials, food)).toMatchObject({
+      ok: true,
+      mode: 'preserve',
+      moved: { trailRation: 2 },
+      message: 'dried trail rations 2 · kelp',
+    });
+    expect(food).toEqual({ rawFish: 1, snowHerb: 1, trailRation: 2 });
+    expect(rack.state).toMatchObject({ preserves: 1 });
+
+    expect(interactStructure(structures, rack.id, materials, food)).toMatchObject({
+      ok: true,
+      mode: 'preserve',
+      moved: { trailRation: 2 },
+      message: 'dried trail rations 2 · snow herb',
+    });
+    expect(food).toEqual({ trailRation: 4 });
+    expect(rack.state).toMatchObject({ preserves: 2 });
+
+    expect(interactStructure(structures, rack.id, materials, food)).toMatchObject({
+      ok: false,
+      mode: 'inspect',
+      message: 'drying rack needs raw fish',
+    });
+
+    const normalized = normalizeStructureSaves([
+      { id: 7, item: 'dryingRack', tile: 19, layer: 3, yaw: 0.5, state: { preserves: 2.8 } },
+    ], 20, 8);
+    expect(normalized).toEqual([{ id: 7, item: 'dryingRack', tile: 19, layer: 3, yaw: 0.5, state: { preserves: 2 } }]);
+  });
+
+  it('reads and normalizes weather vanes as forecast instruments', () => {
+    const structures: StructureSave[] = [];
+    const vane = addStructure(structures, { item: 'weatherVane', tile: 23, layer: 2, yaw: 0.2 })!;
+
+    const result = interactStructure(structures, vane.id, [0, 0, 0, 0, 0], undefined, undefined, undefined, {
+      kind: 'storm',
+      label: 'storm front',
+      intensity: 0.84,
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      mode: 'forecast',
+      message: 'weather vane reads storm front · storm timing marked',
+    });
+    expect(vane.state).toMatchObject({
+      forecastReads: 1,
+      forecastKind: 'storm',
+      forecastLabel: 'storm front',
+      forecastIntensity: 0.84,
+    });
+
+    const normalized = normalizeStructureSaves([
+      { id: 11, item: 'weatherVane', tile: 24, layer: 3, yaw: 0.5, state: { forecastReads: 2.8, forecastKind: 'cold', forecastLabel: ' ridge cold ', forecastIntensity: 1.5 } },
+    ], 50, 8);
+    expect(normalized).toEqual([{ id: 11, item: 'weatherVane', tile: 24, layer: 3, yaw: 0.5, state: { forecastReads: 2, forecastKind: 'cold', forecastLabel: 'ridge cold', forecastIntensity: 1 } }]);
+  });
+
+  it('collects rain and storm water in a rain cistern up to capacity', () => {
+    const structures: StructureSave[] = [];
+    const cistern = addStructure(structures, { item: 'rainCistern', tile: 25, layer: 2, yaw: 0 })!;
+    const materials = [0, 0, 0, 0, 0];
+
+    expect(interactStructure(structures, cistern.id, materials, undefined, undefined, undefined, undefined, {
+      kind: 'clear', label: 'clear', intensity: 0.1,
+    })).toMatchObject({ ok: true, mode: 'inspect', message: 'rain cistern dry · wait for rain, storm, or mist' });
+
+    expect(interactStructure(structures, cistern.id, materials, undefined, undefined, undefined, undefined, {
+      kind: 'storm', label: 'storm front', intensity: 0.9,
+    })).toMatchObject({ ok: true, mode: 'collectWater', message: 'rain cistern caught storm front water · water 2/4' });
+    expect(cistern.state).toMatchObject({ water: 2, fills: 1 });
+
+    expect(interactStructure(structures, cistern.id, materials, undefined, undefined, undefined, undefined, {
+      kind: 'storm', label: 'storm front', intensity: 0.9,
+    })).toMatchObject({ ok: true, mode: 'collectWater', message: 'rain cistern caught storm front water · water 4/4' });
+    expect(cistern.state).toMatchObject({ water: 4, fills: 2 });
+
+    expect(interactStructure(structures, cistern.id, materials, undefined, undefined, undefined, undefined, {
+      kind: 'storm', label: 'storm front', intensity: 0.9,
+    })).toMatchObject({ ok: true, mode: 'collectWater', message: 'rain cistern full · water 4/4' });
+    expect(cistern.state).toMatchObject({ water: 4, fills: 2 });
+    expect(dismantleStructure(structures, cistern.id)).toMatchObject({ ok: false, blockers: ['empty water first'] });
+
+    const normalized = normalizeStructureSaves([
+      { id: 6, item: 'rainCistern', tile: 26, layer: 3, yaw: 0.5, state: { water: 9, fills: 2.8 } },
+    ], 50, 8);
+    expect(normalized).toEqual([{ id: 6, item: 'rainCistern', tile: 26, layer: 3, yaw: 0.5, state: { water: 4, fills: 2 } }]);
+  });
+
+  it('caches root-cellar provisions for home expedition prep and feeds hearth supper', () => {
+    const structures: StructureSave[] = [
+      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
+    ];
+    const cellar = addStructure(structures, { item: 'rootCellar', tile: 101, layer: 2, yaw: 0 })!;
+    const materials = [0, 0, 0, 0, 0];
+    const food: InventoryItems = { trailRation: 1, caveMushroom: 2 };
+
+    expect(interactStructure(structures, cellar.id, materials, food, hubTopology)).toMatchObject({
+      ok: true,
+      mode: 'cache',
+      moved: { trailRation: 1 },
+      message: 'root cellar cached trail ration · provisions 1/6',
+    });
+    expect(food).toEqual({ caveMushroom: 2 });
+    expect(cellar.state).toMatchObject({ provisions: 1, caches: 1 });
+
+    expect(interactStructure(structures, cellar.id, materials, food, hubTopology)).toMatchObject({
+      ok: true,
+      mode: 'cache',
+      moved: { caveMushroom: 2 },
+      message: 'root cellar cached cave mushrooms · provisions 2/6',
+    });
+    expect(food).toEqual({});
+    expect(rootCellarProvisionCount(structures, hubTopology)).toBe(2);
+    expect(homeScore(structures, hubTopology).shelter).toMatchObject({
+      hasCellar: true,
+      cellarProvisions: 2,
+    });
+    expect(homeScore(structures, hubTopology)).toMatchObject({ cellarProvisions: 2 });
+
+    expect(interactStructure(structures, cellar.id, materials, food, hubTopology)).toMatchObject({
+      ok: true,
+      mode: 'withdrawProvision',
+      moved: { trailRation: 1 },
+      message: 'pulled trail ration from root cellar · provisions 1/6',
+    });
+    expect(food).toEqual({ trailRation: 1 });
+    expect(rootCellarProvisionCount(structures, hubTopology)).toBe(1);
+
+    const spent = spendRootCellarProvision(structures, hubTopology);
+    expect(spent).toMatchObject({ ok: true, cellarId: cellar.id, remaining: 0 });
+    expect(cellar.state?.provisions).toBeUndefined();
+    expect(rootCellarProvisionCount(structures, hubTopology)).toBe(0);
+    expect(spendRootCellarProvision(structures, hubTopology)).toMatchObject({ ok: false, remaining: 0 });
+
+    const normalized = normalizeStructureSaves([
+      { id: 15, item: 'rootCellar', tile: 43, layer: 3, yaw: 0.5, state: { provisions: 99, caches: 2.8 } },
+    ], 50, 8);
+    expect(normalized).toEqual([{ id: 15, item: 'rootCellar', tile: 43, layer: 3, yaw: 0.5, state: { provisions: rootCellarProvisionCapacity(), caches: 2 } }]);
+  });
+
   it('attunes and normalizes waystones as persistent route markers', () => {
     const structures: StructureSave[] = [];
     const stone = addStructure(structures, { item: 'waystone', tile: 20, layer: 2, yaw: 0 })!;
     const materials = [0, 0, 0, 0, 0];
 
-    const shore = interactStructure(structures, stone.id, materials, undefined, undefined, undefined, { nearWater: true });
+    const shore = interactStructure(structures, stone.id, materials, undefined, undefined, { nearWater: true });
     expect(shore).toMatchObject({ ok: true, mode: 'mark', message: 'shore waystone attuned · shore route' });
     expect(stone.state).toMatchObject({ waystone: 'shore', markerUses: 1 });
 
-    const cave = interactStructure(structures, stone.id, materials, undefined, undefined, undefined, { cave: true, nearWater: true });
+    const cave = interactStructure(structures, stone.id, materials, undefined, undefined, { cave: true, nearWater: true });
     expect(cave.message).toBe('cave waystone attuned · cave entrance');
     expect(stone.state).toMatchObject({ waystone: 'cave', markerUses: 2 });
     expect(waystoneMarkLabel(stone.state?.waystone)).toBe('cave waystone');
+    expect(dismantleStructure(structures, stone.id)).toMatchObject({ ok: false, blockers: ['waystone is attuned'] });
 
     const normalized = normalizeStructureSaves([
       { id: 9, item: 'waystone', tile: 21, layer: 2, yaw: 0.4, state: { waystone: 'home', markerUses: 3 } },
@@ -2242,5 +735,24 @@ describe('Hearth and Horizon structures', () => {
     ], 50, 5);
     expect(normalized[0].state).toEqual({ waystone: 'home', markerUses: 3 });
     expect(normalized[1].state).toEqual({ markerUses: 2 });
+  });
+
+  it('places dock, trap, and net props on separate hex edges without colliding', () => {
+    const hexTopology: StructureTopology = { degreeOf: () => 6, neighbor: (tile, edge) => 1000 + tile * 10 + edge };
+    const structures: StructureSave[] = [];
+    const dock = addStructure(structures, { item: 'dockSegment', tile: 30, layer: 2, yaw: 0 }, hexTopology)!;
+    expect(structureSocketPlacement(dock)).toMatchObject({ kind: 'edge', edge: 0, occupies: ['edge:0'] });
+
+    // a fish trap on the same tile but a different edge is fine
+    const trap = addStructure(structures, { item: 'fishTrap', tile: 30, layer: 2, yaw: STRUCTURE_YAW_STEP }, hexTopology);
+    expect(trap).not.toBeNull();
+    expect(structureSocketPlacement(trap!)).toMatchObject({ kind: 'edge', edge: 1 });
+
+    // a shore net aimed at the same edge as the dock is blocked
+    expect(addStructure(structures, { item: 'shoreNet', tile: 30, layer: 2, yaw: 0 }, hexTopology)).toBeNull();
+
+    // a socket edge beyond a tile's real degree is rejected
+    const pentagon: StructureTopology = { degreeOf: () => 5, neighbor: (tile, edge) => 2000 + tile * 10 + edge };
+    expect(addStructure(structures, { item: 'fishTrap', tile: 31, layer: 2, yaw: 5 * STRUCTURE_YAW_STEP }, pentagon)).toBeNull();
   });
 });

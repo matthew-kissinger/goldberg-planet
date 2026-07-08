@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three/webgpu';
 import { Goldberg } from '../src/geo/goldberg';
-import { StructureRenderer } from '../src/render/structures';
-import type { KilnStructureSkinSlug, StructureSkinProvider } from '../src/render/kilnAssets';
-import { structureSocketSpec, type StructureSave, type StructureSocketSpec } from '../src/sim/structures';
+import { StructureRenderer, type StructureSnapPreview } from '../src/render/structures';
+import { structureSocketSpec, type StructureSave } from '../src/sim/structures';
 import { buildLayers } from '../src/world/layers';
 
 function meshNames(renderer: StructureRenderer): Set<string> {
@@ -14,29 +13,12 @@ function meshNames(renderer: StructureRenderer): Set<string> {
   return names;
 }
 
-function readabilityRoles(renderer: StructureRenderer): Set<string> {
-  const roles = new Set<string>();
-  renderer.group.traverse((part) => {
-    const role = part.userData.structureReadabilityRole;
-    if (typeof role === 'string') roles.add(role);
-  });
-  return roles;
-}
-
 function namedObject(renderer: StructureRenderer, name: string): THREE.Object3D | null {
   let found: THREE.Object3D | null = null;
   renderer.group.traverse((part) => {
     if (part.name === name) found = part;
   });
   return found;
-}
-
-function visibleNameCount(renderer: StructureRenderer, name: string): number {
-  let count = 0;
-  renderer.group.traverse((part) => {
-    if (part.name === name && part.visible) count += 1;
-  });
-  return count;
 }
 
 function previewObject(renderer: StructureRenderer, name: string): THREE.Object3D | null {
@@ -47,555 +29,36 @@ function previewObject(renderer: StructureRenderer, name: string): THREE.Object3
   return found;
 }
 
-async function flushAsyncSkinLoads(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-const FAKE_KILN_SKIN_ITEMS: Record<KilnStructureSkinSlug, StructureSave['item']> = {
-  waystone: 'waystone',
-  'cave-anchor': 'caveAnchor',
-  'door-kit': 'doorKit',
-  'window-frame': 'windowFrame',
-  'roof-bundle': 'roofBundle',
-  workbench: 'workbench',
-  campfire: 'campfire',
-  chest: 'chest',
-  bedroll: 'bedroll',
-  'crop-plot': 'cropPlot',
-  'compost-bin': 'compostBin',
-  'rain-cistern': 'rainCistern',
-  'root-cellar': 'rootCellar',
-  'dock-segment': 'dockSegment',
-  'fish-trap': 'fishTrap',
-  'shore-net': 'shoreNet',
-  'drying-rack': 'dryingRack',
-  'weather-vane': 'weatherVane',
-  'lantern-post': 'lantern',
-};
-
-const FAKE_KILN_SOCKET_ROLES: Record<KilnStructureSkinSlug, string> = {
-  waystone: 'route-marker',
-  'cave-anchor': 'route-marker',
-  'door-kit': 'wall-opening',
-  'window-frame': 'wall-light',
-  'roof-bundle': 'roof-cap',
-  workbench: 'crafting-station',
-  campfire: 'warmth-station',
-  chest: 'storage-station',
-  bedroll: 'home-rest',
-  'crop-plot': 'food-plot',
-  'compost-bin': 'compost-station',
-  'rain-cistern': 'water-cistern',
-  'root-cellar': 'provision-cache',
-  'dock-segment': 'shore-edge',
-  'fish-trap': 'shore-edge',
-  'shore-net': 'shore-edge',
-  'drying-rack': 'food-preserve',
-  'weather-vane': 'weather-readback',
-  'lantern-post': 'light-post',
-};
-
-const FAKE_KILN_HIDE_NAMES: Record<KilnStructureSkinSlug, string[]> = {
-  waystone: ['waystoneBase', 'waystoneCore', 'waystoneBand'],
-  'cave-anchor': ['caveAnchorStoneBase', 'caveAnchorCairnStone', 'caveAnchorPost', 'caveAnchorRopeRail'],
-  'door-kit': ['leftJamb', 'rightJamb', 'lintel', 'doorSlab', 'knob'],
-  'window-frame': ['topRail', 'bottomRail', 'leftRail', 'rightRail', 'glassPane'],
-  'roof-bundle': ['leftRoofPlane', 'rightRoofPlane', 'ridgeBeam'],
-  workbench: ['benchTop', 'toolBlock', 'metalVise', 'benchLeg'],
-  campfire: ['fireRingStone', 'crossedLog'],
-  chest: ['chestBox', 'chestLid', 'leftBand', 'rightBand'],
-  bedroll: ['sleepMat', 'rolledBlanket', 'strap'],
-  'crop-plot': ['woodFrame', 'tilledSoil'],
-  'compost-bin': ['compostBinBase', 'compostBinPost', 'compostBinSlat', 'compostBinSideSlat', 'compostBinFrontLip'],
-  'rain-cistern': ['rainCisternStoneBase', 'rainCisternBarrel', 'rainCisternRim', 'rainCisternStave', 'rainCisternGutter', 'rainCisternSpout'],
-  'root-cellar': ['rootCellarStoneLip', 'rootCellarDarkMouth', 'rootCellarLadderRung', 'rootCellarCoolStone', 'rootCellarBrace'],
-  'dock-segment': ['dockDeckPlank', 'dockLeftStringer', 'dockRightStringer', 'dockPiling', 'dockRopeRail'],
-  'fish-trap': ['fishTrapSkid', 'fishTrapHoop', 'fishTrapLongSlat', 'fishTrapSideSlat', 'fishTrapFunnel'],
-  'shore-net': ['shoreNetFootRail', 'shoreNetPole', 'shoreNetTopCord', 'shoreNetStrand', 'shoreNetCrossCord'],
-  'drying-rack': ['dryingRackLeg', 'dryingRackRail', 'dryingRackBrace'],
-  'weather-vane': ['weatherVaneStoneBase', 'weatherVanePost', 'weatherVaneCompassDisk', 'weatherVaneCompassTick'],
-  'lantern-post': ['lanternPost', 'arm', 'lanternCage'],
-};
-
-const ALL_FAKE_KILN_STRUCTURE_SKINS = Object.keys(FAKE_KILN_SKIN_ITEMS) as KilnStructureSkinSlug[];
-
-class FakeKilnAssets implements StructureSkinProvider {
-  async createStructureSkin(slug: KilnStructureSkinSlug) {
-    const object = new THREE.Group();
-    object.name = `kiln-skin-${slug}`;
-    object.userData.kilnAssetSlug = slug;
-    object.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial()));
-    const fit = {
-      slug,
-      item: FAKE_KILN_SKIN_ITEMS[slug],
-      socketRole: FAKE_KILN_SOCKET_ROLES[slug],
-      sourceBboxSize: [1, 1, 1],
-      fittedBboxSize: [1, 1, 1],
-      scale: 1,
-      position: [0, 0, 0] as const,
-      rotation: [0, 0, 0] as const,
-      loadBearing: 'code-socket' as const,
-      glbPolicy: 'decorative-skin-after-normalization' as const,
-      instanceability: slug === 'window-frame' ? 'C' : 'B',
-      modularKit: slug !== 'waystone',
-      acceptanceNote: 'fake normalized decorative skin',
-      sourceUrl: `/assets/kiln/models/${slug}.glb`,
-    };
-    object.userData.kilnSkinFit = fit;
-    return {
-      slug,
-      object,
-      manifest: { slug, status: 'ready' as const, file: `models/${slug}.glb` },
-      sourceUrl: `/assets/kiln/models/${slug}.glb`,
-      hideProceduralNames: FAKE_KILN_HIDE_NAMES[slug],
-      fit,
-    };
-  }
-
-  snapshot() {
-    return {
-      enabled: ALL_FAKE_KILN_STRUCTURE_SKINS,
-      manifestUrl: '/assets/kiln/ASSET_MANIFEST.json',
-      modelRequests: [],
-      manifestLoaded: true,
-      loaded: ALL_FAKE_KILN_STRUCTURE_SKINS,
-      failed: [],
-      structureSkins: {},
-    };
-  }
-}
-
-const HOUSE_PREVIEW_SOCKETS: Record<'doorKit' | 'windowFrame' | 'roofBundle', StructureSocketSpec> = {
-  doorKit: {
-    item: 'doorKit',
-    name: 'Door kit',
-    role: 'wall-opening',
-    modularKit: true,
-    gridWidth: 1,
-    gridDepth: 0.22,
-    height: 1.9,
-    openingWidth: 0.72,
-    openingHeight: 1.55,
-    pivot: 'wall-center',
-    collider: 'thin-wall',
-    snap: ['front edge on hex face'],
-    visualScale: 'test',
-    loadBearing: 'code-socket',
-    glbPolicy: 'decorative-skin-after-normalization',
-  },
-  windowFrame: {
-    item: 'windowFrame',
-    name: 'Window frame',
-    role: 'wall-light',
-    modularKit: true,
-    gridWidth: 0.92,
-    gridDepth: 0.18,
-    height: 1.45,
-    openingWidth: 0.58,
-    openingHeight: 0.52,
-    pivot: 'wall-center',
-    collider: 'thin-wall',
-    snap: ['front edge on hex face'],
-    visualScale: 'test',
-    loadBearing: 'code-socket',
-    glbPolicy: 'decorative-skin-after-normalization',
-  },
-  roofBundle: {
-    item: 'roofBundle',
-    name: 'Roof bundle',
-    role: 'roof-cap',
-    modularKit: true,
-    gridWidth: 1.12,
-    gridDepth: 1.12,
-    height: 0.62,
-    pivot: 'center',
-    collider: 'roof-shell',
-    snap: ['centered over one occupied shelter hex'],
-    visualScale: 'test',
-    loadBearing: 'code-socket',
-    glbPolicy: 'decorative-skin-after-normalization',
-  },
-};
-
-class FailingKilnAssets implements StructureSkinProvider {
-  async createStructureSkin() {
-    return null;
-  }
-}
-
 describe('structure renderer asset readability', () => {
-  it('gives cave anchors and waystones distinct route-marker glyph roles', () => {
+  it('renders distinct procedural bodies for the four surviving core props', () => {
     const scene = new THREE.Scene();
     const geo = new Goldberg(8);
     const layers = buildLayers();
     const renderer = new StructureRenderer(scene);
     const structures: StructureSave[] = [
-      { id: 1, item: 'waystone', tile: 1, layer: 100, yaw: 0, state: { waystone: 'survey', markerUses: 1 } },
-      { id: 2, item: 'waystone', tile: 2, layer: 100, yaw: 0, state: { waystone: 'home', markerUses: 1 } },
-      { id: 3, item: 'waystone', tile: 3, layer: 100, yaw: 0, state: { waystone: 'cave', markerUses: 1 } },
-      { id: 4, item: 'waystone', tile: 4, layer: 100, yaw: 0, state: { waystone: 'shore', markerUses: 1 } },
-      { id: 5, item: 'waystone', tile: 5, layer: 100, yaw: 0, state: { waystone: 'forage', markerUses: 1 } },
-      { id: 6, item: 'caveAnchor', tile: 6, layer: 100, yaw: 0, state: { anchorUses: 1, anchorKind: 'arch', anchorFlooded: false, anchorSpring: false } },
-      { id: 7, item: 'caveAnchor', tile: 7, layer: 100, yaw: 0, state: { anchorUses: 1, anchorKind: 'dryCave', anchorFlooded: false, anchorSpring: true } },
-      { id: 8, item: 'caveAnchor', tile: 8, layer: 100, yaw: 0, state: { anchorUses: 1, anchorKind: 'seaCave', anchorFlooded: true, anchorSpring: false } },
-    ];
-
-    renderer.setStructures(structures);
-    renderer.update(structures, geo, layers, { x: 0, y: 0, z: 0 }, 0.5);
-    const stats = renderer.stats();
-
-    expect(stats.groups).toBe(8);
-    expect(stats.routeSilhouettes).toBe(2);
-    expect(stats.routeReadabilityRoles).toBeGreaterThanOrEqual(18);
-    expect([...meshNames(renderer)]).toEqual(expect.arrayContaining([
-      'waystoneGlyph-survey',
-      'waystoneGlyph-home',
-      'waystoneGlyph-cave',
-      'waystoneGlyph-shore',
-      'waystoneGlyph-forage',
-      'caveAnchorGlyph-arch',
-      'caveAnchorGlyph-dryCave',
-      'caveAnchorGlyph-seaCave',
-      'caveAnchorSpringMark',
-      'caveAnchorFloodMark',
-    ]));
-    expect([...readabilityRoles(renderer)]).toEqual(expect.arrayContaining([
-      'survey bearing needle',
-      'home roof chevron',
-      'cave arch lintel',
-      'shore wave bar',
-      'forage leaf sprout',
-      'walk-under arch glyph',
-      'dark dry-cave mouth glyph',
-      'sea-cave waterline glyph',
-      'freshwater spring bead',
-      'set-anchor flood marker',
-      'coiled return rope',
-    ]));
-  });
-
-  it('skins waystones with Kiln GLB bodies while preserving attuned glyph overlays', async () => {
-    const scene = new THREE.Scene();
-    const geo = new Goldberg(8);
-    const layers = buildLayers();
-    const renderer = new StructureRenderer(scene, new FakeKilnAssets());
-    const structures: StructureSave[] = [
-      { id: 1, item: 'waystone', tile: 1, layer: 100, yaw: 0, state: { waystone: 'home', markerUses: 1 } },
-    ];
-
-    renderer.setStructures(structures);
-    await flushAsyncSkinLoads();
-    renderer.update(structures, geo, layers, { x: 0, y: 0, z: 0 }, 0.5);
-
-    expect(namedObject(renderer, 'kiln-skin-waystone')).toBeTruthy();
-    expect(namedObject(renderer, 'waystoneBase')?.visible).toBe(false);
-    expect(namedObject(renderer, 'waystoneCore')?.visible).toBe(false);
-    expect(namedObject(renderer, 'waystoneBand')?.visible).toBe(false);
-    expect(namedObject(renderer, 'waystoneGlyph-home')?.visible).toBe(true);
-    expect(namedObject(renderer, 'waystoneGlyph-survey')?.visible).toBe(false);
-    expect(renderer.stats().kilnSkinsLoaded).toBe(1);
-    expect(renderer.stats().kilnSkinFallbacks).toBe(0);
-    expect(renderer.stats().kilnSkinsBySlug.waystone).toMatchObject({ loaded: 1, pending: 0, fallback: 0 });
-  });
-
-  it('skins cave anchors with Kiln GLB bodies while preserving cave-route overlays', async () => {
-    const scene = new THREE.Scene();
-    const geo = new Goldberg(8);
-    const layers = buildLayers();
-    const renderer = new StructureRenderer(scene, new FakeKilnAssets());
-    const structures: StructureSave[] = [
-      {
-        id: 1,
-        item: 'caveAnchor',
-        tile: 1,
-        layer: 100,
-        yaw: 0,
-        state: { anchorUses: 1, anchorKind: 'seaCave', anchorFlooded: true, anchorSpring: true },
-      },
-    ];
-
-    renderer.setStructures(structures);
-    await flushAsyncSkinLoads();
-    renderer.update(structures, geo, layers, { x: 0, y: 0, z: 0 }, 0.5);
-    const stats = renderer.stats();
-
-    expect(namedObject(renderer, 'kiln-skin-cave-anchor')).toBeTruthy();
-    expect(namedObject(renderer, 'caveAnchorStoneBase')?.visible).toBe(false);
-    expect(namedObject(renderer, 'caveAnchorCairnStone')?.visible).toBe(false);
-    expect(namedObject(renderer, 'caveAnchorPost')?.visible).toBe(false);
-    expect(namedObject(renderer, 'caveAnchorRopeRail')?.visible).toBe(false);
-    expect(namedObject(renderer, 'caveAnchorGlyph-seaCave')?.visible).toBe(true);
-    expect(namedObject(renderer, 'caveAnchorGlyph-arch')?.visible).toBe(false);
-    expect(namedObject(renderer, 'caveAnchorGlyph-dryCave')?.visible).toBe(false);
-    expect(namedObject(renderer, 'caveAnchorRopePulse0')?.visible).toBe(true);
-    expect(namedObject(renderer, 'caveAnchorGlow')?.visible).toBe(true);
-    expect(namedObject(renderer, 'caveAnchorFloodMark')?.visible).toBe(true);
-    expect(namedObject(renderer, 'caveAnchorSpringMark')?.visible).toBe(true);
-    expect(stats.kilnSkinsLoaded).toBe(1);
-    expect(stats.kilnSkinFallbacks).toBe(0);
-    expect(stats.kilnSkinsBySlug['cave-anchor']).toMatchObject({ loaded: 1, pending: 0, fallback: 0 });
-    expect(stats.kilnSkinFits['cave-anchor']).toMatchObject({
-      item: 'caveAnchor',
-      socketRole: 'route-marker',
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-  });
-
-  it('skins modular house-kit sockets with Kiln GLBs while preserving functional shelter overlays', async () => {
-    const scene = new THREE.Scene();
-    const geo = new Goldberg(8);
-    const layers = buildLayers();
-    const renderer = new StructureRenderer(scene, new FakeKilnAssets());
-    const homeTile = Array.from({ length: geo.count }, (_, tile) => tile).find((tile) => geo.degreeOf(tile) >= 6);
-    if (homeTile === undefined) throw new Error('test Goldberg lacks a six-neighbor home tile');
-    const local = Array.from({ length: geo.degreeOf(homeTile) }, (_, edge) => geo.neighbor(homeTile, edge));
-    const structures: StructureSave[] = [
-      { id: 1, item: 'bedroll', tile: homeTile, layer: 100, yaw: 0, state: { home: true } },
-      { id: 2, item: 'roofBundle', tile: local[0], layer: 100, yaw: 0 },
-      { id: 3, item: 'roofBundle', tile: local[1], layer: 100, yaw: 0 },
-      { id: 4, item: 'doorKit', tile: local[2], layer: 100, yaw: 0 },
-      { id: 5, item: 'campfire', tile: local[3], layer: 100, yaw: 0, state: { lit: true } },
-      { id: 6, item: 'workbench', tile: local[4], layer: 100, yaw: 0 },
-      { id: 7, item: 'chest', tile: local[5], layer: 100, yaw: 0 },
-      { id: 8, item: 'windowFrame', tile: homeTile, layer: 100, yaw: 0 },
-    ];
-
-    renderer.setStructures(structures);
-    await flushAsyncSkinLoads();
-    renderer.update(structures, geo, layers, { x: 0, y: 0, z: 0 }, 0.5);
-    const stats = renderer.stats();
-
-    expect(namedObject(renderer, 'kiln-skin-door-kit')).toBeTruthy();
-    expect(namedObject(renderer, 'kiln-skin-window-frame')).toBeTruthy();
-    expect(namedObject(renderer, 'kiln-skin-roof-bundle')).toBeTruthy();
-    expect(namedObject(renderer, 'leftJamb')?.visible).toBe(false);
-    expect(namedObject(renderer, 'glassPane')?.visible).toBe(false);
-    expect(namedObject(renderer, 'leftRoofPlane')?.visible).toBe(false);
-    expect(namedObject(renderer, 'windowWarmLight')?.visible).toBe(true);
-    expect(namedObject(renderer, 'roofShelterGlow')?.visible).toBe(true);
-    expect(stats.kilnSkinsLoaded).toBe(8);
-    expect(stats.kilnSkinFallbacks).toBe(0);
-    expect(stats.kilnSkinsBySlug.bedroll).toMatchObject({ loaded: 1, pending: 0, fallback: 0 });
-    expect(stats.kilnSkinsBySlug.campfire).toMatchObject({ loaded: 1, pending: 0, fallback: 0 });
-    expect(stats.kilnSkinsBySlug.workbench).toMatchObject({ loaded: 1, pending: 0, fallback: 0 });
-    expect(stats.kilnSkinsBySlug.chest).toMatchObject({ loaded: 1, pending: 0, fallback: 0 });
-    expect(stats.kilnSkinsBySlug['door-kit']).toMatchObject({ loaded: 1, pending: 0, fallback: 0 });
-    expect(stats.kilnSkinsBySlug['window-frame']).toMatchObject({ loaded: 1, pending: 0, fallback: 0 });
-    expect(stats.kilnSkinsBySlug['roof-bundle']).toMatchObject({ loaded: 2, pending: 0, fallback: 0 });
-    expect(stats.kilnSkinFits['window-frame']).toMatchObject({
-      item: 'windowFrame',
-      socketRole: 'wall-light',
-      glbPolicy: 'decorative-skin-after-normalization',
-      instanceability: 'C',
-    });
-  });
-
-  it('skins K3 home and camp props while preserving procedural state overlays', async () => {
-    const scene = new THREE.Scene();
-    const geo = new Goldberg(8);
-    const layers = buildLayers();
-    const renderer = new StructureRenderer(scene, new FakeKilnAssets());
-    const structures: StructureSave[] = [
       { id: 1, item: 'workbench', tile: 1, layer: 100, yaw: 0 },
       { id: 2, item: 'campfire', tile: 2, layer: 100, yaw: 0, state: { lit: true } },
       { id: 3, item: 'chest', tile: 3, layer: 100, yaw: 0, state: { storage: { wood: 2 } } },
       { id: 4, item: 'bedroll', tile: 4, layer: 100, yaw: 0, state: { home: true } },
-      { id: 5, item: 'cropPlot', tile: 5, layer: 100, yaw: 0, state: { crop: 'berries', growth: 3, fertility: 2 } },
-      { id: 6, item: 'dryingRack', tile: 6, layer: 100, yaw: 0, state: { preserves: 1 } },
-      { id: 7, item: 'weatherVane', tile: 7, layer: 100, yaw: 0, state: { forecastReads: 1, forecastKind: 'storm' } },
     ];
 
     renderer.setStructures(structures);
-    await flushAsyncSkinLoads();
     renderer.update(structures, geo, layers, { x: 0, y: 0, z: 0 }, 0.5);
     const stats = renderer.stats();
 
-    for (const slug of ['workbench', 'campfire', 'chest', 'bedroll', 'crop-plot', 'drying-rack', 'weather-vane'] as const) {
-      expect(namedObject(renderer, `kiln-skin-${slug}`)).toBeTruthy();
-      expect(stats.kilnSkinsBySlug[slug]).toMatchObject({ loaded: 1, pending: 0, fallback: 0 });
-    }
-    expect(namedObject(renderer, 'benchTop')?.visible).toBe(false);
-    expect(namedObject(renderer, 'fireRingStone')?.visible).toBe(false);
-    expect(namedObject(renderer, 'chestBox')?.visible).toBe(false);
-    expect(namedObject(renderer, 'sleepMat')?.visible).toBe(false);
-    expect(namedObject(renderer, 'woodFrame')?.visible).toBe(false);
-    expect(namedObject(renderer, 'dryingRackLeg')?.visible).toBe(false);
-    expect(namedObject(renderer, 'weatherVanePost')?.visible).toBe(false);
+    expect(stats.groups).toBe(4);
+    expect(stats.meshes).toBeGreaterThan(10);
+    const names = meshNames(renderer);
+    expect(names).toContain('benchTop');
+    expect(names).toContain('fireRingStone');
+    expect(names).toContain('chestBox');
+    expect(names).toContain('sleepMat');
     expect(namedObject(renderer, 'flameCore')?.visible).toBe(true);
-    expect(namedObject(renderer, 'smokePuff0')?.visible).toBe(true);
     expect(namedObject(renderer, 'frontLatch')?.visible).toBe(true);
     expect(namedObject(renderer, 'homeMarker')?.visible).toBe(true);
-    expect(namedObject(renderer, 'sprout')?.visible).toBe(true);
-    expect(namedObject(renderer, 'berryCluster')?.visible).toBe(true);
-    expect(namedObject(renderer, 'dryingFood')?.visible).toBe(true);
-    expect(namedObject(renderer, 'weatherVaneNeedle')?.visible).toBe(true);
-    expect(namedObject(renderer, 'weatherVaneRibbon0')?.visible).toBe(true);
-    expect(namedObject(renderer, 'weatherVaneStormGlow')?.visible).toBe(true);
-    expect(stats.kilnSkinsLoaded).toBe(7);
-    expect(stats.kilnSkinFallbacks).toBe(0);
-    expect(stats.kilnSkinFits['crop-plot']).toMatchObject({
-      item: 'cropPlot',
-      socketRole: 'food-plot',
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
   });
 
-  it('keeps procedural K3 home and camp props visible when GLB skins fall back', async () => {
-    const scene = new THREE.Scene();
-    const geo = new Goldberg(8);
-    const layers = buildLayers();
-    const renderer = new StructureRenderer(scene, new FailingKilnAssets());
-    const structures: StructureSave[] = [
-      { id: 1, item: 'workbench', tile: 1, layer: 100, yaw: 0 },
-      { id: 2, item: 'campfire', tile: 2, layer: 100, yaw: 0, state: { lit: true } },
-      { id: 3, item: 'chest', tile: 3, layer: 100, yaw: 0, state: { storage: { wood: 2 } } },
-      { id: 4, item: 'bedroll', tile: 4, layer: 100, yaw: 0, state: { home: true } },
-      { id: 5, item: 'cropPlot', tile: 5, layer: 100, yaw: 0, state: { crop: 'berries', growth: 3, fertility: 2 } },
-      { id: 6, item: 'dryingRack', tile: 6, layer: 100, yaw: 0, state: { preserves: 1 } },
-      { id: 7, item: 'weatherVane', tile: 7, layer: 100, yaw: 0, state: { forecastReads: 1, forecastKind: 'storm' } },
-    ];
-
-    renderer.setStructures(structures);
-    await flushAsyncSkinLoads();
-    renderer.update(structures, geo, layers, { x: 0, y: 0, z: 0 }, 0.5);
-    const stats = renderer.stats();
-
-    expect(namedObject(renderer, 'kiln-skin-workbench')).toBeNull();
-    for (const name of ['benchTop', 'fireRingStone', 'chestBox', 'sleepMat', 'woodFrame', 'dryingRackLeg', 'weatherVanePost']) {
-      expect(namedObject(renderer, name)?.visible).toBe(true);
-    }
-    for (const name of ['flameCore', 'homeMarker', 'sprout', 'dryingFood', 'weatherVaneNeedle', 'weatherVaneStormGlow']) {
-      expect(namedObject(renderer, name)?.visible).toBe(true);
-    }
-    expect(stats.kilnSkinsLoaded).toBe(0);
-    expect(stats.kilnSkinFallbacks).toBe(7);
-    for (const slug of ['workbench', 'campfire', 'chest', 'bedroll', 'crop-plot', 'drying-rack', 'weather-vane'] as const) {
-      expect(stats.kilnSkinsBySlug[slug]).toMatchObject({ loaded: 0, pending: 0, fallback: 1 });
-    }
-  });
-
-  it('skins K4 utility and waterline props while preserving procedural state overlays', async () => {
-    const scene = new THREE.Scene();
-    const geo = new Goldberg(8);
-    const layers = buildLayers();
-    const renderer = new StructureRenderer(scene, new FakeKilnAssets());
-    const structures: StructureSave[] = [
-      { id: 1, item: 'compostBin', tile: 1, layer: 100, yaw: 0, state: { composts: 1 } },
-      { id: 2, item: 'rainCistern', tile: 2, layer: 100, yaw: 0, state: { water: 3 } },
-      { id: 3, item: 'rootCellar', tile: 3, layer: 100, yaw: 0, state: { provisions: 3 } },
-      { id: 4, item: 'dockSegment', tile: 4, layer: 100, yaw: 0 },
-      { id: 5, item: 'fishTrap', tile: 5, layer: 100, yaw: 0, state: { trapSetDay: 2, trapSetMinute: 30, trapBaited: true } },
-      { id: 6, item: 'shoreNet', tile: 6, layer: 100, yaw: 0, state: { netSetDay: 2, netSetMinute: 40 } },
-      { id: 7, item: 'lantern', tile: 7, layer: 100, yaw: 0, state: { lit: true } },
-    ];
-
-    renderer.setStructures(structures);
-    await flushAsyncSkinLoads();
-    renderer.update(structures, geo, layers, { x: 0, y: 0, z: 0 }, 0.5);
-    const stats = renderer.stats();
-
-    for (const slug of ['compost-bin', 'rain-cistern', 'root-cellar', 'dock-segment', 'fish-trap', 'shore-net', 'lantern-post'] as const) {
-      expect(namedObject(renderer, `kiln-skin-${slug}`)).toBeTruthy();
-      expect(stats.kilnSkinsBySlug[slug]).toMatchObject({ loaded: 1, pending: 0, fallback: 0 });
-    }
-    for (const name of ['compostBinBase', 'rainCisternBarrel', 'rootCellarStoneLip', 'dockDeckPlank', 'fishTrapHoop', 'shoreNetStrand', 'lanternPost']) {
-      expect(namedObject(renderer, name)?.visible).toBe(false);
-    }
-    for (const name of [
-      'compostBinHeap',
-      'compostBinScrap',
-      'compostBinSteam0',
-      'rainCisternWater',
-      'rainCisternRing0',
-      'rootCellarHatch',
-      'rootCellarCoolGlow',
-      'dockFishingMark',
-      'fishTrapBait',
-      'fishTrapFloat',
-      'fishTrapTether',
-      'fishTrapSoakRing0',
-      'shoreNetFloat',
-      'shoreNetSoakRing0',
-      'lanternGlow',
-    ]) {
-      expect(namedObject(renderer, name)?.visible, name).toBe(true);
-    }
-    expect(visibleNameCount(renderer, 'rootCellarProvisionBundle')).toBeGreaterThan(0);
-    expect(stats.kilnSkinsLoaded).toBe(7);
-    expect(stats.kilnSkinFallbacks).toBe(0);
-    expect(stats.kilnSkinFits['shore-net']).toMatchObject({
-      item: 'shoreNet',
-      socketRole: 'shore-edge',
-      glbPolicy: 'decorative-skin-after-normalization',
-    });
-    expect(stats.kilnSkinFits['lantern-post']).toMatchObject({
-      item: 'lantern',
-      socketRole: 'light-post',
-    });
-  });
-
-  it('keeps procedural K4 utility and waterline props visible when GLB skins fall back', async () => {
-    const scene = new THREE.Scene();
-    const geo = new Goldberg(8);
-    const layers = buildLayers();
-    const renderer = new StructureRenderer(scene, new FailingKilnAssets());
-    const structures: StructureSave[] = [
-      { id: 1, item: 'compostBin', tile: 1, layer: 100, yaw: 0, state: { composts: 1 } },
-      { id: 2, item: 'rainCistern', tile: 2, layer: 100, yaw: 0, state: { water: 3 } },
-      { id: 3, item: 'rootCellar', tile: 3, layer: 100, yaw: 0, state: { provisions: 3 } },
-      { id: 4, item: 'dockSegment', tile: 4, layer: 100, yaw: 0 },
-      { id: 5, item: 'fishTrap', tile: 5, layer: 100, yaw: 0, state: { trapSetDay: 2, trapSetMinute: 30, trapBaited: true } },
-      { id: 6, item: 'shoreNet', tile: 6, layer: 100, yaw: 0, state: { netSetDay: 2, netSetMinute: 40 } },
-      { id: 7, item: 'lantern', tile: 7, layer: 100, yaw: 0, state: { lit: true } },
-    ];
-
-    renderer.setStructures(structures);
-    await flushAsyncSkinLoads();
-    renderer.update(structures, geo, layers, { x: 0, y: 0, z: 0 }, 0.5);
-    const stats = renderer.stats();
-
-    expect(namedObject(renderer, 'kiln-skin-compost-bin')).toBeNull();
-    for (const name of ['compostBinBase', 'rainCisternBarrel', 'rootCellarStoneLip', 'dockDeckPlank', 'fishTrapHoop', 'shoreNetStrand', 'lanternPost']) {
-      expect(namedObject(renderer, name)?.visible).toBe(true);
-    }
-    for (const name of ['compostBinHeap', 'rainCisternWater', 'rootCellarCoolGlow', 'dockFishingMark', 'fishTrapBait', 'shoreNetFloat', 'lanternGlow']) {
-      expect(namedObject(renderer, name)?.visible).toBe(true);
-    }
-    expect(stats.kilnSkinsLoaded).toBe(0);
-    expect(stats.kilnSkinFallbacks).toBe(7);
-    for (const slug of ['compost-bin', 'rain-cistern', 'root-cellar', 'dock-segment', 'fish-trap', 'shore-net', 'lantern-post'] as const) {
-      expect(stats.kilnSkinsBySlug[slug]).toMatchObject({ loaded: 0, pending: 0, fallback: 1 });
-    }
-  });
-
-  it('keeps procedural house-kit silhouettes visible when Kiln skin loading falls back', async () => {
-    const scene = new THREE.Scene();
-    const geo = new Goldberg(8);
-    const layers = buildLayers();
-    const renderer = new StructureRenderer(scene, new FailingKilnAssets());
-    const structures: StructureSave[] = [
-      { id: 1, item: 'doorKit', tile: 1, layer: 100, yaw: 0 },
-      { id: 2, item: 'windowFrame', tile: 2, layer: 100, yaw: 0 },
-      { id: 3, item: 'roofBundle', tile: 3, layer: 100, yaw: 0 },
-    ];
-
-    renderer.setStructures(structures);
-    await flushAsyncSkinLoads();
-    renderer.update(structures, geo, layers, { x: 0, y: 0, z: 0 }, 0.5);
-    const stats = renderer.stats();
-
-    expect(namedObject(renderer, 'kiln-skin-door-kit')).toBeNull();
-    expect(namedObject(renderer, 'leftJamb')?.visible).toBe(true);
-    expect(namedObject(renderer, 'glassPane')?.visible).toBe(true);
-    expect(namedObject(renderer, 'leftRoofPlane')?.visible).toBe(true);
-    expect(stats.kilnSkinsLoaded).toBe(0);
-    expect(stats.kilnSkinFallbacks).toBe(3);
-    expect(stats.kilnSkinsBySlug['door-kit']).toMatchObject({ loaded: 0, pending: 0, fallback: 1 });
-    expect(stats.kilnSkinsBySlug['window-frame']).toMatchObject({ loaded: 0, pending: 0, fallback: 1 });
-    expect(stats.kilnSkinsBySlug['roof-bundle']).toMatchObject({ loaded: 0, pending: 0, fallback: 1 });
-  });
-
-  it('renders functional shelter warmth and comfort signals from the room report', () => {
+  it('renders functional camp warmth and comfort signals from the shelter report', () => {
     const scene = new THREE.Scene();
     const geo = new Goldberg(8);
     const layers = buildLayers();
@@ -605,12 +68,9 @@ describe('structure renderer asset readability', () => {
     const local = Array.from({ length: geo.degreeOf(homeTile) }, (_, edge) => geo.neighbor(homeTile, edge));
     const structures: StructureSave[] = [
       { id: 1, item: 'bedroll', tile: homeTile, layer: 100, yaw: 0, state: { home: true } },
-      { id: 2, item: 'roofBundle', tile: local[0], layer: 100, yaw: 0 },
-      { id: 3, item: 'roofBundle', tile: local[1], layer: 100, yaw: 0 },
-      { id: 4, item: 'doorKit', tile: local[2], layer: 100, yaw: 0 },
-      { id: 5, item: 'campfire', tile: local[3], layer: 100, yaw: 0, state: { lit: true } },
-      { id: 6, item: 'workbench', tile: local[4], layer: 100, yaw: 0 },
-      { id: 7, item: 'chest', tile: local[5], layer: 100, yaw: 0 },
+      { id: 2, item: 'campfire', tile: local[0], layer: 100, yaw: 0, state: { lit: true } },
+      { id: 3, item: 'workbench', tile: local[1], layer: 100, yaw: 0 },
+      { id: 4, item: 'chest', tile: local[2], layer: 100, yaw: 0 },
     ];
 
     renderer.setStructures(structures);
@@ -619,103 +79,13 @@ describe('structure renderer asset readability', () => {
 
     expect(namedObject(renderer, 'homeComfortRing')?.visible).toBe(true);
     expect(namedObject(renderer, 'hearthWarmthHalo')?.visible).toBe(true);
-    expect(namedObject(renderer, 'roofShelterGlow')?.visible).toBe(true);
-    expect(stats.homeComfortSignals).toBeGreaterThanOrEqual(4);
-    expect(stats.shelterReadabilityRoles).toBeGreaterThanOrEqual(3);
+    expect(stats.homeComfortSignals).toBeGreaterThanOrEqual(2);
     expect(stats.homeComfort).toMatchObject({
-      visibleWarmthMeshes: 4,
-      visibleLightMeshes: 1,
+      visibleWarmthMeshes: 2,
       visibleHomeMarkers: 1,
       visibleSmokePuffs: 6,
       litCampfires: 1,
-      litLanterns: 0,
     });
-    expect([...readabilityRoles(renderer)]).toEqual(expect.arrayContaining([
-      'functional shelter comfort ring',
-      'warmth radius from lit shelter fire',
-      'roof coverage shelter glow',
-    ]));
-  });
-
-  it('renders procedural wall-shell pieces with distinct foundation, wall, rail, corner, and roof roles', () => {
-    const scene = new THREE.Scene();
-    const geo = new Goldberg(8);
-    const layers = buildLayers();
-    const renderer = new StructureRenderer(scene);
-    const structures: StructureSave[] = [
-      { id: 1, item: 'floorFoundation', tile: 1, layer: 100, yaw: 0 },
-      { id: 2, item: 'wallPanel', tile: 2, layer: 100, yaw: Math.PI / 3 },
-      { id: 3, item: 'wallHalfRail', tile: 3, layer: 100, yaw: Math.PI * 2 / 3 },
-      { id: 4, item: 'wallDoorPanel', tile: 4, layer: 100, yaw: 0 },
-      { id: 5, item: 'wallWindowPanel', tile: 5, layer: 100, yaw: 0 },
-      { id: 6, item: 'wallCorner', tile: 6, layer: 100, yaw: 0 },
-      { id: 7, item: 'roofJoin', tile: 7, layer: 100, yaw: 0 },
-    ];
-
-    renderer.setStructures(structures);
-    renderer.update(structures, geo, layers, { x: 0, y: 0, z: 0 }, 1.5);
-    const stats = renderer.stats();
-
-    expect(stats.wallShell).toMatchObject({
-      foundations: 1,
-      fullWalls: 1,
-      halfRails: 1,
-      doorPanels: 1,
-      windowPanels: 1,
-      corners: 1,
-      roofJoins: 1,
-    });
-    expect(stats.wallShellReadabilityRoles).toBeGreaterThanOrEqual(14);
-    expect(stats.wallShellSignals).toBeGreaterThanOrEqual(14);
-    expect([...meshNames(renderer)]).toEqual(expect.arrayContaining([
-      'foundationFootprint',
-      'foundationLevelBand',
-      'wallPanelFace',
-      'wallPanelTopCap',
-      'halfRailRun',
-      'halfRailOpenGap',
-      'wallDoorPanelLeftFace',
-      'wallDoorPanelLintel',
-      'wallWindowPanelGlass',
-      'wallCornerPost',
-      'roofJoinRidge',
-    ]));
-    expect(stats.wallShell.visibleRoles).toEqual(expect.arrayContaining([
-      'floor foundation level footprint',
-      'full wall panel shelter boundary',
-      'wall shell top cap under roof join',
-      'half rail porch guard',
-      'half rail open weather gap',
-      'wall-door panel shelter boundary',
-      'wall-window panel shelter boundary',
-      'wall corner shelter boundary',
-      'roof join ridge shelter cap',
-    ]));
-  });
-
-  it('reports same-tile wall-shell edge sockets for stacked building pieces', () => {
-    const scene = new THREE.Scene();
-    const geo = new Goldberg(8);
-    const layers = buildLayers();
-    const renderer = new StructureRenderer(scene);
-    const structures: StructureSave[] = [
-      { id: 1, item: 'floorFoundation', tile: 1, layer: 100, yaw: 0 },
-      { id: 2, item: 'wallPanel', tile: 1, layer: 100, yaw: 0 },
-      { id: 3, item: 'wallWindowPanel', tile: 1, layer: 100, yaw: Math.PI / 3 },
-      { id: 4, item: 'wallCorner', tile: 1, layer: 100, yaw: Math.PI * 2 / 3 },
-    ];
-
-    renderer.setStructures(structures);
-    renderer.update(structures, geo, layers, { x: 0, y: 0, z: 0 }, 1.5);
-    const stats = renderer.stats();
-
-    expect(stats.wallShell.sameTileEdgeStacks).toBe(1);
-    expect(stats.wallShell.edgeSockets).toEqual(expect.arrayContaining([
-      '1:edge:0',
-      '1:edge:1',
-      '1:edge:2',
-      '1:edge:3',
-    ]));
   });
 
   it('renders valid and blocked snap previews without adding saved structure groups', () => {
@@ -724,25 +94,26 @@ describe('structure renderer asset readability', () => {
     const layers = buildLayers();
     const renderer = new StructureRenderer(scene);
     const structures: StructureSave[] = [
-      { id: 1, item: 'doorKit', tile: 1, layer: 100, yaw: 0 },
+      { id: 1, item: 'workbench', tile: 1, layer: 100, yaw: 0 },
     ];
 
     renderer.setStructures(structures);
     renderer.update(structures, geo, layers, { x: 0, y: 0, z: 0 }, 1);
-    renderer.updateSnapPreview({
+    const chestPreview: StructureSnapPreview = {
       active: true,
       mode: 'place',
       ok: true,
-      item: 'windowFrame',
+      item: 'chest',
       tile: 2,
       layer: 100,
       yaw: Math.PI / 3,
       turn: 1,
-      message: 'Window frame can snap here',
+      message: 'Chest can snap here',
       blocker: null,
       blockers: [],
-      socket: HOUSE_PREVIEW_SOCKETS.windowFrame,
-    }, geo, layers, { x: 0, y: 0, z: 0 }, 1.1);
+      socket: structureSocketSpec('chest'),
+    };
+    renderer.updateSnapPreview(chestPreview, geo, layers, { x: 0, y: 0, z: 0 }, 1.1);
 
     expect(renderer.stats()).toMatchObject({
       groups: 1,
@@ -750,21 +121,20 @@ describe('structure renderer asset readability', () => {
         active: true,
         ok: true,
         mode: 'place',
-        item: 'windowFrame',
+        item: 'chest',
         tile: 2,
         blocker: null,
       },
     });
     expect(renderer.stats().snapPreview.meshes).toBeGreaterThan(2);
-    expect(renderer.stats().snapPreview.readabilityRoles).toBeGreaterThanOrEqual(3);
     expect(previewObject(renderer, 'snapPreviewFootprint')?.visible).toBe(true);
     expect(previewObject(renderer, 'snapPreviewBlockerA')?.visible).toBe(false);
 
-    renderer.updateSnapPreview({
+    const blockedPreview: StructureSnapPreview = {
       active: true,
       mode: 'relocate',
       ok: false,
-      item: 'doorKit',
+      item: 'workbench',
       id: 1,
       tile: 1,
       layer: 100,
@@ -772,11 +142,12 @@ describe('structure renderer asset readability', () => {
       turn: 0,
       fromTile: 1,
       fromLayer: 100,
-      message: 'door kit already on that snap hex',
+      message: 'workbench already on that snap hex',
       blocker: 'same snap target',
       blockers: ['same snap target'],
-      socket: HOUSE_PREVIEW_SOCKETS.doorKit,
-    }, geo, layers, { x: 0, y: 0, z: 0 }, 1.2);
+      socket: structureSocketSpec('workbench'),
+    };
+    renderer.updateSnapPreview(blockedPreview, geo, layers, { x: 0, y: 0, z: 0 }, 1.2);
 
     expect(renderer.stats()).toMatchObject({
       groups: 1,
@@ -784,7 +155,7 @@ describe('structure renderer asset readability', () => {
         active: true,
         ok: false,
         mode: 'relocate',
-        item: 'doorKit',
+        item: 'workbench',
         tile: 1,
         blocker: 'same snap target',
       },
@@ -797,177 +168,45 @@ describe('structure renderer asset readability', () => {
     expect(renderer.stats().groups).toBe(1);
   });
 
-  it('exposes socket-specific snap preview silhouettes for house-kit pieces', () => {
+  it('renders distinct procedural bodies for the nine restored utility and waterline props', () => {
     const scene = new THREE.Scene();
     const geo = new Goldberg(8);
     const layers = buildLayers();
     const renderer = new StructureRenderer(scene);
-    const cases: Array<{
-      item: 'doorKit' | 'windowFrame' | 'roofBundle';
-      role: StructureSocketSpec['role'];
-      collider: StructureSocketSpec['collider'];
-      silhouette: string;
-      meshNames: string[];
-      roles: string[];
-    }> = [
-      {
-        item: 'doorKit',
-        role: 'wall-opening',
-        collider: 'thin-wall',
-        silhouette: 'door-opening-preview',
-        meshNames: ['snapPreviewDoorLeftJamb', 'snapPreviewDoorRightJamb', 'snapPreviewDoorLintel'],
-        roles: ['snap preview door opening', 'snap preview door lintel'],
-      },
-      {
-        item: 'windowFrame',
-        role: 'wall-light',
-        collider: 'thin-wall',
-        silhouette: 'window-light-preview',
-        meshNames: ['snapPreviewWindowGlassPane', 'snapPreviewWindowSill', 'snapPreviewWindowCenterMullion'],
-        roles: ['snap preview window light', 'snap preview window sill', 'snap preview window centered opening'],
-      },
-      {
-        item: 'roofBundle',
-        role: 'roof-cap',
-        collider: 'roof-shell',
-        silhouette: 'roof-cap-preview',
-        meshNames: ['snapPreviewRoofRidgeBeam', 'snapPreviewRoofLeftEave', 'snapPreviewRoofCapPlane'],
-        roles: ['snap preview roof cap', 'snap preview roof eave', 'snap preview roof cap coverage'],
-      },
+    const structures: StructureSave[] = [
+      { id: 1, item: 'rainCistern', tile: 1, layer: 100, yaw: 0, state: { water: 2 } },
+      { id: 2, item: 'rootCellar', tile: 2, layer: 100, yaw: 0, state: { provisions: 2 } },
+      { id: 3, item: 'dockSegment', tile: 3, layer: 100, yaw: 0 },
+      { id: 4, item: 'fishTrap', tile: 4, layer: 100, yaw: 0, state: { trapSetDay: 1, trapSetMinute: 0, trapBaited: true } },
+      { id: 5, item: 'shoreNet', tile: 5, layer: 100, yaw: 0, state: { netSetDay: 1, netSetMinute: 0 } },
+      { id: 6, item: 'dryingRack', tile: 6, layer: 100, yaw: 0, state: { preserves: 1 } },
+      { id: 7, item: 'weatherVane', tile: 7, layer: 100, yaw: 0, state: { forecastReads: 1, forecastKind: 'storm' } },
+      { id: 8, item: 'lantern', tile: 8, layer: 100, yaw: 0, state: { lit: true } },
+      { id: 9, item: 'waystone', tile: 9, layer: 100, yaw: 0, state: { waystone: 'shore' } },
     ];
 
-    for (const [index, testCase] of cases.entries()) {
-      renderer.updateSnapPreview({
-        active: true,
-        mode: 'place',
-        ok: true,
-        item: testCase.item,
-        tile: index + 2,
-        layer: 100,
-        yaw: index * Math.PI / 3,
-        turn: index,
-        message: `${testCase.item} can snap here`,
-        blocker: null,
-        blockers: [],
-        socket: HOUSE_PREVIEW_SOCKETS[testCase.item],
-      }, geo, layers, { x: 0, y: 0, z: 0 }, 1 + index);
+    renderer.setStructures(structures);
+    renderer.update(structures, geo, layers, { x: 0, y: 0, z: 0 }, 0.5);
+    const stats = renderer.stats();
 
-      const stats = renderer.stats().snapPreview;
-      expect(stats).toMatchObject({
-        active: true,
-        ok: true,
-        mode: 'place',
-        item: testCase.item,
-        socketRole: testCase.role,
-        socketCollider: testCase.collider,
-        silhouette: testCase.silhouette,
-      });
-      expect(stats.meshNames).toEqual(expect.arrayContaining(testCase.meshNames));
-      expect(stats.visibleReadabilityRoles).toEqual(expect.arrayContaining(testCase.roles));
-      expect(stats.visibleReadabilityRoles).not.toContain('blocked snap crossbar');
-      expect(stats.meshes).toBeGreaterThanOrEqual(testCase.meshNames.length + 3);
+    expect(stats.groups).toBe(9);
+    const names = meshNames(renderer);
+    for (const name of [
+      'rainCisternBarrel', 'rootCellarStoneLip', 'dockDeckPlank', 'fishTrapSkid', 'shoreNetFootRail',
+      'dryingRackRail', 'weatherVaneCompassDisk', 'lanternCage', 'waystoneBase',
+    ]) {
+      expect(names).toContain(name);
     }
-  });
 
-  it('exposes socket-specific snap preview silhouettes for wall-shell pieces', () => {
-    const scene = new THREE.Scene();
-    const geo = new Goldberg(8);
-    const layers = buildLayers();
-    const renderer = new StructureRenderer(scene);
-    const cases: Array<{
-      item: 'floorFoundation' | 'wallPanel' | 'wallDoorPanel' | 'wallWindowPanel' | 'wallCorner' | 'wallHalfRail' | 'roofJoin';
-      role: StructureSocketSpec['role'];
-      collider: StructureSocketSpec['collider'];
-      silhouette: string;
-      meshNames: string[];
-      roles: string[];
-    }> = [
-      {
-        item: 'floorFoundation',
-        role: 'foundation',
-        collider: 'hex-cell',
-        silhouette: 'foundation-pad-preview',
-        meshNames: ['snapPreviewFoundationPad', 'snapPreviewFoundationLevelBand', 'snapPreviewFoundationCenterMark'],
-        roles: ['snap preview floor foundation', 'snap preview leveled floor socket', 'snap preview floor center mark'],
-      },
-      {
-        item: 'wallPanel',
-        role: 'wall-panel',
-        collider: 'thin-wall',
-        silhouette: 'wall-panel-preview',
-        meshNames: ['snapPreviewWallPanelFace', 'snapPreviewWallPanelLeftPost', 'snapPreviewWallPanelTopCap'],
-        roles: ['snap preview full wall boundary', 'snap preview full wall post', 'snap preview wall top cap'],
-      },
-      {
-        item: 'wallDoorPanel',
-        role: 'wall-opening',
-        collider: 'thin-wall',
-        silhouette: 'wall-door-panel-preview',
-        meshNames: ['snapPreviewWallDoorLeftWall', 'snapPreviewWallDoorLeftJamb', 'snapPreviewWallDoorLintel'],
-        roles: ['snap preview wall door shelter boundary', 'snap preview integrated door opening', 'snap preview wall door lintel'],
-      },
-      {
-        item: 'wallWindowPanel',
-        role: 'wall-light',
-        collider: 'thin-wall',
-        silhouette: 'wall-window-panel-preview',
-        meshNames: ['snapPreviewWallWindowFace', 'snapPreviewWallWindowPane', 'snapPreviewWallWindowMullion'],
-        roles: ['snap preview wall window shelter boundary', 'snap preview wall window light opening', 'snap preview wall window centered opening'],
-      },
-      {
-        item: 'wallCorner',
-        role: 'wall-corner',
-        collider: 'thin-wall',
-        silhouette: 'wall-corner-preview',
-        meshNames: ['snapPreviewWallCornerPost', 'snapPreviewWallCornerLeftWing', 'snapPreviewWallCornerCap'],
-        roles: ['snap preview wall corner shelter boundary', 'snap preview wall corner wing', 'snap preview wall shell corner cap'],
-      },
-      {
-        item: 'wallHalfRail',
-        role: 'half-rail',
-        collider: 'thin-wall',
-        silhouette: 'half-rail-preview',
-        meshNames: ['snapPreviewHalfRailLeftPost', 'snapPreviewHalfRailRun', 'snapPreviewHalfRailOpenGap'],
-        roles: ['snap preview half rail post', 'snap preview porch rail', 'snap preview open weather gap'],
-      },
-      {
-        item: 'roofJoin',
-        role: 'roof-join',
-        collider: 'roof-shell',
-        silhouette: 'roof-join-preview',
-        meshNames: ['snapPreviewRoofJoinRidge', 'snapPreviewRoofJoinLeftBracket', 'snapPreviewRoofJoinCoverage'],
-        roles: ['snap preview roof join ridge', 'snap preview roof join bracket', 'snap preview roof join coverage'],
-      },
-    ];
-
-    for (const [index, testCase] of cases.entries()) {
-      renderer.updateSnapPreview({
-        active: true,
-        mode: 'place',
-        ok: true,
-        item: testCase.item,
-        tile: index + 2,
-        layer: 100,
-        yaw: index * Math.PI / 3,
-        turn: index,
-        message: `${testCase.item} can snap here`,
-        blocker: null,
-        blockers: [],
-        socket: structureSocketSpec(testCase.item),
-      }, geo, layers, { x: 0, y: 0, z: 0 }, 2 + index);
-
-      const stats = renderer.stats().snapPreview;
-      expect(stats).toMatchObject({
-        active: true,
-        ok: true,
-        mode: 'place',
-        item: testCase.item,
-        socketRole: testCase.role,
-        socketCollider: testCase.collider,
-        silhouette: testCase.silhouette,
-      });
-      expect(stats.meshNames).toEqual(expect.arrayContaining(testCase.meshNames));
-      expect(stats.visibleReadabilityRoles).toEqual(expect.arrayContaining(testCase.roles));
-    }
+    expect(namedObject(renderer, 'rainCisternWater')?.visible).toBe(true);
+    expect(namedObject(renderer, 'rootCellarCoolGlow')?.visible).toBe(true);
+    expect(namedObject(renderer, 'fishTrapBait')?.visible).toBe(true);
+    expect(namedObject(renderer, 'fishTrapFloat')?.visible).toBe(true);
+    expect(namedObject(renderer, 'shoreNetFloat')).toBeTruthy();
+    expect(namedObject(renderer, 'dryingFood')?.visible).toBe(true);
+    expect(namedObject(renderer, 'weatherVaneStormGlow')?.visible).toBe(true);
+    expect(namedObject(renderer, 'lanternGlow')?.visible).toBe(true);
+    expect(namedObject(renderer, 'waystoneGlyph-shore')?.visible).toBe(true);
+    expect(namedObject(renderer, 'waystoneGlyph-home')?.visible).toBe(false);
   });
 });

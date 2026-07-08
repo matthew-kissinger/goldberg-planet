@@ -31,8 +31,6 @@ export interface GamepadFrame {
   use: boolean;
   pack: boolean;
   craft: boolean;
-  chart: boolean;
-  journal: boolean;
   eat: boolean;
   pin: boolean;
   clearPin: boolean;
@@ -77,8 +75,6 @@ const EMPTY_FRAME: GamepadFrame = {
   use: false,
   pack: false,
   craft: false,
-  chart: false,
-  journal: false,
   eat: false,
   pin: false,
   clearPin: false,
@@ -100,7 +96,7 @@ const EMPTY_FRAME: GamepadFrame = {
 };
 
 const EDGE_FIELDS: (keyof Pick<GamepadFrame,
-  'plane' | 'use' | 'pack' | 'craft' | 'chart' | 'journal' | 'eat' | 'pin' | 'clearPin' |
+  'plane' | 'use' | 'pack' | 'craft' | 'eat' | 'pin' | 'clearPin' |
   'relocate' | 'menuUp' | 'menuDown' | 'menuLeft' | 'menuRight' | 'confirm' | 'cancel' |
   'mute' | 'help' | 'diag' | 'minePressed' | 'placePressed' | 'slotDelta'
 >)[] = [
@@ -108,8 +104,6 @@ const EDGE_FIELDS: (keyof Pick<GamepadFrame,
   'use',
   'pack',
   'craft',
-  'chart',
-  'journal',
   'eat',
   'pin',
   'clearPin',
@@ -213,8 +207,6 @@ export function gamepadFrameFromState(gamepad: GamepadLike | null, previous: rea
     use: edge(Btn.B) && !lb,
     pack: edge(Btn.B) && lb,
     craft: edge(Btn.Y),
-    chart: edge(Btn.Back) && !lb,
-    journal: edge(Btn.DpadDown),
     eat: edge(Btn.DpadUp) && !lb,
     pin: edge(Btn.DpadRight) && lb,
     clearPin: edge(Btn.DpadLeft) && lb,
@@ -251,8 +243,6 @@ function mergeFrames(a: GamepadFrame, b: GamepadFrame): GamepadFrame {
     use: a.use || b.use,
     pack: a.pack || b.pack,
     craft: a.craft || b.craft,
-    chart: a.chart || b.chart,
-    journal: a.journal || b.journal,
     eat: a.eat || b.eat,
     pin: a.pin || b.pin,
     clearPin: a.clearPin || b.clearPin,

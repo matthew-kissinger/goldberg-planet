@@ -5,18 +5,13 @@ import { normalizeInventory, type InventoryItems } from './crafting';
 import { MineProgress, normalizeMineProgress, type MineProgressSave } from './mining';
 import { normalizeResourceDrops, type ResourceDropSave } from './resourceDrops';
 import { normalizeStructureSaves, type StructureSave } from './structures';
-import { normalizePentagonList, normalizeThresholdChamberObservations } from './landmarks';
-import { normalizeDomainHarvests } from './domainResources';
-import { normalizeSkyfallHarvests } from './skyfall';
-import { normalizeMurmurObservations } from './murmurs';
-import { normalizeCaveResonanceObservations } from './caveResonance';
-import { normalizeNativeCreatureTends, normalizeNativeCreatureWards } from './nativeLife';
+import { normalizePentagonList } from './landmarks';
 import { normalizeToolWear, type ToolWear } from './tools';
 import { normalizeSurvivalState, normalizeTimeState, normalizeWeatherState, type SurvivalState, type TimeState, type WeatherState } from './survival';
-import { normalizeRoutePlan, type RoutePlanSave } from './navigation';
-import { normalizeSeasonAfterglowReadings } from './eventSeasons';
 
-export const SAVE_VERSION = 1;
+// Bumped for the controlled-burn cut (2026-07-08): save shape changed across ~20 systems,
+// old saves are incompatible and intentionally not migrated — this forces a clean reset.
+export const SAVE_VERSION = 2;
 
 export interface ColumnEditSave {
   tile: number;
@@ -62,7 +57,7 @@ export interface WorldSave {
   time: TimeState;
   weather: WeatherState;
   survival: SurvivalState;
-  progression: { pentagons: number[]; siteCompletions: number[]; domainHarvests: number[]; skyfallHarvests: number[]; murmurObservations: number[]; seasonAfterglowReadings: number[]; thresholdChamberObservations: number[]; caveResonanceObservations: number[]; nativeCreatureTends: number[]; nativeCreatureWards: number[]; routePlan: RoutePlanSave | null; toolWear: ToolWear };
+  progression: { pentagons: number[]; toolWear: ToolWear };
 }
 
 export interface CaptureWorldSaveInput {
@@ -76,7 +71,7 @@ export interface CaptureWorldSaveInput {
   craftedItems?: InventoryItems;
   drops?: readonly ResourceDropSave[];
   structures?: readonly StructureSave[];
-  progression?: { pentagons?: readonly number[]; siteCompletions?: readonly number[]; domainHarvests?: readonly number[]; skyfallHarvests?: readonly number[]; murmurObservations?: readonly number[]; seasonAfterglowReadings?: readonly number[]; thresholdChamberObservations?: readonly number[]; caveResonanceObservations?: readonly number[]; nativeCreatureTends?: readonly number[]; nativeCreatureWards?: readonly number[]; routePlan?: RoutePlanSave | null; toolWear?: ToolWear };
+  progression?: { pentagons?: readonly number[]; toolWear?: ToolWear };
   time?: TimeState;
   weather?: WeatherState;
   survival?: SurvivalState;
@@ -250,16 +245,6 @@ export function captureWorldSave(input: CaptureWorldSaveInput): WorldSave {
     survival: normalizeSurvivalState(input.survival),
     progression: {
       pentagons: normalizePentagonList(input.progression?.pentagons),
-      siteCompletions: normalizePentagonList(input.progression?.siteCompletions),
-      domainHarvests: normalizeDomainHarvests(input.progression?.domainHarvests),
-      skyfallHarvests: normalizeSkyfallHarvests(input.progression?.skyfallHarvests),
-      murmurObservations: normalizeMurmurObservations(input.progression?.murmurObservations),
-      seasonAfterglowReadings: normalizeSeasonAfterglowReadings(input.progression?.seasonAfterglowReadings),
-      thresholdChamberObservations: normalizeThresholdChamberObservations(input.progression?.thresholdChamberObservations),
-      caveResonanceObservations: normalizeCaveResonanceObservations(input.progression?.caveResonanceObservations),
-      nativeCreatureTends: normalizeNativeCreatureTends(input.progression?.nativeCreatureTends),
-      nativeCreatureWards: normalizeNativeCreatureWards(input.progression?.nativeCreatureWards),
-      routePlan: normalizeRoutePlan(input.progression?.routePlan, Number.MAX_SAFE_INTEGER),
       toolWear: normalizeToolWear(input.progression?.toolWear),
     },
   };
@@ -327,19 +312,9 @@ export function parseWorldSaveJson(json: string): WorldSave | null {
       progression: v.progression && Array.isArray(v.progression.pentagons)
         ? {
           pentagons: normalizePentagonList(intArray(v.progression.pentagons) ?? []),
-          siteCompletions: normalizePentagonList(intArray(v.progression.siteCompletions) ?? []),
-          domainHarvests: normalizeDomainHarvests(intArray(v.progression.domainHarvests) ?? []),
-          skyfallHarvests: normalizeSkyfallHarvests(intArray(v.progression.skyfallHarvests) ?? []),
-          murmurObservations: normalizeMurmurObservations(intArray(v.progression.murmurObservations) ?? []),
-          seasonAfterglowReadings: normalizeSeasonAfterglowReadings(intArray(v.progression.seasonAfterglowReadings) ?? []),
-          thresholdChamberObservations: normalizeThresholdChamberObservations(intArray(v.progression.thresholdChamberObservations) ?? []),
-          caveResonanceObservations: normalizeCaveResonanceObservations(intArray(v.progression.caveResonanceObservations) ?? []),
-          nativeCreatureTends: normalizeNativeCreatureTends(intArray(v.progression.nativeCreatureTends) ?? []),
-          nativeCreatureWards: normalizeNativeCreatureWards(intArray(v.progression.nativeCreatureWards) ?? []),
-          routePlan: normalizeRoutePlan(v.progression.routePlan, Number.MAX_SAFE_INTEGER),
           toolWear: normalizeToolWear(v.progression.toolWear),
         }
-        : { pentagons: [], siteCompletions: [], domainHarvests: [], skyfallHarvests: [], murmurObservations: [], seasonAfterglowReadings: [], thresholdChamberObservations: [], caveResonanceObservations: [], nativeCreatureTends: [], nativeCreatureWards: [], routePlan: null, toolWear: {} },
+        : { pentagons: [], toolWear: {} },
     };
   } catch {
     return null;

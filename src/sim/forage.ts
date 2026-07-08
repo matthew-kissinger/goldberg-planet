@@ -1,7 +1,6 @@
 import type { InventoryItems, ItemId } from './crafting';
 import type { WeatherReport } from './survival';
 import type { NaturalVoidKind } from '../world/caves';
-import type { PentagonInsightEffect } from './landmarks';
 
 export type ForageKind = 'none' | 'berryPatch' | 'seedPods' | 'snowHerb' | 'caveMushroom' | 'kelp' | 'reeds';
 
@@ -13,8 +12,6 @@ export interface ForageContext {
   nearWater: boolean;
   weatherKind?: WeatherReport['kind'];
   caveKind?: NaturalVoidKind | null;
-  domainEffect?: PentagonInsightEffect | null;
-  domainIntensity?: number;
   thresholdForageBoost?: number;
   thresholdLabel?: string;
 }
@@ -50,30 +47,9 @@ export function forageAt(ctx: ForageContext): ForageReport {
   const day = Math.max(0, Math.trunc(ctx.day));
   const minute = clamp(ctx.minute, 0, 24 * 60);
   const wave = Math.sin((tile * 0.023 + day * 0.61 + minute / (24 * 60) * 1.7) * Math.PI);
-  const domainIntensity = clamp(ctx.domainIntensity ?? 0, 0, 1);
-  const domainBoost = ctx.domainEffect === 'root'
-    ? 0.28 * domainIntensity
-    : ctx.domainEffect === 'cold'
-    ? 0.2 * domainIntensity
-    : ctx.domainEffect === 'water' || ctx.domainEffect === 'tide'
-    ? 0.16 * domainIntensity
-    : ctx.domainEffect === 'cave'
-    ? 0.14 * domainIntensity
-    : 0;
   const thresholdBoost = clamp(ctx.thresholdForageBoost ?? 0, 0, 0.35);
   const thresholdLabel = ctx.thresholdLabel ?? 'threshold';
-  const strength = clamp(0.5 + 0.5 * wave + domainBoost + thresholdBoost, 0, 1);
-
-  if (ctx.domainEffect === 'root' && ctx.height > -6 && ctx.height < 42 && strength > 0.38) {
-    return {
-      kind: 'seedPods',
-      item: 'seeds',
-      count: strength > 0.78 ? 3 : 2,
-      label: 'root-vault seed pods',
-      strength,
-      message: 'foraged root-vault seed pods',
-    };
-  }
+  const strength = clamp(0.5 + 0.5 * wave + thresholdBoost, 0, 1);
 
   if (ctx.caveKind === 'dryCave') {
     return {
@@ -93,16 +69,6 @@ export function forageAt(ctx: ForageContext): ForageReport {
       label: 'sea-cave kelp',
       strength,
       message: 'foraged sea-cave kelp',
-    };
-  }
-  if ((ctx.domainEffect === 'water' || ctx.domainEffect === 'tide') && ctx.nearWater && ctx.height > -1 && ctx.height < 8 && strength > 0.18) {
-    return {
-      kind: 'reeds',
-      item: 'reeds',
-      count: strength > 0.66 ? 3 : 2,
-      label: ctx.domainEffect === 'tide' ? 'salt-tide reeds' : 'reed-water stems',
-      strength,
-      message: 'cut waterline reeds',
     };
   }
   if (ctx.nearWater && ctx.height < 1.2 && strength > 0.22) {
@@ -133,26 +99,6 @@ export function forageAt(ctx: ForageContext): ForageReport {
       label: 'snow herb sprig',
       strength,
       message: 'foraged snow herbs',
-    };
-  }
-  if (ctx.domainEffect === 'cold' && strength > 0.36) {
-    return {
-      kind: 'snowHerb',
-      item: 'snowHerb',
-      count: strength > 0.74 ? 2 : 1,
-      label: 'snow-dial herb',
-      strength,
-      message: 'foraged snow-dial herbs',
-    };
-  }
-  if (ctx.domainEffect === 'cave' && strength > 0.52) {
-    return {
-      kind: 'caveMushroom',
-      item: 'caveMushroom',
-      count: strength > 0.78 ? 2 : 1,
-      label: 'deep-bell mushroom',
-      strength,
-      message: 'foraged deep-bell mushrooms',
     };
   }
   if (thresholdBoost > 0 && ctx.height > -8 && ctx.height < 46 && strength > 0.32) {

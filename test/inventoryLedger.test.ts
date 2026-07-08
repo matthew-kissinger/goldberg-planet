@@ -8,19 +8,15 @@ describe('Pack Ledger inventory view', () => {
     const crafted: InventoryItems = {
       sticks: 2,
       stoneHatchet: 1,
-      stoneBlade: 1,
       stonePick: 1,
       repairKit: 2,
-      reedBow: 1,
-      whistlingArrow: 5,
       cookedFish: 1,
       campMeal: 1,
       chest: 1,
-      waystone: 2,
-      horizonChart: 1,
+      stormCloak: 1,
     };
 
-    const ledger = buildInventoryLedger(materials, crafted, { stoneBlade: 4, stonePick: 9, reedBow: 3 });
+    const ledger = buildInventoryLedger(materials, crafted, { stonePick: 9 });
     const section = (id: string) => ledger.sections.find((s) => s.id === id);
 
     expect(ledger.title).toBe('Pack Ledger');
@@ -28,22 +24,19 @@ describe('Pack Ledger inventory view', () => {
     expect(ledger.summary).toContain('3.4 meal units');
     expect(ledger.burden).toMatchObject({ status: 'light', sprintBlocked: false });
     expect(section('materials')?.entries.map((entry) => entry.item)).toEqual(['dirt', 'rock', 'wood']);
-    expect(section('tools')?.entries.map((entry) => entry.item)).toEqual(['stoneHatchet', 'stoneBlade', 'stonePick', 'repairKit', 'reedBow']);
+    expect(section('tools')?.entries.map((entry) => entry.item)).toEqual(['stoneHatchet', 'stonePick', 'repairKit']);
     expect(section('food')?.entries.map((entry) => entry.item)).toEqual(['cookedFish', 'campMeal']);
     expect(section('build')?.entries.map((entry) => entry.item)).toEqual(['chest']);
-    expect(section('route')?.entries.map((entry) => entry.item)).toEqual(['waystone', 'horizonChart']);
-    expect(section('parts')?.entries.map((entry) => entry.item)).toEqual(['sticks', 'whistlingArrow']);
+    expect(section('route')?.entries.map((entry) => entry.item)).toEqual(['stormCloak']);
+    expect(section('parts')?.entries.map((entry) => entry.item)).toEqual(['sticks']);
     expect(section('tools')?.entries.find((entry) => entry.item === 'stoneHatchet')?.detail).toBe('24/24 uses · wood');
-    expect(section('tools')?.entries.find((entry) => entry.item === 'stoneBlade')?.detail).toBe('26/30 uses · defense');
     expect(section('tools')?.entries.find((entry) => entry.item === 'stonePick')?.detail).toBe('29/38 uses · rock');
-    expect(section('tools')?.entries.find((entry) => entry.item === 'reedBow')?.detail).toBe('33/36 uses · ranged defense');
-    expect(section('parts')?.entries.find((entry) => entry.item === 'whistlingArrow')?.detail).toBe('5 ranged ward shots');
     expect(ledger.totals).toMatchObject({
       materials: 13,
-      tools: 6,
+      tools: 4,
       foodUnits: 3.4,
       buildKits: 1,
-      routeGear: 3,
+      routeGear: 1,
       repairKits: 2,
     });
   });
@@ -91,12 +84,12 @@ describe('Pack Ledger inventory view', () => {
   });
 
   it('lists a storm cloak as lightweight route gear with weather protection detail', () => {
-    const crafted: InventoryItems = { stormCloak: 1, horizonChart: 1 };
+    const crafted: InventoryItems = { stormCloak: 1, echoLantern: 1 };
     const ledger = buildInventoryLedger([0, 0, 0, 0, 0], crafted, {});
     const route = ledger.sections.find((section) => section.id === 'route');
 
-    expect(route?.entries.map((entry) => entry.item)).toEqual(['stormCloak', 'horizonChart']);
+    expect(route?.entries.map((entry) => entry.item)).toEqual(['stormCloak', 'echoLantern']);
     expect(route?.entries[0].detail).toContain('weather cloak');
-    expect(ledger.burden.load).toBe(1.1);
+    expect(ledger.burden.load).toBe(2.1);
   });
 });

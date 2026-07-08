@@ -2,17 +2,18 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three/webgpu';
 import { Goldberg } from '../src/geo/goldberg';
 import { ResourceDropRenderer } from '../src/render/resourceDrops';
-import type {
-  KilnResourceDropSkinSlug,
-  KilnResourceDropSkinTemplate,
-  ResourceDropSkinProvider,
-} from '../src/render/kilnAssets';
 import type { ResourceDropSave } from '../src/sim/resourceDrops';
 import { buildLayers } from '../src/world/layers';
 import { Columns } from '../src/world/columns';
 import { Terrain } from '../src/world/terrain';
 
-function drop(id: number, item: ResourceDropSave['item'], tile: number, source: ResourceDropSave['source'] = item === 'wood' ? 'tree' : 'mine'): ResourceDropSave {
+function drop(
+  id: number,
+  item: ResourceDropSave['item'],
+  tile: number,
+  source: ResourceDropSave['source'] = item === 'wood' ? 'tree' : 'mine',
+  groundRadius = 905,
+): ResourceDropSave {
   return {
     id,
     item,
@@ -20,85 +21,10 @@ function drop(id: number, item: ResourceDropSave['item'], tile: number, source: 
     tile,
     offsetA: 0.12 * id,
     offsetB: -0.05 * id,
+    groundRadius,
     age: 1.2,
     source,
   };
-}
-
-function itemForSlug(slug: KilnResourceDropSkinSlug): string {
-  if (slug === 'drop-wood-logs') return 'wood';
-  if (slug === 'drop-ore-chunk') return 'rock';
-  if (slug === 'drop-dirt-clod') return 'dirt';
-  if (slug === 'drop-sand-pile') return 'sand';
-  if (slug === 'drop-snow-clump') return 'snow';
-  if (slug === 'drop-glow-crystal') return 'glowCrystal';
-  if (slug === 'drop-raw-fish') return 'rawFish';
-  if (slug === 'drop-kelp-reeds') return 'kelp/reeds';
-  if (slug === 'drop-compost-pellet') return 'compost';
-  if (slug === 'drop-cave-mushroom') return 'caveMushroom';
-  if (slug === 'node-root-pod') return 'seeds';
-  return 'reeds';
-}
-
-function template(slug: KilnResourceDropSkinSlug): KilnResourceDropSkinTemplate {
-  const geometry = new THREE.BoxGeometry(1, 1, 1);
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  return {
-    slug,
-    manifest: {
-      slug,
-      status: 'ready',
-      file: `models/${slug}.glb`,
-      geometry: { materialCount: 1 },
-    },
-    sourceUrl: `/assets/kiln/models/${slug}.glb`,
-    parts: [{
-      name: `fake-instanced-${slug}`,
-      sourceMeshNames: [`${slug}-mesh`],
-      sourceMeshCount: 1,
-      geometry,
-      material: new THREE.MeshStandardMaterial({ color: slug === 'drop-wood-logs' ? 0xa56d3a : slug === 'drop-glow-crystal' ? 0x70d6d1 : 0x8a8d91 }),
-    }],
-    fit: {
-      slug,
-      item: itemForSlug(slug),
-      socketRole: 'ground-pickup',
-      sourceBboxSize: [1, 1, 1],
-      runtimeSourceBboxSize: [1, 1, 1],
-      orientedSourceBboxSize: [1, 1, 1],
-      normalizedBboxSize: [1, 1, 1],
-      normalizePolicy: 'center-xz-bottom-y',
-      orientation: { policy: 'preserve-y-up', sourceUpAxis: 'y', axisCorrection: [0, 0, 0] },
-      batchingPolicy: 'instanced-merged-by-material',
-      animationPolicy: 'matrix-bob-only',
-      sourceUrl: `/assets/kiln/models/${slug}.glb`,
-      sourceMeshCount: 1,
-      instancedMeshCount: 1,
-      materialCount: 1,
-      acceptanceNote: 'fake test template',
-    },
-  };
-}
-
-class FakeDropSkins implements ResourceDropSkinProvider {
-  readonly requested: KilnResourceDropSkinSlug[] = [];
-
-  async createResourceDropSkinTemplate(slug: KilnResourceDropSkinSlug): Promise<KilnResourceDropSkinTemplate | null> {
-    this.requested.push(slug);
-    return template(slug);
-  }
-}
-
-class FailingDropSkins implements ResourceDropSkinProvider {
-  async createResourceDropSkinTemplate(): Promise<KilnResourceDropSkinTemplate | null> {
-    return null;
-  }
-}
-
-async function flushSkinPromises(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
 }
 
 function fixtureWorld() {
@@ -108,11 +34,10 @@ function fixtureWorld() {
   return { geo, layers, columns };
 }
 
-describe('resource drop renderer Kiln skin batching', () => {
-  it('batches approved pickup GLBs while keeping unmapped drops on fallback meshes', async () => {
+describe('resource drop renderer', () => {
+  it('renders every drop via plain-geometry fallback meshes', () => {
     const scene = new THREE.Scene();
-    const provider = new FakeDropSkins();
-    const renderer = new ResourceDropRenderer(scene, provider);
+    const renderer = new ResourceDropRenderer(scene);
     const drops = [
       drop(1, 'wood', 3),
       drop(2, 'rock', 4),
@@ -132,65 +57,86 @@ describe('resource drop renderer Kiln skin batching', () => {
     const { geo, layers, columns } = fixtureWorld();
 
     renderer.setDrops(drops);
-    await flushSkinPromises();
     renderer.update(drops, geo, layers, columns, { x: 0, y: 0, z: 0 }, 2.1);
     const stats = renderer.stats();
 
-    expect(provider.requested.sort()).toEqual([
-      'drop-cave-mushroom',
-      'drop-compost-pellet',
-      'drop-creature-fiber',
-      'drop-dirt-clod',
-      'drop-glow-crystal',
-      'drop-kelp-reeds',
-      'drop-ore-chunk',
-      'drop-raw-fish',
-      'drop-sand-pile',
-      'drop-snow-clump',
-      'drop-wood-logs',
-      'node-root-pod',
-    ]);
-    expect(stats.kilnSkinsLoaded).toBe(13);
-    expect(stats.kilnSkinsPending).toBe(0);
-    expect(stats.kilnSkinFallbacks).toBe(0);
-    expect(stats.batchedInstances).toBe(13);
-    expect(stats.instancedMeshes).toBe(12);
-    expect(stats.instancedDrawCalls).toBe(12);
-    expect(stats.fallbackGroups).toBe(1);
-    expect(stats.kilnDropSkinsBySlug['drop-wood-logs']).toMatchObject({ loaded: 1, batchedInstances: 1, instancedMeshes: 1 });
-    expect(stats.kilnDropSkinsBySlug['drop-ore-chunk']).toMatchObject({ loaded: 1, batchedInstances: 1, instancedMeshes: 1 });
-    expect(stats.kilnDropSkinsBySlug['drop-kelp-reeds']).toMatchObject({ loaded: 2, batchedInstances: 2, instancedMeshes: 1 });
-    expect(stats.kilnDropSkinsBySlug['drop-creature-fiber']).toMatchObject({ loaded: 1, batchedInstances: 1, instancedMeshes: 1 });
-    expect(stats.kilnDropSkinsBySlug['drop-raw-fish']).toMatchObject({ loaded: 1, batchedInstances: 1, instancedMeshes: 1 });
-    expect(stats.kilnDropSkinsBySlug['drop-cave-mushroom']).toMatchObject({ loaded: 1, batchedInstances: 1, instancedMeshes: 1 });
-    expect(stats.kilnDropSkinsBySlug['node-root-pod']).toMatchObject({ loaded: 1, batchedInstances: 1, instancedMeshes: 1 });
-    expect(stats.kilnSkinFits['drop-wood-logs']).toMatchObject({
-      sourceUrl: '/assets/kiln/models/drop-wood-logs.glb',
-      batchingPolicy: 'instanced-merged-by-material',
-      animationPolicy: 'matrix-bob-only',
-    });
+    expect(stats.groups).toBe(drops.length);
+    expect(stats.active).toBe(drops.length);
+    expect(stats.meshes).toBeGreaterThan(drops.length);
   });
 
-  it('leaves supported drops visible through procedural fallback if the GLB skin fails', async () => {
+  it('renders fully via plain-geometry fallback with no constructor argument at all', () => {
     const scene = new THREE.Scene();
-    const renderer = new ResourceDropRenderer(scene, new FailingDropSkins());
-    const drops = [drop(1, 'wood', 3), drop(2, 'rock', 4), drop(3, 'rawFish', 5), drop(4, 'reeds', 6, 'creature'), drop(5, 'seeds', 7, 'creature')];
+    const renderer = new ResourceDropRenderer(scene);
+    const drops = [drop(1, 'wood', 3), drop(2, 'rock', 4), drop(3, 'rawFish', 5)];
     const { geo, layers, columns } = fixtureWorld();
 
     renderer.setDrops(drops);
-    await flushSkinPromises();
     renderer.update(drops, geo, layers, columns, { x: 0, y: 0, z: 0 }, 2.1);
     const stats = renderer.stats();
 
-    expect(stats.kilnSkinsLoaded).toBe(0);
-    expect(stats.batchedInstances).toBe(0);
-    expect(stats.instancedDrawCalls).toBe(0);
-    expect(stats.fallbackGroups).toBe(5);
-    expect(stats.kilnSkinFallbacks).toBe(5);
-    expect(stats.kilnDropSkinsBySlug['drop-wood-logs']).toMatchObject({ loaded: 0, fallback: 1 });
-    expect(stats.kilnDropSkinsBySlug['drop-ore-chunk']).toMatchObject({ loaded: 0, fallback: 1 });
-    expect(stats.kilnDropSkinsBySlug['drop-raw-fish']).toMatchObject({ loaded: 0, fallback: 1 });
-    expect(stats.kilnDropSkinsBySlug['drop-creature-fiber']).toMatchObject({ loaded: 0, fallback: 1 });
-    expect(stats.kilnDropSkinsBySlug['node-root-pod']).toMatchObject({ loaded: 0, fallback: 1 });
+    expect(stats.groups).toBe(3);
+    expect(stats.active).toBe(3);
+    expect(renderer.group.children.filter((child) => child.visible).length).toBe(3);
+  });
+
+  it('colors plain-geometry fallback drops per resource kind instead of one generic look', () => {
+    const scene = new THREE.Scene();
+    const renderer = new ResourceDropRenderer(scene);
+    // These all shared a single hardcoded "glow" fallback color/shape before; each should
+    // now read as visually distinct via its own item catalog color.
+    const items: ResourceDropSave['item'][] = ['glowCrystal', 'rawFish', 'kelp', 'compost', 'caveMushroom', 'bait'];
+    const drops = items.map((item, i) => drop(i + 1, item, 3 + i));
+    const { geo, layers, columns } = fixtureWorld();
+
+    renderer.setDrops(drops);
+    renderer.update(drops, geo, layers, columns, { x: 0, y: 0, z: 0 }, 1);
+
+    const colors = new Set<string>();
+    for (const child of renderer.group.children) {
+      child.traverse((node) => {
+        if (node.name !== 'dropChip' || !(node as THREE.Mesh).isMesh) return;
+        const material = (node as THREE.Mesh).material as THREE.MeshStandardMaterial;
+        colors.add(material.color.getHexString());
+      });
+    }
+    expect(colors.size).toBe(items.length);
+  });
+
+  it('keeps a drop\'s cached ground height fixed after nearby terrain is mined out from under it', () => {
+    const scene = new THREE.Scene();
+    const renderer = new ResourceDropRenderer(scene);
+    const { geo, layers, columns } = fixtureWorld();
+
+    const tile = 3;
+    const groundLayerBefore = columns.groundLayerBelow(tile, layers.bounds[0]);
+    const groundRadiusBefore = layers.topRadius(groundLayerBefore);
+    const testDrop: ResourceDropSave = {
+      id: 1,
+      item: 'rock',
+      count: 1,
+      tile,
+      offsetA: 0,
+      offsetB: 0,
+      groundRadius: groundRadiusBefore,
+      age: 1.2,
+      source: 'mine',
+    };
+
+    renderer.setDrops([testDrop]);
+    renderer.update([testDrop], geo, layers, columns, { x: 0, y: 0, z: 0 }, 2.1);
+    const before = renderer.group.children.find((child) => child.userData.resourceDropId === testDrop.id)!;
+    const posBefore = before.position.clone();
+
+    // Mine away the exact cell the drop is resting on — the scenario from the bug report:
+    // breaking terrain right at/above a ground item used to make it visibly snap downward.
+    expect(columns.mine(tile, groundLayerBefore)).toBe(true);
+    const groundLayerAfter = columns.groundLayerBelow(tile, layers.bounds[0]);
+    expect(groundLayerAfter).not.toBe(groundLayerBefore);
+    expect(layers.topRadius(groundLayerAfter)).toBeLessThan(groundRadiusBefore);
+
+    renderer.update([testDrop], geo, layers, columns, { x: 0, y: 0, z: 0 }, 2.1);
+    const after = renderer.group.children.find((child) => child.userData.resourceDropId === testDrop.id)!;
+    expect(after.position.distanceTo(posBefore)).toBeLessThan(1e-9);
   });
 });

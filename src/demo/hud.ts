@@ -35,7 +35,6 @@ export interface InventoryLedgerView {
 
 export interface HudControlLabels {
   craft: string;
-  route: string;
   hotbar: string[];
 }
 
@@ -53,24 +52,6 @@ export interface CraftingRecipeView {
   focusAction?: 'craft' | 'place';
   station?: string;
   requirements: { name: string; need: number; have: number }[];
-}
-
-export interface RouteSlateView {
-  title: string;
-  summary: string;
-  pins: { id: string; label: string; detail: string; ready: boolean; selected?: boolean; selectable?: boolean }[];
-}
-
-export interface HearthJournalView {
-  title: string;
-  summary: string;
-  next: { label: string; detail: string; tone?: string }[];
-  sections: {
-    id: string;
-    title: string;
-    summary: string;
-    entries: { label: string; detail: string; tone?: string }[];
-  }[];
 }
 
 export type ChestStorageAction = 'depositOne' | 'depositAll' | 'withdrawOne' | 'withdrawAll';
@@ -104,13 +85,6 @@ export class Hud {
   onSlotSelect: ((i: number) => void) | null = null;
   onCraftSelect: ((id: string) => void) | null = null;
   onPlaceSelect: ((id: string) => void) | null = null;
-  onRoutePin: (() => void) | null = null;
-  onRouteClear: (() => void) | null = null;
-  onRouteLater: (() => void) | null = null;
-  onRouteDrop: (() => void) | null = null;
-  onRouteSelect: ((index: number) => void) | null = null;
-  onJournalToggle: (() => void) | null = null;
-  onJournalClose: (() => void) | null = null;
   onStorageTransfer: ((chestId: number, item: string, action: ChestStorageAction) => void) | null = null;
   onStorageClose: (() => void) | null = null;
   private vitals = document.getElementById('vitals')!;
@@ -121,27 +95,20 @@ export class Hud {
   private help = document.getElementById('help')!;
   private hotbar = document.getElementById('hotbar')!;
   private crafting = document.getElementById('crafting')!;
-  private route = document.getElementById('route')!;
-  private journal = document.getElementById('journal')!;
   private storage = document.getElementById('storage')!;
-  private journalButton = document.getElementById('btn-journal')!;
   private craftButton = document.getElementById('btn-craft')!;
   private hotbarCache = '';
   private craftingCache = '';
-  private routeCache = '';
-  private journalCache = '';
   private storageCache = '';
   private vitalsCache = '';
   private helpCache = '';
   private controls: HudControlLabels = {
     craft: 'B',
-    route: 'M',
     hotbar: ['1', '2', '3', '4', '5'],
   };
   private ledger: InventoryLedgerView | null = null;
   private msgTimer = 0;
   private slotTimer = 0;
-  private routeTimer = 0;
   private helpTimer = 25;
   private helpShown = true;
 
@@ -162,35 +129,6 @@ export class Hud {
       if (place && !place.disabled) this.onPlaceSelect?.(place.dataset.place ?? '');
       else if (button && !button.disabled) this.onCraftSelect?.(button.dataset.recipe ?? '');
     });
-    this.journal.addEventListener('pointerdown', (e) => {
-      e.stopPropagation();
-      const close = (e.target as HTMLElement).closest('button[data-journal-close]') as HTMLButtonElement | null;
-      if (close) {
-        e.preventDefault();
-        this.onJournalClose?.();
-      }
-    });
-    this.route.addEventListener('pointerdown', (e) => {
-      e.stopPropagation();
-      const pin = (e.target as HTMLElement).closest('[data-route-index]') as HTMLElement | null;
-      if (pin?.dataset.routeIndex !== undefined) {
-        e.preventDefault();
-        this.onRouteSelect?.(Number(pin.dataset.routeIndex));
-        return;
-      }
-      const action = (e.target as HTMLElement).closest('button[data-route-action]') as HTMLButtonElement | null;
-      if (!action || action.disabled) return;
-      e.preventDefault();
-      if (action.dataset.routeAction === 'pin') this.onRoutePin?.();
-      else if (action.dataset.routeAction === 'clear') this.onRouteClear?.();
-      else if (action.dataset.routeAction === 'later') this.onRouteLater?.();
-      else if (action.dataset.routeAction === 'drop') this.onRouteDrop?.();
-    });
-    this.journalButton.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.onJournalToggle?.();
-    });
     this.storage.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       const close = (e.target as HTMLElement).closest('button[data-storage-close]') as HTMLButtonElement | null;
@@ -210,10 +148,13 @@ export class Hud {
     });
   }
 
-  setVitals(text: string): void {
-    if (text !== this.vitalsCache) {
+  setVitals(text: string, alert: 'none' | 'warning' | 'critical' = 'none'): void {
+    const cacheKey = `${alert}|${text}`;
+    if (cacheKey !== this.vitalsCache) {
       this.vitals.textContent = text;
-      this.vitalsCache = text;
+      this.vitals.classList.toggle('warn', alert === 'warning');
+      this.vitals.classList.toggle('critical', alert === 'critical');
+      this.vitalsCache = cacheKey;
     }
   }
 
@@ -302,62 +243,6 @@ export class Hud {
     }
   }
 
-  setRouteSlate(slate: RouteSlateView | null, seconds = 8): void {
-    if (!slate) {
-      this.route.classList.add('hide');
-      this.routeTimer = 0;
-      return;
-    }
-    const rows = slate.pins.slice(0, 5).map((pin, index) =>
-      `<div class="route-pin${pin.ready ? ' ready' : ''}${pin.selected ? ' selected' : ''}${pin.selectable ? ' selectable' : ''}" data-route-index="${index}">` +
-      `<span class="route-dot"></span><div><strong>${pin.label}</strong><p>${pin.detail}</p></div></div>`,
-    ).join('');
-    const html = `<div class="route-head"><span>${slate.title}</span><span>${escapeHtml(this.controls.route)}</span></div>` +
-      `<div class="route-summary">${slate.summary}</div>` +
-      `<div class="route-actions"><button data-route-action="pin" aria-label="Pin current route" title="Pin current route">pin</button>` +
-      `<button data-route-action="later" aria-label="Move active stop later" title="Move active stop later">later</button>` +
-      `<button data-route-action="drop" aria-label="Drop active stop" title="Drop active stop">drop</button>` +
-      `<button data-route-action="clear" aria-label="Clear current route" title="Clear current route">clear</button></div>${rows}`;
-    if (html !== this.routeCache) {
-      this.route.innerHTML = html;
-      this.routeCache = html;
-    }
-    this.route.classList.remove('hide');
-    this.routeTimer = seconds;
-  }
-
-  routeVisible(): boolean {
-    return !this.route.classList.contains('hide');
-  }
-
-  setJournal(journal: HearthJournalView | null, open: boolean): void {
-    this.journalButton.classList.toggle('active', open);
-    if (!open || !journal) {
-      this.journal.classList.add('hide');
-      return;
-    }
-    const toneClass = (tone: string | undefined): string => tone ? ` ${escapeHtml(tone)}` : '';
-    const nextRows = journal.next.slice(0, 5).map((entry) =>
-      `<div class="journal-next-item${toneClass(entry.tone)}"><strong>${escapeHtml(entry.label)}</strong><span>${escapeHtml(entry.detail)}</span></div>`,
-    ).join('');
-    const sectionRows = journal.sections.map((section) => {
-      const entries = section.entries.slice(0, 7).map((entry) =>
-        `<div class="journal-entry${toneClass(entry.tone)}"><span>${escapeHtml(entry.label)}</span><p>${escapeHtml(entry.detail)}</p></div>`,
-      ).join('');
-      return `<section class="journal-section ${escapeHtml(section.id)}">` +
-        `<div class="journal-section-head"><strong>${escapeHtml(section.title)}</strong><span>${escapeHtml(section.summary)}</span></div>` +
-        `<div class="journal-entries">${entries}</div></section>`;
-    }).join('');
-    const html = `<div class="journal-head"><div><strong>${escapeHtml(journal.title)}</strong><p>${escapeHtml(journal.summary)}</p></div>` +
-      '<button data-journal-close="1" aria-label="Close journal" title="Close journal">×</button></div>' +
-      `<div class="journal-next">${nextRows}</div><div class="journal-sections">${sectionRows}</div>`;
-    if (html !== this.journalCache) {
-      this.journal.innerHTML = html;
-      this.journalCache = html;
-    }
-    this.journal.classList.remove('hide');
-  }
-
   setStorage(view: ChestStoragePanelView | null, open: boolean): void {
     if (!open || !view) {
       this.storage.classList.add('hide');
@@ -414,13 +299,11 @@ export class Hud {
   setControlLabels(labels: HudControlLabels): void {
     if (
       labels.craft === this.controls.craft &&
-      labels.route === this.controls.route &&
       labels.hotbar.join('|') === this.controls.hotbar.join('|')
     ) return;
-    this.controls = { craft: labels.craft, route: labels.route, hotbar: labels.hotbar.slice() };
+    this.controls = { craft: labels.craft, hotbar: labels.hotbar.slice() };
     this.hotbarCache = '';
     this.craftingCache = '';
-    this.routeCache = '';
   }
 
   setHelpText(text: string): void {
@@ -437,10 +320,6 @@ export class Hud {
     if (this.slotTimer > 0) {
       this.slotTimer -= dt;
       if (this.slotTimer <= 0) this.slot.classList.remove('on');
-    }
-    if (this.routeTimer > 0) {
-      this.routeTimer -= dt;
-      if (this.routeTimer <= 0) this.route.classList.add('hide');
     }
     if (this.helpShown && this.helpTimer > 0) {
       this.helpTimer -= dt;

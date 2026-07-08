@@ -4,15 +4,6 @@ import type { FishSchoolReport } from '../sim/fishing';
 import type { Columns } from '../world/columns';
 import type { Layers } from '../world/layers';
 import { WATER_SURFACE } from '../world/layers';
-import {
-  FISH_ACTIVE_MIXER_RADIUS,
-  FISH_FROZEN_MIXER_RADIUS,
-  FISH_LOW_RATE_MIXER_RADIUS,
-  type FishSkinProvider,
-  type KilnFishSkinFitSnapshot,
-  type KilnFishSkinSlug,
-  type KilnFishSkinTemplate,
-} from './kilnAssets';
 import { makeSurfaceBasisFromYaw } from './surfaceFrame';
 
 export interface FishSchoolVisualSite {
@@ -21,32 +12,28 @@ export interface FishSchoolVisualSite {
   school: FishSchoolReport;
 }
 
-type FishSkinStatus = 'pending' | 'loaded' | 'fallback';
-type FishAnimationBand = 'active' | 'lowRate' | 'frozen' | 'hidden';
+// This slug set used to select which Kiln GLB body to load per fish-school kind. The
+// runtime Kiln loader is gone (game ships plain three.js geometry only — see the
+// controlled-burn step 14 plan), but the slug still usefully tags which fallback
+// color/motion style a school renders with, so it stays local to this renderer.
+export type KilnFishSkinSlug =
+  | 'fish-shore-minnow'
+  | 'fish-storm-runner'
+  | 'fish-cave-shimmer'
+  | 'creature-driftjelly'
+  | 'fish-reed-fry';
+
 type FishMotionBand = 'nearBoids' | 'frozenCloud' | 'hidden';
 
-interface FishAnchorRecord {
-  root: THREE.Object3D;
-  mixer: THREE.AnimationMixer;
-  clips: Map<string, THREE.AnimationClip>;
-  actions: Map<string, THREE.AnimationAction>;
-  currentClip: string | null;
-  lastMixerSeconds: number;
-  lastLowRateStepSeconds: number;
-  band: FishAnimationBand;
-}
-
-export const KILN_FISH_SKIN_SLUGS: readonly KilnFishSkinSlug[] = [
-  'fish-shore-minnow',
-  'fish-storm-runner',
-  'fish-cave-shimmer',
-  'creature-driftjelly',
-  'fish-reed-fry',
-];
+// Distance bands for the plain-geometry point-sprite school: inside NEAR_BOIDS the sprites
+// animate as a swimming boid cluster with a visible swim path; beyond that (out to VISIBLE)
+// they freeze in place as a static cloud; beyond VISIBLE the whole school is hidden.
+const FISH_NEAR_BOIDS_RADIUS = 110;
+const FISH_VISIBLE_RADIUS = 230;
 
 const MAX_POINT_SPRITES = 32;
 const MAX_SWIM_PATH_BEADS = 14;
-const FISH_MOTION_POLICY = 'two-glb-anchors-plus-near-only-analytic-boids-freeze-far' as const;
+const FISH_MOTION_POLICY = 'point-school-near-boids-freeze-far' as const;
 
 function schoolColor(slug: KilnFishSkinSlug): number {
   if (slug === 'fish-storm-runner') return 0xa3e2f2;
@@ -117,13 +104,7 @@ export class FishSchoolRenderer {
   });
   private readonly points: THREE.Points;
   private readonly swimPath: THREE.Points;
-  private readonly skinTemplates = new Map<KilnFishSkinSlug, KilnFishSkinTemplate>();
-  private readonly skinPromises = new Map<KilnFishSkinSlug, Promise<KilnFishSkinTemplate | null>>();
-  private readonly skinStatus = new Map<KilnFishSkinSlug, FishSkinStatus>();
-  private readonly anchors: FishAnchorRecord[] = [];
   private currentSite: FishSchoolVisualSite | null = null;
-  private currentSlug: KilnFishSkinSlug | null = null;
-  private currentAnchorCount = 0;
   private visibleSlug: KilnFishSkinSlug | null = null;
   private pointSpriteCount = 0;
   private nearBoidSpriteCount = 0;
@@ -132,7 +113,7 @@ export class FishSchoolRenderer {
   private swimPathLength = 0;
   private schoolSpread = 0;
 
-  constructor(scene: THREE.Scene, private readonly fishSkins?: FishSkinProvider) {
+  constructor(scene: THREE.Scene) {
     this.group.name = 'fish-school-visuals';
     this.pointsGeometry.setAttribute('position', new THREE.BufferAttribute(this.pointPositions, 3));
     this.pointsGeometry.setDrawRange(0, 0);
@@ -172,90 +153,26 @@ export class FishSchoolRenderer {
     }
     this.pointsMaterial.color.setHex(schoolColor(slug));
     this.swimPathMaterial.color.setHex(schoolColor(slug));
-    this.ensureSkin(slug);
-    const template = this.skinTemplates.get(slug);
-    if (template) {
-      this.ensureAnchors(this.currentSite, template);
-      this.fallback.visible = false;
-    } else if (!this.fishSkins || this.skinStatus.get(slug) === 'fallback') {
-      this.disposeAnchors();
-      this.fallback.visible = true;
-    }
+    this.updateFallbackColor(slug);
+    this.fallback.visible = true;
   }
 
-  private ensureSkin(slug: KilnFishSkinSlug): void {
-    if (this.skinTemplates.has(slug)) {
-      this.skinStatus.set(slug, 'loaded');
-      return;
+  /** Recolors the shared plain-geometry fallback body so each fish-school kind still reads
+   * as visually distinct (there is no other visual for fish schools). */
+  private updateFallbackColor(slug: KilnFishSkinSlug): void {
+    const bodyColor = schoolColor(slug);
+    const tailColor = new THREE.Color(bodyColor).multiplyScalar(0.68).getHex();
+    const body = this.fallback.getObjectByName('fallbackFishBody') as THREE.Mesh | null;
+    const tail = this.fallback.getObjectByName('fallbackFishTail') as THREE.Mesh | null;
+    if (body) {
+      const material = body.material as THREE.MeshStandardMaterial;
+      material.color.setHex(bodyColor);
+      material.emissive.setHex(bodyColor);
     }
-    if (!this.fishSkins) {
-      this.skinStatus.set(slug, 'fallback');
-      return;
-    }
-    if (this.skinPromises.has(slug)) {
-      this.skinStatus.set(slug, 'pending');
-      return;
-    }
-    this.skinStatus.set(slug, 'pending');
-    const promise = this.fishSkins.createFishSkinTemplate(slug)
-      .then((template) => {
-        this.skinPromises.delete(slug);
-        if (!template) {
-          this.skinStatus.set(slug, 'fallback');
-          return null;
-        }
-        this.skinTemplates.set(slug, template);
-        this.skinStatus.set(slug, 'loaded');
-        return template;
-      })
-      .catch(() => {
-        this.skinPromises.delete(slug);
-        this.skinStatus.set(slug, 'fallback');
-        return null;
-      });
-    this.skinPromises.set(slug, promise);
-  }
-
-  private disposeAnchors(): void {
-    for (const record of this.anchors) {
-      record.mixer.stopAllAction();
-      record.mixer.uncacheRoot(record.root);
-      this.group.remove(record.root);
-    }
-    this.anchors.length = 0;
-    this.currentSlug = null;
-    this.currentAnchorCount = 0;
-  }
-
-  private ensureAnchors(site: FishSchoolVisualSite, template: KilnFishSkinTemplate): void {
-    const desired = Math.max(1, Math.min(2, Math.trunc(site.school.catchCount)));
-    if (this.currentSlug === template.slug && this.currentAnchorCount === desired) return;
-    this.disposeAnchors();
-    this.currentSlug = template.slug;
-    this.currentAnchorCount = desired;
-    for (let i = 0; i < desired; i += 1) {
-      const root = template.template.clone(true);
-      root.name = `kiln-fish-${template.slug}-${i}`;
-      root.userData.kilnAssetSlug = template.slug;
-      root.userData.kilnFishSchoolKind = template.schoolKind;
-      root.userData.kilnFishSkinFit = template.fit;
-      root.traverse((child) => {
-        child.userData.kilnAssetSlug = template.slug;
-        child.userData.kilnFishSchoolKind = template.schoolKind;
-      });
-      const mixer = new THREE.AnimationMixer(root);
-      const clips = new Map(template.clips.map((clip) => [clip.name, clip]));
-      this.anchors.push({
-        root,
-        mixer,
-        clips,
-        actions: new Map(),
-        currentClip: null,
-        lastMixerSeconds: 0,
-        lastLowRateStepSeconds: 0,
-        band: 'hidden',
-      });
-      this.group.add(root);
+    if (tail) {
+      const material = tail.material as THREE.MeshStandardMaterial;
+      material.color.setHex(tailColor);
+      material.emissive.setHex(tailColor);
     }
   }
 
@@ -283,7 +200,7 @@ export class FishSchoolRenderer {
   private updatePoints(site: FishSchoolVisualSite, slug: KilnFishSkinSlug, seconds: number, distance: number): void {
     const strength = Math.max(0, Math.min(1, site.school.strength));
     const count = Math.max(8, Math.min(MAX_POINT_SPRITES, 8 + Math.trunc(site.school.catchCount * 5 + strength * 10)));
-    const nearBoids = distance <= FISH_ACTIVE_MIXER_RADIUS;
+    const nearBoids = distance <= FISH_NEAR_BOIDS_RADIUS;
     const flowSeconds = nearBoids ? seconds : 0;
     const drift = slug === 'creature-driftjelly';
     const pathLength = (drift ? 0.42 : 0.64) + strength * (drift ? 0.28 : 0.46) + Math.min(0.28, site.school.catchCount * 0.045);
@@ -315,48 +232,6 @@ export class FishSchoolRenderer {
     this.points.visible = true;
   }
 
-  private updateAnchorAnimation(record: FishAnchorRecord, site: FishSchoolVisualSite, slug: KilnFishSkinSlug, distance: number, seconds: number): void {
-    const desiredBand: FishAnimationBand =
-      distance <= FISH_ACTIVE_MIXER_RADIUS ? 'active'
-      : distance <= FISH_LOW_RATE_MIXER_RADIUS ? 'lowRate'
-      : distance <= FISH_FROZEN_MIXER_RADIUS ? 'frozen'
-      : 'hidden';
-    record.band = desiredBand;
-    record.root.visible = desiredBand !== 'hidden';
-    const desiredClip = slug === 'creature-driftjelly'
-      ? (site.school.strength >= 0.45 ? 'swim' : 'pulse')
-      : site.school.catchCount <= 1 && site.school.strength < 0.45
-      ? 'idle'
-      : 'swim';
-    const clip = record.clips.get(desiredClip)
-      ?? record.clips.get('swim')
-      ?? record.clips.get('pulse')
-      ?? record.clips.get('idle')
-      ?? [...record.clips.values()][0];
-    if (!clip) return;
-    let action = record.actions.get(clip.name);
-    if (!action) {
-      action = record.mixer.clipAction(clip);
-      record.actions.set(clip.name, action);
-    }
-    if (record.currentClip !== clip.name) {
-      if (record.currentClip) record.actions.get(record.currentClip)?.fadeOut(0.12);
-      action.reset().fadeIn(0.12).play();
-      record.currentClip = clip.name;
-    }
-    const dt = record.lastMixerSeconds > 0 ? Math.max(0, Math.min(0.05, seconds - record.lastMixerSeconds)) : 1 / 60;
-    record.lastMixerSeconds = seconds;
-    const shouldStepLowRate = desiredBand === 'lowRate' && seconds - record.lastLowRateStepSeconds >= 0.24;
-    for (const ownedAction of record.actions.values()) ownedAction.paused = desiredBand !== 'active' && !shouldStepLowRate;
-    if (desiredBand === 'active') {
-      record.mixer.update(dt);
-    } else if (shouldStepLowRate) {
-      record.mixer.update(Math.min(0.08, Math.max(0.016, seconds - record.lastLowRateStepSeconds)));
-      record.lastLowRateStepSeconds = seconds;
-      for (const ownedAction of record.actions.values()) ownedAction.paused = true;
-    }
-  }
-
   update(
     site: FishSchoolVisualSite | null,
     geo: Goldberg,
@@ -378,7 +253,7 @@ export class FishSchoolRenderer {
       c[tile * 3 + 2] * radius - camWorld.z,
     );
     const distance = this.group.position.length();
-    const active = distance <= FISH_FROZEN_MIXER_RADIUS;
+    const active = distance <= FISH_VISIBLE_RADIUS;
     this.group.visible = active;
     if (!active) {
       this.points.visible = false;
@@ -389,13 +264,9 @@ export class FishSchoolRenderer {
       this.nearBoidSpriteCount = 0;
       this.swimPathBeadCount = 0;
       this.motionBand = 'hidden';
-      for (const record of this.anchors) {
-        record.band = 'hidden';
-        record.root.visible = false;
-      }
       return;
     }
-    const nearBoids = distance <= FISH_ACTIVE_MIXER_RADIUS;
+    const nearBoids = distance <= FISH_NEAR_BOIDS_RADIUS;
     const flowSeconds = nearBoids ? seconds : 0;
     this.group.scale.setScalar(nearBoids ? 1.55 : 1);
     const yaw = this.currentSite.id * 0.013 + flowSeconds * 0.18;
@@ -404,28 +275,9 @@ export class FishSchoolRenderer {
     const vZ = new THREE.Vector3();
     this.group.setRotationFromMatrix(makeSurfaceBasisFromYaw(frame, yaw, new THREE.Matrix4(), vX, vY, vZ));
     this.updatePoints(this.currentSite, this.visibleSlug, seconds, distance);
-    if (this.fallback.visible) {
-      this.fallback.position.set(0, 0.04, Math.sin(flowSeconds * 1.3) * 0.08);
-      this.fallback.rotation.y = Math.sin(flowSeconds * 2.1) * 0.26;
-      this.fallback.scale.setScalar(1 + Math.sin(flowSeconds * 2.7) * 0.03);
-    }
-    for (let i = 0; i < this.anchors.length; i += 1) {
-      const record = this.anchors[i];
-      const strength = Math.max(0, Math.min(1, this.currentSite.school.strength));
-      const drift = this.visibleSlug === 'creature-driftjelly';
-      const phase = flowSeconds * (drift ? 0.72 + i * 0.1 : 1.05 + i * 0.17) + this.currentSite.id * 0.031 + i * 1.7;
-      const lane = i === 0 ? -0.08 : 0.12;
-      const lead = i === 0 ? 0.18 : -0.18;
-      const path = (drift ? 0.42 : 0.62) + strength * (drift ? 0.2 : 0.34);
-      record.root.position.set(
-        lane + Math.cos(phase * 0.83) * (0.045 + i * 0.025),
-        0.04 + Math.sin(phase * (drift ? 1.1 : 1.7)) * (drift ? 0.085 : 0.055),
-        lead + Math.sin(phase) * path * 0.32,
-      );
-      record.root.rotation.set(0, Math.sin(phase * 1.23) * (drift ? 0.18 : 0.32) + i * 0.18, 0);
-      record.root.scale.setScalar(1 + i * 0.08 + Math.sin(phase * 1.9) * 0.025);
-      this.updateAnchorAnimation(record, this.currentSite, this.visibleSlug, distance, seconds);
-    }
+    this.fallback.position.set(0, 0.04, Math.sin(flowSeconds * 1.3) * 0.08);
+    this.fallback.rotation.y = Math.sin(flowSeconds * 2.1) * 0.26;
+    this.fallback.scale.setScalar(1 + Math.sin(flowSeconds * 2.7) * 0.03);
   }
 
   stats(): {
@@ -441,72 +293,10 @@ export class FishSchoolRenderer {
     swimPathBeads: number;
     swimPathLength: number;
     schoolSpread: number;
-    glbAnchors: number;
-    glbAnchorsVisible: number;
     fallbackVisible: number;
-    activeMixers: number;
-    lowRateMixers: number;
-    frozenMixers: number;
-    hiddenFishSkins: number;
-    activeMixerRadius: number;
-    lowRateMixerRadius: number;
-    frozenMixerRadius: number;
-    kilnFishSkinsLoaded: number;
-    kilnFishSkinsPending: number;
-    kilnFishSkinFallbacks: number;
-    kilnFishSkinsBySlug: Partial<Record<KilnFishSkinSlug, {
-      loaded: number;
-      pending: number;
-      fallback: number;
-      clips: readonly string[];
-      activeMixers: number;
-      lowRateMixers: number;
-      frozenMixers: number;
-      hidden: number;
-      visibleAnchors: number;
-    }>>;
-    kilnFishSkinFits: Partial<Record<KilnFishSkinSlug, KilnFishSkinFitSnapshot>>;
+    nearBoidsRadius: number;
+    visibleRadius: number;
   } {
-    const bySlug: Partial<Record<KilnFishSkinSlug, {
-      loaded: number;
-      pending: number;
-      fallback: number;
-      clips: readonly string[];
-      activeMixers: number;
-      lowRateMixers: number;
-      frozenMixers: number;
-      hidden: number;
-      visibleAnchors: number;
-    }>> = {};
-    const fits: Partial<Record<KilnFishSkinSlug, KilnFishSkinFitSnapshot>> = {};
-    let activeMixers = 0;
-    let lowRateMixers = 0;
-    let frozenMixers = 0;
-    let hiddenFishSkins = 0;
-    let visibleAnchors = 0;
-    for (const slug of KILN_FISH_SKIN_SLUGS) {
-      const status = this.skinStatus.get(slug);
-      const template = this.skinTemplates.get(slug);
-      const records = this.currentSlug === slug ? this.anchors : [];
-      const row = {
-        loaded: template ? 1 : 0,
-        pending: status === 'pending' ? 1 : 0,
-        fallback: status === 'fallback' ? 1 : 0,
-        clips: template?.clips.map((clip) => clip.name) ?? [],
-        activeMixers: records.filter((record) => record.band === 'active').length,
-        lowRateMixers: records.filter((record) => record.band === 'lowRate').length,
-        frozenMixers: records.filter((record) => record.band === 'frozen').length,
-        hidden: records.filter((record) => record.band === 'hidden').length,
-        visibleAnchors: records.filter((record) => record.root.visible).length,
-      };
-      if (row.loaded || row.pending || row.fallback || records.length) bySlug[slug] = row;
-      if (template) fits[slug] = template.fit;
-      activeMixers += row.activeMixers;
-      lowRateMixers += row.lowRateMixers;
-      frozenMixers += row.frozenMixers;
-      hiddenFishSkins += row.hidden;
-      visibleAnchors += row.visibleAnchors;
-    }
     return {
       active: this.group.visible ? 1 : 0,
       slug: this.visibleSlug,
@@ -520,21 +310,9 @@ export class FishSchoolRenderer {
       swimPathBeads: this.swimPath.visible ? this.swimPathBeadCount : 0,
       swimPathLength: this.points.visible ? this.swimPathLength : 0,
       schoolSpread: this.points.visible ? this.schoolSpread : 0,
-      glbAnchors: this.anchors.length,
-      glbAnchorsVisible: visibleAnchors,
       fallbackVisible: this.fallback.visible ? 1 : 0,
-      activeMixers,
-      lowRateMixers,
-      frozenMixers,
-      hiddenFishSkins,
-      activeMixerRadius: FISH_ACTIVE_MIXER_RADIUS,
-      lowRateMixerRadius: FISH_LOW_RATE_MIXER_RADIUS,
-      frozenMixerRadius: FISH_FROZEN_MIXER_RADIUS,
-      kilnFishSkinsLoaded: [...this.skinTemplates.keys()].length,
-      kilnFishSkinsPending: [...this.skinStatus.values()].filter((status) => status === 'pending').length,
-      kilnFishSkinFallbacks: [...this.skinStatus.values()].filter((status) => status === 'fallback').length,
-      kilnFishSkinsBySlug: bySlug,
-      kilnFishSkinFits: fits,
+      nearBoidsRadius: FISH_NEAR_BOIDS_RADIUS,
+      visibleRadius: FISH_VISIBLE_RADIUS,
     };
   }
 }

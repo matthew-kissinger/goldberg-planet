@@ -11,13 +11,13 @@ import {
   selectStructurePlacementCommand,
   useStructureInteractionCommand,
 } from '../src/sim/buildCommands';
-import { addStructure, STRUCTURE_YAW_STEP, type StructureSave, type StructureTopology } from '../src/sim/structures';
+import { addStructure, type StructureSave } from '../src/sim/structures';
 import type { InventoryItems } from '../src/sim/crafting';
 
 describe('Hearth and Horizon build commands', () => {
   it('returns explicit command results for select, rotate, place, use, and pack', () => {
     const materials = [0, 0, 0, 0, 0];
-    const crafted: InventoryItems = { doorKit: 2, campfire: 1 };
+    const crafted: InventoryItems = { chest: 2, campfire: 1 };
     const structures: StructureSave[] = [];
 
     expect(normalizePlacementTurn(-1)).toBe(5);
@@ -27,31 +27,31 @@ describe('Hearth and Horizon build commands', () => {
       action: 'select:invalid',
       selected: null,
     });
-    expect(selectStructurePlacementCommand(materials, {}, 'doorKit')).toMatchObject({
+    expect(selectStructurePlacementCommand(materials, {}, 'chest')).toMatchObject({
       ok: false,
       command: 'selectPlacement',
-      action: 'doorKit:select:missing',
-      message: 'craft door kit first',
+      action: 'chest:select:missing',
+      message: 'craft chest first',
     });
 
-    const selected = selectStructurePlacementCommand(materials, crafted, 'doorKit');
-    expect(selected).toMatchObject({ ok: true, action: 'doorKit:select', selected: 'doorKit' });
+    const selected = selectStructurePlacementCommand(materials, crafted, 'chest');
+    expect(selected).toMatchObject({ ok: true, action: 'chest:select', selected: 'chest' });
     expect(rotateSelectedPlacementCommand(null, 0, 1)).toMatchObject({
       ok: false,
       command: 'rotatePlacement',
       action: 'placement-rotate:none',
     });
-    const placementTurn = rotateSelectedPlacementCommand('doorKit', 0, 2);
+    const placementTurn = rotateSelectedPlacementCommand('chest', 0, 2);
     expect(placementTurn).toMatchObject({
       ok: true,
       command: 'rotatePlacement',
-      action: 'doorKit:placement-rotate:hex face 3',
+      action: 'chest:placement-rotate:hex face 3',
       turn: 2,
     });
 
     expect(placeStructureCommand({
       structures,
-      item: 'doorKit',
+      item: 'chest',
       tile: 4,
       layer: 2,
       yaw: placementTurn.yaw!,
@@ -63,13 +63,13 @@ describe('Hearth and Horizon build commands', () => {
     })).toMatchObject({
       ok: false,
       command: 'place',
-      action: 'doorKit:place:blocked:player',
+      action: 'chest:place:blocked:player',
       message: 'step aside before placing here',
     });
 
     const placed = placeStructureCommand({
       structures,
-      item: 'doorKit',
+      item: 'chest',
       tile: 6,
       layer: 2,
       yaw: placementTurn.yaw!,
@@ -82,16 +82,16 @@ describe('Hearth and Horizon build commands', () => {
     expect(placed).toMatchObject({
       ok: true,
       command: 'place',
-      item: 'doorKit',
-      selected: 'doorKit',
+      item: 'chest',
+      selected: 'chest',
       turn: 2,
-      action: 'doorKit:placed:hex face 3:placement face 3',
+      action: 'chest:placed:hex face 3:placement face 3',
     });
-    expect(placed.placed).toMatchObject({ item: 'doorKit', tile: 6, layer: 2 });
-    expect(crafted.doorKit).toBe(1);
+    expect(placed.placed).toMatchObject({ item: 'chest', tile: 6, layer: 2 });
+    expect(crafted.chest).toBe(1);
     expect(placeStructureCommand({
       structures,
-      item: 'doorKit',
+      item: 'chest',
       tile: 6,
       layer: 2,
       yaw: placementTurn.yaw!,
@@ -103,8 +103,8 @@ describe('Hearth and Horizon build commands', () => {
     })).toMatchObject({
       ok: false,
       command: 'place',
-      action: 'doorKit:place:blocked:occupied edge socket',
-      message: 'that edge already has a prop',
+      action: 'chest:place:blocked:occupied snap target',
+      message: 'that hex already has a prop',
     });
 
     expect(rotatePlacedStructureCommand(structures, null, 1)).toMatchObject({
@@ -127,12 +127,12 @@ describe('Hearth and Horizon build commands', () => {
     expect(rotatePlacedStructureCommand(structures, placed.placed!, -1)).toMatchObject({
       ok: true,
       command: 'rotatePlaced',
-      item: 'doorKit',
+      item: 'chest',
       turn: 1,
-      action: 'doorKit:rotate:rotated door kit to hex face 2',
+      action: 'chest:rotate:rotated chest to hex face 2',
     });
 
-    addStructure(structures, { item: 'windowFrame', tile: 9, layer: 2, yaw: 0 });
+    addStructure(structures, { item: 'workbench', tile: 9, layer: 2, yaw: 0 });
     expect(relocateStructureCommand({
       structures,
       target: placed.placed!,
@@ -142,11 +142,11 @@ describe('Hearth and Horizon build commands', () => {
     })).toMatchObject({
       ok: false,
       command: 'relocate',
-      item: 'doorKit',
+      item: 'chest',
       id: placed.placed!.id,
       fromTile: 6,
       toTile: 4,
-      action: 'doorKit:relocate:blocked:player',
+      action: 'chest:relocate:blocked:player',
       blockers: ['player on snap target'],
     });
     expect(relocateStructureCommand({
@@ -159,16 +159,16 @@ describe('Hearth and Horizon build commands', () => {
     })).toMatchObject({
       ok: false,
       command: 'relocate',
-      item: 'doorKit',
+      item: 'chest',
       id: placed.placed!.id,
       fromTile: 6,
       toTile: 7,
-      action: 'doorKit:relocate:blocked:needs solid ground',
+      action: 'chest:relocate:blocked:needs solid ground',
       blockers: ['needs solid ground'],
     });
     expect(placeStructureCommand({
       structures,
-      item: 'doorKit',
+      item: 'chest',
       tile: 11,
       layer: 2,
       yaw: 0,
@@ -177,12 +177,12 @@ describe('Hearth and Horizon build commands', () => {
       craftedItems: crafted,
       creative: false,
       playerTile: 4,
-      blocker: 'native life on snap target: brambleback',
+      blocker: 'obstruction on snap target',
     })).toMatchObject({
       ok: false,
       command: 'place',
-      action: 'doorKit:place:blocked:native life on snap target: brambleback',
-      blockers: ['native life on snap target: brambleback'],
+      action: 'chest:place:blocked:obstruction on snap target',
+      blockers: ['obstruction on snap target'],
     });
     expect(relocateStructureCommand({
       structures,
@@ -194,12 +194,12 @@ describe('Hearth and Horizon build commands', () => {
     })).toMatchObject({
       ok: false,
       command: 'relocate',
-      item: 'doorKit',
+      item: 'chest',
       id: placed.placed!.id,
       fromTile: 6,
       toTile: 9,
-      action: 'doorKit:relocate:door kit edge is occupied',
-      blockers: ['occupied edge socket'],
+      action: 'chest:relocate:that hex already has a prop',
+      blockers: ['occupied snap target'],
     });
     expect(relocateStructureCommand({
       structures,
@@ -210,11 +210,11 @@ describe('Hearth and Horizon build commands', () => {
     })).toMatchObject({
       ok: false,
       command: 'relocate',
-      item: 'doorKit',
+      item: 'chest',
       id: placed.placed!.id,
       fromTile: 6,
       toTile: 6,
-      action: 'doorKit:relocate:door kit already on that snap hex',
+      action: 'chest:relocate:chest already on that snap hex',
       blockers: ['same snap target'],
     });
     expect(relocateStructureCommand({
@@ -226,14 +226,14 @@ describe('Hearth and Horizon build commands', () => {
     })).toMatchObject({
       ok: true,
       command: 'relocate',
-      item: 'doorKit',
+      item: 'chest',
       id: placed.placed!.id,
       fromTile: 6,
       fromLayer: 2,
       toTile: 8,
       toLayer: 3,
       turn: 1,
-      action: 'doorKit:relocate:moved door kit to snap hex',
+      action: 'chest:relocate:moved chest to snap hex',
     });
     expect(placed.placed).toMatchObject({ tile: 8, layer: 3 });
 
@@ -241,12 +241,12 @@ describe('Hearth and Horizon build commands', () => {
     expect(packed).toMatchObject({
       ok: true,
       command: 'pack',
-      item: 'doorKit',
-      selected: 'doorKit',
+      item: 'chest',
+      selected: 'chest',
       inventoryReturned: true,
-      action: 'doorKit:pack:packed door kit',
+      action: 'chest:pack:packed chest',
     });
-    expect(crafted.doorKit).toBe(2);
+    expect(crafted.chest).toBe(2);
     expect(packStructureCommand(structures, null, crafted, false)).toMatchObject({
       ok: false,
       command: 'pack',
@@ -278,14 +278,14 @@ describe('Hearth and Horizon build commands', () => {
 
   it('previews snap placement and relocation blockers without mutating structures or inventory', () => {
     const materials = [0, 0, 0, 0, 0];
-    const crafted: InventoryItems = { doorKit: 1, windowFrame: 1 };
+    const crafted: InventoryItems = { chest: 1, workbench: 1 };
     const structures: StructureSave[] = [];
-    const door = addStructure(structures, { item: 'doorKit', tile: 6, layer: 2, yaw: 0 })!;
-    const windowFrame = addStructure(structures, { item: 'windowFrame', tile: 9, layer: 2, yaw: 0 })!;
+    const chest = addStructure(structures, { item: 'chest', tile: 6, layer: 2, yaw: 0 })!;
+    const bench = addStructure(structures, { item: 'workbench', tile: 9, layer: 2, yaw: 0 })!;
 
     expect(previewPlaceStructureCommand({
       structures,
-      item: 'windowFrame',
+      item: 'workbench',
       tile: 7,
       layer: 2,
       yaw: 0,
@@ -298,18 +298,18 @@ describe('Hearth and Horizon build commands', () => {
       active: true,
       mode: 'place',
       ok: true,
-      item: 'windowFrame',
+      item: 'workbench',
       tile: 7,
       blocker: null,
       blockers: [],
-      socket: { role: 'wall-light', modularKit: true },
+      socket: { role: 'crafting-station', modularKit: false },
     });
-    expect(crafted.windowFrame).toBe(1);
+    expect(crafted.workbench).toBe(1);
     expect(structures.map((s) => s.tile)).toEqual([6, 9]);
 
     expect(previewPlaceStructureCommand({
       structures,
-      item: 'windowFrame',
+      item: 'workbench',
       tile: 4,
       layer: 2,
       yaw: 0,
@@ -326,7 +326,7 @@ describe('Hearth and Horizon build commands', () => {
     });
     expect(previewPlaceStructureCommand({
       structures,
-      item: 'windowFrame',
+      item: 'workbench',
       tile: 6,
       layer: 2,
       yaw: 0,
@@ -337,13 +337,13 @@ describe('Hearth and Horizon build commands', () => {
       playerTile: 4,
     })).toMatchObject({
       ok: false,
-      message: 'that edge already has a prop',
-      blocker: 'occupied edge socket',
-      blockers: ['occupied edge socket'],
+      message: 'that hex already has a prop',
+      blocker: 'occupied snap target',
+      blockers: ['occupied snap target'],
     });
     expect(previewPlaceStructureCommand({
       structures,
-      item: 'windowFrame',
+      item: 'workbench',
       tile: 8,
       layer: 2,
       yaw: 0,
@@ -362,7 +362,7 @@ describe('Hearth and Horizon build commands', () => {
 
     expect(previewRelocateStructureCommand({
       structures,
-      target: door,
+      target: chest,
       tile: 8,
       layer: 3,
       yaw: Math.PI / 3,
@@ -371,18 +371,18 @@ describe('Hearth and Horizon build commands', () => {
       active: true,
       mode: 'relocate',
       ok: true,
-      item: 'doorKit',
-      id: door.id,
+      item: 'chest',
+      id: chest.id,
       fromTile: 6,
       tile: 8,
       layer: 3,
       turn: 1,
       blocker: null,
-      socket: { role: 'wall-opening', modularKit: true },
+      socket: { role: 'storage-station', modularKit: false },
     });
     expect(previewRelocateStructureCommand({
       structures,
-      target: door,
+      target: chest,
       tile: 4,
       layer: 2,
       playerTile: 4,
@@ -394,31 +394,31 @@ describe('Hearth and Horizon build commands', () => {
     });
     expect(previewRelocateStructureCommand({
       structures,
-      target: door,
+      target: chest,
       tile: 9,
       layer: 2,
       playerTile: 4,
     })).toMatchObject({
       ok: false,
-      message: 'Door Kit edge is occupied',
-      blocker: 'occupied edge socket',
-      blockers: ['occupied edge socket'],
+      message: 'that hex already has a prop',
+      blocker: 'occupied snap target',
+      blockers: ['occupied snap target'],
     });
     expect(previewRelocateStructureCommand({
       structures,
-      target: door,
+      target: chest,
       tile: 6,
       layer: 2,
       playerTile: 4,
     })).toMatchObject({
       ok: false,
-      message: 'door kit already on that snap hex',
+      message: 'chest already on that snap hex',
       blocker: 'same snap target',
       blockers: ['same snap target'],
     });
     expect(previewRelocateStructureCommand({
       structures,
-      target: windowFrame,
+      target: bench,
       tile: 8,
       layer: 2,
       playerTile: 4,
@@ -438,336 +438,50 @@ describe('Hearth and Horizon build commands', () => {
       blocker: 'douse light first',
       blockers: ['douse light first'],
     });
-    expect(structures.find((s) => s.id === door.id)).toMatchObject({ tile: 6, layer: 2 });
+    expect(structures.find((s) => s.id === chest.id)).toMatchObject({ tile: 6, layer: 2 });
   });
 
-  it('uses the wall-shell socket contract for new procedural house pieces', () => {
-    const materials = [0, 0, 0, 0, 0];
-    const crafted: InventoryItems = { wallPanel: 1, floorFoundation: 1, wallHalfRail: 1 };
+  it('forwards waystone, weather vane, rain cistern, and fish trap contexts into the structure interaction', () => {
     const structures: StructureSave[] = [];
-
-    expect(selectStructurePlacementCommand(materials, crafted, 'wallPanel')).toMatchObject({
-      ok: true,
-      action: 'wallPanel:select',
-      selected: 'wallPanel',
-    });
-    expect(previewPlaceStructureCommand({
-      structures,
-      item: 'wallPanel',
-      tile: 12,
-      layer: 2,
-      yaw: Math.PI / 3,
-      placementTurn: 1,
-      materialCounts: materials,
-      craftedItems: crafted,
-      creative: false,
-      playerTile: 4,
-    })).toMatchObject({
-      active: true,
-      ok: true,
-      item: 'wallPanel',
-      socket: { role: 'wall-panel', collider: 'thin-wall', modularKit: true },
-    });
-
-    const placed = placeStructureCommand({
-      structures,
-      item: 'wallPanel',
-      tile: 12,
-      layer: 2,
-      yaw: Math.PI / 3,
-      placementTurn: 1,
-      materialCounts: materials,
-      craftedItems: crafted,
-      creative: false,
-      playerTile: 4,
-    });
-    expect(placed).toMatchObject({
-      ok: true,
-      item: 'wallPanel',
-      selected: null,
-      action: 'wallPanel:placed:hex face 2:placement face 2',
-    });
-    expect(crafted.wallPanel).toBeUndefined();
-    expect(previewRelocateStructureCommand({
-      structures,
-      target: placed.placed!,
-      tile: 13,
-      layer: 2,
-      yaw: Math.PI * 2 / 3,
-      playerTile: 4,
-    })).toMatchObject({
-      ok: true,
-      item: 'wallPanel',
-      socket: { role: 'wall-panel', collider: 'thin-wall' },
-      turn: 2,
-    });
-
-    const moved = relocateStructureCommand({
-      structures,
-      target: placed.placed!,
-      tile: 13,
-      layer: 2,
-      yaw: Math.PI * 2 / 3,
-      playerTile: 4,
-    });
-    expect(moved).toMatchObject({
-      ok: true,
-      item: 'wallPanel',
-      toTile: 13,
-      turn: 2,
-      action: 'wallPanel:relocate:moved wall panel to snap hex',
-    });
-    expect(packStructureCommand(structures, placed.placed!, crafted, false)).toMatchObject({
-      ok: true,
-      item: 'wallPanel',
-      selected: 'wallPanel',
-      action: 'wallPanel:pack:packed wall panel',
-    });
-    expect(crafted.wallPanel).toBe(1);
-  });
-
-  it('uses integrated wall-shell sockets in generic build commands', () => {
     const materials = [0, 0, 0, 0, 0];
-    const crafted: InventoryItems = { wallDoorPanel: 1, wallWindowPanel: 1, wallCorner: 1, roofJoin: 1 };
-    const structures: StructureSave[] = [];
-    const cases: Array<{ item: 'wallDoorPanel' | 'wallWindowPanel' | 'wallCorner' | 'roofJoin'; role: string; tile: number }> = [
-      { item: 'wallDoorPanel', role: 'wall-opening', tile: 20 },
-      { item: 'wallWindowPanel', role: 'wall-light', tile: 21 },
-      { item: 'wallCorner', role: 'wall-corner', tile: 22 },
-      { item: 'roofJoin', role: 'roof-join', tile: 23 },
-    ];
 
-    for (const [index, testCase] of cases.entries()) {
-      expect(selectStructurePlacementCommand(materials, crafted, testCase.item)).toMatchObject({
-        ok: true,
-        selected: testCase.item,
-      });
-      expect(previewPlaceStructureCommand({
-        structures,
-        item: testCase.item,
-        tile: testCase.tile,
-        layer: 2,
-        yaw: index * Math.PI / 3,
-        placementTurn: index,
-        materialCounts: materials,
-        craftedItems: crafted,
-        creative: false,
-        playerTile: 4,
-      })).toMatchObject({
-        active: true,
-        ok: true,
-        item: testCase.item,
-        socket: { role: testCase.role, modularKit: true },
-      });
-      const placed = placeStructureCommand({
-        structures,
-        item: testCase.item,
-        tile: testCase.tile,
-        layer: 2,
-        yaw: index * Math.PI / 3,
-        placementTurn: index,
-        materialCounts: materials,
-        craftedItems: crafted,
-        creative: false,
-        playerTile: 4,
-      });
-      expect(placed).toMatchObject({ ok: true, item: testCase.item, selected: null });
-      expect(packStructureCommand(structures, placed.placed!, crafted, false)).toMatchObject({
-        ok: true,
-        item: testCase.item,
-        selected: testCase.item,
-      });
-      expect(crafted[testCase.item]).toBe(1);
-    }
-  });
-
-  it('places and blocks wall-shell pieces by edge socket instead of whole tile', () => {
-    const materials = [0, 0, 0, 0, 0];
-    const crafted: InventoryItems = { floorFoundation: 1, wallPanel: 1, wallWindowPanel: 1, wallDoorPanel: 1 };
-    const structures: StructureSave[] = [];
-
-    const foundation = placeStructureCommand({
+    const stone = addStructure(structures, { item: 'waystone', tile: 12, layer: 2, yaw: 0 })!;
+    expect(useStructureInteractionCommand({
       structures,
-      item: 'floorFoundation',
-      tile: 30,
-      layer: 2,
-      yaw: 0,
-      placementTurn: 0,
+      target: stone,
       materialCounts: materials,
-      craftedItems: crafted,
-      creative: false,
-      playerTile: 4,
-    });
-    expect(foundation).toMatchObject({ ok: true, item: 'floorFoundation' });
+      waystoneContext: { home: true },
+    })).toMatchObject({ ok: true, mode: 'mark', message: 'hearth waystone attuned · home route' });
 
-    const wall = placeStructureCommand({
+    const vane = addStructure(structures, { item: 'weatherVane', tile: 13, layer: 2, yaw: 0 })!;
+    expect(useStructureInteractionCommand({
       structures,
-      item: 'wallPanel',
-      tile: 30,
-      layer: 2,
-      yaw: 0,
-      placementTurn: 0,
+      target: vane,
       materialCounts: materials,
-      craftedItems: crafted,
-      creative: false,
-      playerTile: 4,
-    });
-    expect(wall).toMatchObject({ ok: true, item: 'wallPanel' });
+      weatherVaneContext: { kind: 'storm', label: 'storm front', intensity: 0.9 },
+    })).toMatchObject({ ok: true, mode: 'forecast', message: 'weather vane reads storm front · storm timing marked' });
 
-    expect(previewPlaceStructureCommand({
+    const cistern = addStructure(structures, { item: 'rainCistern', tile: 14, layer: 2, yaw: 0 })!;
+    expect(useStructureInteractionCommand({
       structures,
-      item: 'wallWindowPanel',
-      tile: 30,
-      layer: 2,
-      yaw: Math.PI / 3,
-      placementTurn: 1,
+      target: cistern,
       materialCounts: materials,
-      craftedItems: crafted,
-      creative: false,
-      playerTile: 4,
-    })).toMatchObject({
-      ok: true,
-      item: 'wallWindowPanel',
-      tile: 30,
-      turn: 1,
-    });
+      rainCisternContext: { kind: 'rain', label: 'rain', intensity: 0.6 },
+    })).toMatchObject({ ok: true, mode: 'collectWater' });
 
-    const window = placeStructureCommand({
+    const trap = addStructure(structures, { item: 'fishTrap', tile: 15, layer: 2, yaw: 0 })!;
+    const food: InventoryItems = {};
+    expect(useStructureInteractionCommand({
       structures,
-      item: 'wallWindowPanel',
-      tile: 30,
-      layer: 2,
-      yaw: Math.PI / 3,
-      placementTurn: 1,
+      target: trap,
       materialCounts: materials,
-      craftedItems: crafted,
-      creative: false,
-      playerTile: 4,
-    });
-    expect(window).toMatchObject({ ok: true, item: 'wallWindowPanel' });
-    expect(structures.filter((entry) => entry.tile === 30)).toHaveLength(3);
-
-    expect(previewPlaceStructureCommand({
-      structures,
-      item: 'wallDoorPanel',
-      tile: 30,
-      layer: 2,
-      yaw: 0,
-      placementTurn: 0,
-      materialCounts: materials,
-      craftedItems: crafted,
-      creative: false,
-      playerTile: 4,
-    })).toMatchObject({
-      ok: false,
-      blocker: 'occupied edge socket',
-      blockers: ['occupied edge socket'],
-      message: 'that edge already has a prop',
-    });
-
-    expect(rotatePlacedStructureCommand(structures, window.placed!, -1)).toMatchObject({
-      ok: false,
-      command: 'rotatePlaced',
-      item: 'wallWindowPanel',
-      blockers: ['occupied edge socket'],
-    });
-  });
-
-  it('blocks wall-shell previews and moves onto nonexistent pentagon edges', () => {
-    const topology: StructureTopology = {
-      degreeOf: (tile) => (tile === 30 || tile === 31 ? 5 : 6),
-      neighbor: (tile, edge) => tile * 10 + edge,
-    };
-    const materials = [0, 0, 0, 0, 0];
-    const crafted: InventoryItems = { wallPanel: 2 };
-    const structures: StructureSave[] = [];
-
-    expect(previewPlaceStructureCommand({
-      structures,
-      item: 'wallPanel',
-      tile: 30,
-      layer: 2,
-      yaw: STRUCTURE_YAW_STEP * 5,
-      placementTurn: 5,
-      materialCounts: materials,
-      craftedItems: crafted,
-      creative: false,
-      playerTile: 4,
-      topology,
-    })).toMatchObject({
-      ok: false,
-      blocker: 'invalid edge socket',
-      blockers: ['invalid edge socket'],
-      message: 'Wall Panel needs a real hex edge',
-    });
-
-    expect(placeStructureCommand({
-      structures,
-      item: 'wallPanel',
-      tile: 30,
-      layer: 2,
-      yaw: STRUCTURE_YAW_STEP * 5,
-      placementTurn: 5,
-      materialCounts: materials,
-      craftedItems: crafted,
-      creative: false,
-      playerTile: 4,
-      topology,
-    })).toMatchObject({
-      ok: false,
-      action: 'wallPanel:place:blocked:invalid edge socket',
-      blockers: ['invalid edge socket'],
-      message: 'Wall Panel needs a real hex edge',
-    });
-    expect(crafted.wallPanel).toBe(2);
-
-    const placed = placeStructureCommand({
-      structures,
-      item: 'wallPanel',
-      tile: 30,
-      layer: 2,
-      yaw: STRUCTURE_YAW_STEP * 4,
-      placementTurn: 4,
-      materialCounts: materials,
-      craftedItems: crafted,
-      creative: false,
-      playerTile: 4,
-      topology,
-    });
-    expect(placed).toMatchObject({ ok: true, item: 'wallPanel', turn: 4 });
-
-    expect(rotatePlacedStructureCommand(structures, placed.placed!, 1, topology)).toMatchObject({
-      ok: false,
-      command: 'rotatePlaced',
-      blockers: ['invalid edge socket'],
-      message: 'wall panel needs a real hex edge',
-    });
-    expect(previewRelocateStructureCommand({
-      structures,
-      target: placed.placed!,
-      tile: 31,
-      layer: 2,
-      yaw: STRUCTURE_YAW_STEP * 5,
-      playerTile: 4,
-      topology,
-    })).toMatchObject({
-      ok: false,
-      blocker: 'invalid edge socket',
-      blockers: ['invalid edge socket'],
-      message: 'Wall Panel needs a real hex edge',
-    });
-    expect(relocateStructureCommand({
-      structures,
-      target: placed.placed!,
-      tile: 31,
-      layer: 2,
-      yaw: STRUCTURE_YAW_STEP * 5,
-      playerTile: 4,
-      topology,
-    })).toMatchObject({
-      ok: false,
-      blockers: ['invalid edge socket'],
-      message: 'wall panel needs a real hex edge',
-    });
+      craftedItems: food,
+      fishTrapContext: {
+        day: 1,
+        minute: 0,
+        nearWater: true,
+        school: { kind: 'shore', label: 'shore run', strength: 0.4, catchCount: 1, baitUseful: false, usesBait: false, message: 'shore run' },
+      },
+    })).toMatchObject({ ok: true, mode: 'setTrap' });
   });
 });

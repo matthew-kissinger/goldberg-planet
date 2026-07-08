@@ -1,5 +1,4 @@
 import type { InventoryItems, ItemId } from './crafting';
-import type { PentagonInsightEffect } from './landmarks';
 
 export interface TimeState {
   day: number;
@@ -26,12 +25,6 @@ export interface WeatherReport {
   staminaRegen: number;
 }
 
-export interface WeatherDomainContext {
-  effect?: PentagonInsightEffect | null;
-  intensity?: number;
-  label?: string;
-}
-
 export interface SurvivalContext {
   dt: number;
   moving: boolean;
@@ -45,7 +38,6 @@ export interface SurvivalContext {
   nearWarmth: boolean;
   weather: WeatherReport;
   weatherProtection?: WeatherProtectionContext | null;
-  cavePressure?: CavePressureReport;
   thresholdEffect?: SurvivalThresholdEffect | null;
 }
 
@@ -80,16 +72,6 @@ export interface SurvivalReport {
   status: 'rested' | 'steady' | 'winded' | 'exposed' | 'worn';
   label: string;
   weather: WeatherReport;
-}
-
-export interface CavePressureReport {
-  active: boolean;
-  label: string;
-  exposureRate: number;
-  staminaRegen: number;
-  light: 'daylight' | 'dark' | 'warmth' | 'lantern' | 'echoLantern';
-  message: string;
-  focus?: { active: boolean; minutes: number; exposureMultiplier: number; label: string };
 }
 
 export interface EatResult {
@@ -133,6 +115,13 @@ export interface RestResult {
   message: string;
 }
 
+/**
+ * Force-relocates the player home/to spawn and resets stamina/exposure. No longer invoked
+ * automatically from the survival loop — normal exposure pressure is handled by
+ * isExposureWarning/isExposureCritical + the ongoing stamina-drain penalty in updateSurvival.
+ * recoverFromCollapse is kept only as an explicit, developer-invoked rescue (see main.ts's
+ * debug.collapse hook); it is never called as a silent background mechanic.
+ */
 export interface CollapseRecoveryContext extends RestShelterContext {
   hasHome: boolean;
 }
@@ -168,6 +157,13 @@ export interface WeatherWindowResult {
 }
 
 const TRAIL_FOCUS_MAX = 720;
+
+/** exposure >= this is the 'exposed' status band */
+export const EXPOSURE_EXPOSED_THRESHOLD = 55;
+/** exposure >= this is the 'worn' status band — also where the HUD raises a clear warning */
+export const EXPOSURE_WARNING_THRESHOLD = 82;
+/** exposure at this ceiling applies an ongoing "cold is winning" penalty instead of a hard collapse */
+export const EXPOSURE_CRITICAL_THRESHOLD = 100;
 
 const FOOD_ORDER: { item: ItemId; label: string; stamina: number; exposureDrop: number; trailFocus?: number }[] = [
   { item: 'expeditionStew', label: 'expedition stew', stamina: 64, exposureDrop: 22, trailFocus: 240 },
@@ -256,27 +252,12 @@ export function weatherAt(
   tile: number,
   height: number,
   submerged: number,
-  domain?: WeatherDomainContext | null,
 ): WeatherReport {
   const stormWave = Math.sin((weather.phase * 2 + tile * 0.019 + time.day * 0.37) * Math.PI);
   const local = 0.5 + 0.5 * stormWave;
-  const domainIntensity = clamp(domain?.intensity ?? 0, 0, 1);
-  const effect = domain?.effect ?? null;
   const cold = height > 42;
   if (submerged > 0.45) {
     return { kind: 'soaked', label: 'soaked', intensity: 1, exposureRate: 2.1, staminaRegen: 0.35 };
-  }
-  if (effect === 'storm' && local > 0.34) {
-    const intensity = clamp(Math.max(local, 0.64 + domainIntensity * 0.24), 0, 1);
-    return { kind: 'storm', label: 'storm-seat squall', intensity, exposureRate: 1.35 + intensity * 0.55, staminaRegen: 0.48 };
-  }
-  if (effect === 'weather' && local > 0.26) {
-    const intensity = clamp(Math.max(local, 0.42 + domainIntensity * 0.24), 0, 1);
-    return { kind: intensity > 0.82 ? 'storm' : 'rain', label: intensity > 0.82 ? 'rainward storm' : 'rainward rain', intensity, exposureRate: 0.62 + intensity * 0.32, staminaRegen: 0.76 };
-  }
-  if (effect === 'cold' && (height > 18 || local > 0.22)) {
-    const intensity = clamp(Math.max(local * 0.85, 0.4 + domainIntensity * 0.24), 0, 1);
-    return { kind: 'cold', label: 'snow-dial cold', intensity, exposureRate: 0.78 + intensity * 0.72, staminaRegen: 0.68 };
   }
   if (cold && local > 0.28) {
     return { kind: 'cold', label: 'cold wind', intensity: clamp(local * 0.85, 0, 1), exposureRate: 0.9 + local * 0.9, staminaRegen: 0.65 };
@@ -289,9 +270,6 @@ export function weatherAt(
   }
   if (local > 0.38) {
     return { kind: 'mist', label: 'mist', intensity: local, exposureRate: 0.22, staminaRegen: 0.9 };
-  }
-  if ((effect === 'hearth' || effect === 'light' || effect === 'glass') && domainIntensity > 0.45) {
-    return { kind: 'clear', label: effect === 'hearth' ? 'warm clear' : effect === 'light' ? 'clear high light' : 'glass-clear glare', intensity: local, exposureRate: -0.28, staminaRegen: 1.04 };
   }
   return { kind: 'clear', label: 'clear', intensity: local, exposureRate: -0.2, staminaRegen: 1 };
 }
@@ -329,13 +307,20 @@ export function updateSurvival(state: SurvivalState, ctx: SurvivalContext): Surv
   const threshold = ctx.thresholdEffect;
   const protection = ctx.weatherProtection?.active ? ctx.weatherProtection : null;
   const thresholdRecovery = Math.max(0, threshold?.recoveryBonus ?? 0);
-  const cave = ctx.cavePressure?.active ? ctx.cavePressure : undefined;
-  const caveStamina = cave?.staminaRegen ?? 1;
-  const caveExposure = (cave?.exposureRate ?? 0) * (focusActive ? 0.55 : 1) * Math.max(0.2, Math.min(1.4, threshold?.caveExposureMultiplier ?? 1));
   const thresholdStamina = threshold?.staminaRegenBonus ?? 0;
   const protectionStamina = protection?.staminaRegenBonus ?? 0;
-  const baseRegen = ctx.sprinting || ctx.swimming ? 0 : 3.4 * Math.max(0.1, ctx.weather.staminaRegen + thresholdStamina + protectionStamina) * caveStamina;
-  const exposurePenalty = state.exposure > 70 ? 2.5 : state.exposure > 45 ? 1.1 : 0;
+  const baseRegen = ctx.sprinting || ctx.swimming ? 0 : 3.4 * Math.max(0.1, ctx.weather.staminaRegen + thresholdStamina + protectionStamina);
+  // Once exposure is maxed out, the old design hard-teleported the player home/to spawn.
+  // Instead: a steep ongoing stamina drain kicks in and only eases once exposure actually
+  // drops below the ceiling again (i.e. the player finds shelter/warmth), which happens
+  // naturally via shelterFactor/warmth below on the very next tick.
+  const exposurePenalty = state.exposure >= EXPOSURE_CRITICAL_THRESHOLD
+    ? 6
+    : state.exposure > 70
+    ? 2.5
+    : state.exposure > 45
+    ? 1.1
+    : 0;
   state.stamina = clamp(state.stamina + (baseRegen + shelterRecovery + warmthRecovery + thresholdRecovery - exertion - exposurePenalty) * dt, 0, 100);
 
   const shelterFactor = ctx.functionalShelter ? -6.5 : ctx.sheltered ? -4.2 : 1;
@@ -347,14 +332,14 @@ export function updateSurvival(state: SurvivalState, ctx: SurvivalContext): Surv
   const packExposure = ctx.moving && !ctx.flying && !ctx.sheltered
     ? Math.max(0, pack?.exposureRate ?? 0) * (ctx.swimming ? 1.4 : 1)
     : 0;
-  state.exposure = clamp(state.exposure + (weatherRate + focusExposureRelief + caveExposure + packExposure + shelterFactor + warmth) * dt, 0, 100);
+  state.exposure = clamp(state.exposure + (weatherRate + focusExposureRelief + packExposure + shelterFactor + warmth) * dt, 0, 100);
   if (focusActive) spendTrailFocus(state, ctx.minutesElapsed ?? dt * 8);
   return state;
 }
 
 export function survivalStatus(state: SurvivalState): SurvivalReport['status'] {
-  if (state.exposure >= 82) return 'worn';
-  if (state.exposure >= 55) return 'exposed';
+  if (state.exposure >= EXPOSURE_WARNING_THRESHOLD) return 'worn';
+  if (state.exposure >= EXPOSURE_EXPOSED_THRESHOLD) return 'exposed';
   if (state.stamina <= 24) return 'winded';
   if (state.stamina >= 86 && state.exposure <= 12) return 'rested';
   return 'steady';
@@ -374,8 +359,14 @@ export function survivalReport(state: SurvivalState, weather: WeatherReport): Su
   };
 }
 
-export function shouldCollapse(state: SurvivalState): boolean {
-  return state.exposure >= 100;
+/** true once exposure has entered the warning band (same threshold as the 'worn' status) — HUD should raise a clear alert */
+export function isExposureWarning(state: SurvivalState): boolean {
+  return state.exposure >= EXPOSURE_WARNING_THRESHOLD;
+}
+
+/** true once exposure is fully maxed out — updateSurvival applies an ongoing stamina-drain penalty while this holds, no relocation */
+export function isExposureCritical(state: SurvivalState): boolean {
+  return state.exposure >= EXPOSURE_CRITICAL_THRESHOLD;
 }
 
 export function isHazardWeather(weather: WeatherReport): boolean {

@@ -2,25 +2,9 @@ import * as THREE from 'three/webgpu';
 import type { Goldberg } from '../geo/goldberg';
 import type { Layers } from '../world/layers';
 import { homeScore, structureSocketOccupancy, type ShelterReport, type StructureSave, type StructureSocketSpec } from '../sim/structures';
-import type { KilnAssetSnapshot, KilnSkinFitSnapshot, KilnStructureSkinSlug, StructureSkinProvider } from './kilnAssets';
 import { makeSurfaceBasisFromYaw } from './surfaceFrame';
 
 type PropFactory = () => THREE.Group;
-type StructureSilhouette = 'cave-anchor-belay-marker' | 'waystone-attuned-marker';
-type SnapPreviewSilhouette = 'foundation-pad-preview' | 'wall-panel-preview' | 'half-rail-preview' | 'wall-door-panel-preview' | 'wall-window-panel-preview' | 'wall-corner-preview' | 'roof-join-preview' | 'door-opening-preview' | 'window-light-preview' | 'roof-cap-preview';
-
-interface SnapPreviewGuidePart {
-  name: string;
-  role: string;
-  pos: [number, number, number];
-  scale: [number, number, number];
-  geom?: THREE.BufferGeometry;
-}
-
-interface SnapPreviewGuideSpec {
-  silhouette: SnapPreviewSilhouette;
-  parts: readonly SnapPreviewGuidePart[];
-}
 
 export interface StructureSnapPreview {
   active: boolean;
@@ -51,32 +35,25 @@ const materials = {
   darkWood: mat(0x5b3a22),
   stone: mat(0x7b7f84),
   soil: mat(0x5a3824),
-  compost: mat(0x4b3a20, 0.95, 0.01),
-  compostGreen: mat(0x76a45e, 0.72, 0.02),
   water: mat(0x5faed2, 0.26, 0.04, 0x287aa6),
-  leaf: mat(0x4f8d45),
-  berry: mat(0xb64263),
   reed: mat(0x7da65f),
   reedTip: mat(0xb7c66e),
   cloth: mat(0x7199bd),
   warm: mat(0xff8a3d, 0.6, 0, 0xff5b18),
   metal: mat(0xa4a9ad, 0.55, 0.2),
-  glass: mat(0x9fd3df, 0.18, 0.02),
   rope: mat(0xc9a56d),
   gold: mat(0xf0be5a, 0.48, 0.15, 0xf0a020),
   route: mat(0x87a9d6, 0.42, 0.08, 0x4b83d1),
   cave: mat(0x70d6d1, 0.36, 0.08, 0x2bcac3),
   shore: mat(0x5faed2, 0.4, 0.05, 0x287aa6),
   fish: mat(0x8bb7c8, 0.72, 0.02),
+  berry: mat(0xb64263),
   ration: mat(0xb89458, 0.78, 0.02),
   weather: mat(0x9fb8c2, 0.5, 0.16),
   weatherRibbon: mat(0x87a9d6, 0.62, 0.03, 0x3f6fa5),
   storm: mat(0x82c7ff, 0.28, 0.04, 0x4aa8ff),
   cellar: mat(0x7b6a8f, 0.5, 0.08, 0x3a3354),
   cellarGlow: mat(0x8bd0b0, 0.32, 0.03, 0x48cfa2),
-  anchorGlow: mat(0x70d6d1, 0.28, 0.04, 0x2bcac3),
-  anchorArch: mat(0xd6c08a, 0.62, 0.04),
-  anchorFlood: mat(0x5faed2, 0.34, 0.04, 0x287aa6),
   forage: mat(0x7db35f, 0.58, 0.03, 0x4f8d45),
   home: mat(0xf0be5a, 0.45, 0.12, 0xf0a020),
   smoke: new THREE.MeshStandardMaterial({ color: 0x9aa3a7, roughness: 1, metalness: 0, transparent: true, opacity: 0.46, depthWrite: false }),
@@ -84,8 +61,6 @@ const materials = {
   snapPreviewBlocked: new THREE.MeshStandardMaterial({ color: 0xff8b64, roughness: 0.55, metalness: 0.02, emissive: 0xff4f2d, emissiveIntensity: 0.52, transparent: true, opacity: 0.42, depthWrite: false }),
   snapPreviewRingOk: new THREE.MeshStandardMaterial({ color: 0xc8f0a3, roughness: 0.6, metalness: 0.02, emissive: 0x5fd65b, emissiveIntensity: 0.65, transparent: true, opacity: 0.72, depthWrite: false }),
   snapPreviewRingBlocked: new THREE.MeshStandardMaterial({ color: 0xffc08a, roughness: 0.6, metalness: 0.02, emissive: 0xff5b36, emissiveIntensity: 0.72, transparent: true, opacity: 0.78, depthWrite: false }),
-  snapPreviewGuideOk: new THREE.MeshBasicMaterial({ color: 0xeaff8d, transparent: true, opacity: 0.94, depthWrite: false, depthTest: false }),
-  snapPreviewGuideBlocked: new THREE.MeshBasicMaterial({ color: 0xffd08a, transparent: true, opacity: 0.95, depthWrite: false, depthTest: false }),
 };
 
 const box = new THREE.BoxGeometry(1, 1, 1);
@@ -110,124 +85,11 @@ function role<T extends THREE.Object3D>(obj: T, roleName: string): T {
   return obj;
 }
 
+type StructureSilhouette = 'waystone-attuned-marker';
+
 function silhouette<T extends THREE.Object3D>(obj: T, silhouetteName: StructureSilhouette): T {
   obj.userData.structureSilhouette = silhouetteName;
   return obj;
-}
-
-const SNAP_PREVIEW_GUIDES: Partial<Record<StructureSave['item'], SnapPreviewGuideSpec>> = {
-  floorFoundation: {
-    silhouette: 'foundation-pad-preview',
-    parts: [
-      { name: 'snapPreviewFoundationPad', role: 'snap preview floor foundation', pos: [0, 0.1, 0], scale: [1.08, 0.08, 1.08] },
-      { name: 'snapPreviewFoundationLevelBand', role: 'snap preview leveled floor socket', pos: [0, 0.2, -0.42], scale: [0.9, 0.06, 0.1] },
-      { name: 'snapPreviewFoundationCenterMark', role: 'snap preview floor center mark', pos: [0, 0.24, 0], scale: [0.24, 0.045, 0.24] },
-    ],
-  },
-  wallPanel: {
-    silhouette: 'wall-panel-preview',
-    parts: [
-      { name: 'snapPreviewWallPanelFace', role: 'snap preview full wall boundary', pos: [0, 0.86, -0.2], scale: [1.04, 1.42, 0.08] },
-      { name: 'snapPreviewWallPanelLeftPost', role: 'snap preview full wall post', pos: [-0.54, 0.84, -0.18], scale: [0.08, 1.58, 0.11] },
-      { name: 'snapPreviewWallPanelRightPost', role: 'snap preview full wall post', pos: [0.54, 0.84, -0.18], scale: [0.08, 1.58, 0.11] },
-      { name: 'snapPreviewWallPanelTopCap', role: 'snap preview wall top cap', pos: [0, 1.58, -0.2], scale: [1.14, 0.08, 0.12] },
-    ],
-  },
-  wallHalfRail: {
-    silhouette: 'half-rail-preview',
-    parts: [
-      { name: 'snapPreviewHalfRailLeftPost', role: 'snap preview half rail post', pos: [-0.52, 0.43, -0.2], scale: [0.08, 0.78, 0.1] },
-      { name: 'snapPreviewHalfRailRightPost', role: 'snap preview half rail post', pos: [0.52, 0.43, -0.2], scale: [0.08, 0.78, 0.1] },
-      { name: 'snapPreviewHalfRailRun', role: 'snap preview porch rail', pos: [0, 0.72, -0.2], scale: [1.06, 0.08, 0.1] },
-      { name: 'snapPreviewHalfRailOpenGap', role: 'snap preview open weather gap', pos: [0, 1.18, -0.2], scale: [0.64, 0.05, 0.08] },
-    ],
-  },
-  wallDoorPanel: {
-    silhouette: 'wall-door-panel-preview',
-    parts: [
-      { name: 'snapPreviewWallDoorLeftWall', role: 'snap preview wall door shelter boundary', pos: [-0.39, 0.86, -0.2], scale: [0.28, 1.34, 0.08] },
-      { name: 'snapPreviewWallDoorRightWall', role: 'snap preview wall door shelter boundary', pos: [0.39, 0.86, -0.2], scale: [0.28, 1.34, 0.08] },
-      { name: 'snapPreviewWallDoorLeftJamb', role: 'snap preview integrated door opening', pos: [-0.22, 0.82, -0.16], scale: [0.07, 1.46, 0.11] },
-      { name: 'snapPreviewWallDoorRightJamb', role: 'snap preview integrated door opening', pos: [0.22, 0.82, -0.16], scale: [0.07, 1.46, 0.11] },
-      { name: 'snapPreviewWallDoorLintel', role: 'snap preview wall door lintel', pos: [0, 1.54, -0.18], scale: [1.08, 0.09, 0.12] },
-      { name: 'snapPreviewWallDoorThreshold', role: 'snap preview wall door threshold', pos: [0, 0.14, -0.23], scale: [0.66, 0.045, 0.18] },
-    ],
-  },
-  wallWindowPanel: {
-    silhouette: 'wall-window-panel-preview',
-    parts: [
-      { name: 'snapPreviewWallWindowFace', role: 'snap preview wall window shelter boundary', pos: [0, 0.86, -0.2], scale: [1.04, 1.34, 0.08] },
-      { name: 'snapPreviewWallWindowPane', role: 'snap preview wall window light opening', pos: [0, 0.92, -0.13], scale: [0.62, 0.46, 0.04] },
-      { name: 'snapPreviewWallWindowSill', role: 'snap preview wall window sill', pos: [0, 0.58, -0.24], scale: [0.78, 0.07, 0.13] },
-      { name: 'snapPreviewWallWindowTopCap', role: 'snap preview wall window top cap', pos: [0, 1.58, -0.2], scale: [1.14, 0.08, 0.12] },
-      { name: 'snapPreviewWallWindowMullion', role: 'snap preview wall window centered opening', pos: [0, 0.92, -0.25], scale: [0.055, 0.54, 0.06] },
-    ],
-  },
-  wallCorner: {
-    silhouette: 'wall-corner-preview',
-    parts: [
-      { name: 'snapPreviewWallCornerPost', role: 'snap preview wall corner shelter boundary', pos: [0, 0.86, -0.18], scale: [0.18, 1.56, 0.18] },
-      { name: 'snapPreviewWallCornerLeftWing', role: 'snap preview wall corner wing', pos: [-0.29, 0.86, -0.18], scale: [0.5, 1.22, 0.08] },
-      { name: 'snapPreviewWallCornerRightWing', role: 'snap preview wall corner wing', pos: [0.18, 0.86, -0.41], scale: [0.08, 1.22, 0.5] },
-      { name: 'snapPreviewWallCornerCap', role: 'snap preview wall shell corner cap', pos: [-0.06, 1.58, -0.3], scale: [0.72, 0.08, 0.72] },
-    ],
-  },
-  roofJoin: {
-    silhouette: 'roof-join-preview',
-    parts: [
-      { name: 'snapPreviewRoofJoinRidge', role: 'snap preview roof join ridge', pos: [0, 0.56, -0.2], scale: [1.12, 0.11, 0.12] },
-      { name: 'snapPreviewRoofJoinLeftBracket', role: 'snap preview roof join bracket', pos: [-0.34, 0.38, -0.2], scale: [0.42, 0.08, 0.18] },
-      { name: 'snapPreviewRoofJoinRightBracket', role: 'snap preview roof join bracket', pos: [0.34, 0.38, -0.2], scale: [0.42, 0.08, 0.18] },
-      { name: 'snapPreviewRoofJoinCoverage', role: 'snap preview roof join coverage', pos: [0, 0.28, -0.2], scale: [1.02, 0.04, 0.36] },
-    ],
-  },
-  doorKit: {
-    silhouette: 'door-opening-preview',
-    parts: [
-      { name: 'snapPreviewDoorLeftJamb', role: 'snap preview door opening', pos: [-0.5, 0.82, -0.2], scale: [0.075, 1.5, 0.09] },
-      { name: 'snapPreviewDoorRightJamb', role: 'snap preview door opening', pos: [0.5, 0.82, -0.2], scale: [0.075, 1.5, 0.09] },
-      { name: 'snapPreviewDoorLintel', role: 'snap preview door lintel', pos: [0, 1.54, -0.2], scale: [1.08, 0.095, 0.09] },
-      { name: 'snapPreviewDoorThreshold', role: 'snap preview door threshold', pos: [0, 0.14, -0.24], scale: [0.84, 0.045, 0.2] },
-    ],
-  },
-  windowFrame: {
-    silhouette: 'window-light-preview',
-    parts: [
-      { name: 'snapPreviewWindowGlassPane', role: 'snap preview window light', pos: [0, 0.9, -0.2], scale: [0.68, 0.5, 0.04] },
-      { name: 'snapPreviewWindowSill', role: 'snap preview window sill', pos: [0, 0.58, -0.24], scale: [0.78, 0.07, 0.13] },
-      { name: 'snapPreviewWindowCenterMullion', role: 'snap preview window centered opening', pos: [0, 0.9, -0.26], scale: [0.055, 0.56, 0.06] },
-      { name: 'snapPreviewWindowTopRail', role: 'snap preview window light', pos: [0, 1.22, -0.24], scale: [0.76, 0.07, 0.09] },
-    ],
-  },
-  roofBundle: {
-    silhouette: 'roof-cap-preview',
-    parts: [
-      { name: 'snapPreviewRoofRidgeBeam', role: 'snap preview roof cap', pos: [0, 0.78, -0.12], scale: [0.15, 0.18, 1.18] },
-      { name: 'snapPreviewRoofLeftEave', role: 'snap preview roof eave', pos: [-0.62, 0.42, -0.12], scale: [0.1, 0.14, 1.2] },
-      { name: 'snapPreviewRoofRightEave', role: 'snap preview roof eave', pos: [0.62, 0.42, -0.12], scale: [0.1, 0.14, 1.2] },
-      { name: 'snapPreviewRoofCapPlane', role: 'snap preview roof cap coverage', pos: [0, 0.46, -0.14], scale: [1.18, 0.05, 1.18] },
-    ],
-  },
-};
-
-function makeSnapPreviewGuides(item: StructureSave['item']): THREE.Group | null {
-  const spec = SNAP_PREVIEW_GUIDES[item];
-  if (!spec) return null;
-  const group = new THREE.Group();
-  group.name = `snapPreviewGuide-${item}`;
-  group.userData.snapPreviewSilhouette = spec.silhouette;
-  group.userData.structureReadabilityRole = `snap preview ${spec.silhouette}`;
-  for (const part of spec.parts) {
-    const guide = role(
-      mesh(part.geom ?? box, materials.snapPreviewRingOk, part.pos, part.scale, part.name),
-      part.role,
-    );
-    guide.userData.snapPreviewGuide = true;
-    guide.userData.snapPreviewSilhouette = spec.silhouette;
-    guide.renderOrder = 8;
-    group.add(guide);
-  }
-  return group;
 }
 
 function post(name: string, x: number, z: number, height = 0.8): THREE.Mesh {
@@ -301,60 +163,6 @@ function makeBedroll(): THREE.Group {
   return g;
 }
 
-function makeCropPlot(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = 'structure-crop-plot';
-  g.add(mesh(box, materials.darkWood, [0, 0.08, 0], [1.35, 0.14, 0.9], 'woodFrame'));
-  g.add(mesh(box, materials.soil, [0, 0.18, 0], [1.1, 0.08, 0.66], 'tilledSoil'));
-  for (const x of [-0.35, 0, 0.35]) {
-    for (const z of [-0.18, 0.18]) {
-      const sprout = mesh(cone8, materials.leaf, [x, 0.36, z], [0.06, 0.22, 0.06], 'sprout');
-      sprout.rotation.z = 0.35;
-      g.add(sprout);
-      g.add(mesh(sphere8, materials.berry, [x + 0.04, 0.47, z + 0.02], [0.055, 0.055, 0.055], 'berryCluster'));
-    }
-  }
-  for (const x of [-0.42, -0.18, 0.08, 0.32]) {
-    const stalk = mesh(cyl8, materials.reed, [x, 0.46, 0.02], [0.025, 0.72, 0.025], 'reedStalk');
-    stalk.rotation.z = x * 0.4;
-    g.add(stalk);
-    const tip = mesh(cone8, materials.reedTip, [x + 0.03, 0.88, 0.02], [0.055, 0.18, 0.055], 'reedTip');
-    tip.rotation.z = x * 0.25;
-    g.add(tip);
-  }
-  return g;
-}
-
-function makeCompostBin(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = 'structure-compost-bin';
-  g.add(mesh(box, materials.soil, [0, 0.08, 0], [0.88, 0.12, 0.7], 'compostBinBase'));
-  for (const x of [-0.45, 0.45]) {
-    for (const z of [-0.35, 0.35]) g.add(post('compostBinPost', x, z, 0.65));
-  }
-  for (let i = 0; i < 3; i++) {
-    const y = 0.22 + i * 0.16;
-    g.add(mesh(box, materials.wood, [0, y, -0.38], [1.02, 0.08, 0.06], 'compostBinSlat'));
-    g.add(mesh(box, materials.wood, [0, y, 0.38], [1.02, 0.08, 0.06], 'compostBinSlat'));
-    g.add(mesh(box, materials.wood, [-0.51, y, 0], [0.06, 0.08, 0.72], 'compostBinSideSlat'));
-    g.add(mesh(box, materials.wood, [0.51, y, 0], [0.06, 0.08, 0.72], 'compostBinSideSlat'));
-  }
-  g.add(mesh(box, materials.compost, [0, 0.34, 0], [0.72, 0.22, 0.52], 'compostBinHeap'));
-  for (let i = 0; i < 5; i++) {
-    const scrap = mesh(box, i % 2 === 0 ? materials.compostGreen : materials.berry, [-0.24 + i * 0.12, 0.5 + (i % 2) * 0.035, -0.08 + (i % 3) * 0.08], [0.12, 0.035, 0.08], 'compostBinScrap');
-    scrap.rotation.y = i * 0.7;
-    scrap.rotation.z = (i - 2) * 0.12;
-    g.add(scrap);
-  }
-  for (let i = 0; i < 3; i++) {
-    const steam = mesh(sphere8, materials.smoke, [-0.16 + i * 0.16, 0.82 + i * 0.18, 0.02], [0.12, 0.08, 0.12], `compostBinSteam${i}`);
-    steam.visible = false;
-    g.add(steam);
-  }
-  g.add(mesh(box, materials.darkWood, [0, 0.64, -0.42], [0.8, 0.08, 0.08], 'compostBinFrontLip'));
-  return g;
-}
-
 function makeRainCistern(): THREE.Group {
   const g = new THREE.Group();
   g.name = 'structure-rain-cistern';
@@ -401,201 +209,6 @@ function makeRootCellar(): THREE.Group {
     g.add(bundle);
   }
   g.add(mesh(box, materials.darkWood, [0, 0.42, -0.32], [0.9, 0.08, 0.08], 'rootCellarBrace'));
-  return g;
-}
-
-function makeCaveAnchor(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = 'structure-cave-anchor';
-  silhouette(g, 'cave-anchor-belay-marker');
-  g.add(mesh(cyl8, materials.stone, [0, 0.1, 0], [0.42, 0.18, 0.42], 'caveAnchorStoneBase'));
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2;
-    const stone = role(mesh(cyl8, materials.stone, [Math.cos(a) * 0.28, 0.22, Math.sin(a) * 0.22], [0.12, 0.18 + (i % 2) * 0.05, 0.1], 'caveAnchorCairnStone'), 'stacked cave-route cairn');
-    stone.rotation.y = a;
-    g.add(stone);
-  }
-  const postA = role(mesh(box, materials.darkWood, [-0.18, 0.52, 0], [0.08, 0.8, 0.08], 'caveAnchorPost'), 'belay post');
-  postA.rotation.z = -0.18;
-  const postB = role(mesh(box, materials.darkWood, [0.2, 0.5, 0], [0.08, 0.72, 0.08], 'caveAnchorPost'), 'belay post');
-  postB.rotation.z = 0.24;
-  g.add(postA, postB);
-  const ropeRail = role(mesh(cyl8, materials.rope, [0, 0.78, 0], [0.035, 0.62, 0.035], 'caveAnchorRopeRail'), 'route rope rail');
-  ropeRail.rotation.z = Math.PI / 2;
-  g.add(ropeRail);
-  for (let i = 0; i < 3; i++) {
-    const coil = role(mesh(cyl12, materials.rope, [0, 0.26 + i * 0.018, -0.3], [0.3 - i * 0.055, 0.018, 0.3 - i * 0.055], `caveAnchorRopePulse${i}`), 'coiled return rope');
-    g.add(coil);
-  }
-  const crystal = role(mesh(cone8, materials.anchorGlow, [0, 0.98, 0], [0.14, 0.36, 0.14], 'caveAnchorGlow'), 'set-anchor glow spike');
-  crystal.rotation.z = 0.18;
-  g.add(crystal);
-  const archA = role(mesh(box, materials.anchorArch, [-0.16, 1.04, 0.11], [0.075, 0.38, 0.06], 'caveAnchorGlyph-arch'), 'walk-under arch glyph');
-  const archB = role(mesh(box, materials.anchorArch, [0.16, 1.04, 0.11], [0.075, 0.38, 0.06], 'caveAnchorGlyph-arch'), 'walk-under arch glyph');
-  const archTop = role(mesh(box, materials.anchorArch, [0, 1.23, 0.11], [0.38, 0.065, 0.06], 'caveAnchorGlyph-arch'), 'walk-under arch glyph');
-  g.add(archA, archB, archTop);
-  const dryMouth = role(mesh(sphere8, materials.cave, [0, 1.1, 0.12], [0.18, 0.12, 0.09], 'caveAnchorGlyph-dryCave'), 'dark dry-cave mouth glyph');
-  dryMouth.scale.y = 0.08;
-  const dryLip = role(mesh(box, materials.stone, [0, 1.0, 0.12], [0.42, 0.055, 0.08], 'caveAnchorGlyph-dryCave'), 'dry-cave stone lip glyph');
-  const dryGlow = role(mesh(sphere8, materials.anchorGlow, [0, 1.13, 0.19], [0.045, 0.045, 0.035], 'caveAnchorGlyph-dryCave'), 'cave-depth glow bead');
-  g.add(dryMouth, dryLip, dryGlow);
-  const waveA = role(mesh(box, materials.anchorFlood, [0, 1.02, 0.11], [0.42, 0.045, 0.09], 'caveAnchorGlyph-seaCave'), 'sea-cave waterline glyph');
-  const waveB = role(mesh(box, materials.anchorFlood, [-0.04, 1.12, 0.12], [0.34, 0.04, 0.075], 'caveAnchorGlyph-seaCave'), 'sea-cave second wave glyph');
-  waveB.rotation.z = -0.2;
-  const tideMouth = role(mesh(sphere8, materials.cave, [0.14, 1.07, 0.1], [0.12, 0.07, 0.055], 'caveAnchorGlyph-seaCave'), 'flooded cave mouth glyph');
-  tideMouth.scale.y = 0.06;
-  g.add(waveA, waveB, tideMouth);
-  g.add(role(mesh(box, materials.anchorFlood, [0, 0.44, -0.36], [0.54, 0.04, 0.1], 'caveAnchorFloodMark'), 'set-anchor flood marker'));
-  g.add(role(mesh(sphere8, materials.water, [0.24, 1.0, 0.21], [0.055, 0.055, 0.045], 'caveAnchorSpringMark'), 'freshwater spring bead'));
-  return g;
-}
-
-function makeFloorFoundation(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = 'structure-floor-foundation';
-  const footprint = role(mesh(cyl12, materials.stone, [0, 0.06, 0], [0.72, 0.08, 0.72], 'foundationFootprint'), 'floor foundation level footprint');
-  g.add(footprint);
-  g.add(role(mesh(box, materials.darkWood, [0, 0.18, -0.48], [0.96, 0.07, 0.08], 'foundationLevelBand'), 'floor foundation front level band'));
-  g.add(role(mesh(box, materials.darkWood, [0, 0.18, 0.48], [0.96, 0.07, 0.08], 'foundationLevelBand'), 'floor foundation rear level band'));
-  g.add(role(mesh(box, materials.wood, [-0.48, 0.18, 0], [0.08, 0.07, 0.96], 'foundationSideBand'), 'floor foundation side band'));
-  g.add(role(mesh(box, materials.wood, [0.48, 0.18, 0], [0.08, 0.07, 0.96], 'foundationSideBand'), 'floor foundation side band'));
-  g.add(role(mesh(box, materials.rope, [0, 0.25, 0], [0.22, 0.035, 0.22], 'foundationCenterSocket'), 'floor foundation snap center'));
-  return g;
-}
-
-function makeWallPanel(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = 'structure-wall-panel';
-  g.add(role(mesh(box, materials.wood, [0, 0.86, 0], [1.02, 1.36, 0.1], 'wallPanelFace'), 'full wall panel shelter boundary'));
-  g.add(role(post('wallPanelLeftPost', -0.54, 0, 1.62), 'wall shell vertical post'));
-  g.add(role(post('wallPanelRightPost', 0.54, 0, 1.62), 'wall shell vertical post'));
-  g.add(role(mesh(box, materials.darkWood, [0, 1.58, 0], [1.16, 0.09, 0.14], 'wallPanelTopCap'), 'wall shell top cap under roof join'));
-  g.add(role(mesh(box, materials.darkWood, [0, 0.19, 0.02], [1.08, 0.08, 0.16], 'wallPanelSill'), 'wall shell bottom sill'));
-  for (const x of [-0.28, 0.28]) {
-    g.add(role(mesh(box, materials.darkWood, [x, 0.86, 0.065], [0.055, 1.18, 0.04], 'wallPanelBrace'), 'full wall brace'));
-  }
-  return g;
-}
-
-function makeWallHalfRail(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = 'structure-wall-half-rail';
-  g.add(role(post('halfRailLeftPost', -0.52, 0, 0.78), 'half rail porch post'));
-  g.add(role(post('halfRailRightPost', 0.52, 0, 0.78), 'half rail porch post'));
-  g.add(role(mesh(box, materials.wood, [0, 0.68, 0], [1.08, 0.08, 0.1], 'halfRailRun'), 'half rail porch guard'));
-  g.add(role(mesh(box, materials.darkWood, [0, 0.32, 0], [1.0, 0.06, 0.08], 'halfRailLowerRun'), 'half rail lower guard'));
-  const gap = role(mesh(box, materials.weatherRibbon, [0, 1.12, 0.02], [0.64, 0.045, 0.04], 'halfRailOpenGap'), 'half rail open weather gap');
-  gap.visible = true;
-  g.add(gap);
-  return g;
-}
-
-function makeWallDoorPanel(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = 'structure-wall-door-panel';
-  g.add(role(mesh(box, materials.wood, [-0.39, 0.86, 0], [0.28, 1.34, 0.1], 'wallDoorPanelLeftFace'), 'wall-door panel shelter boundary'));
-  g.add(role(mesh(box, materials.wood, [0.39, 0.86, 0], [0.28, 1.34, 0.1], 'wallDoorPanelRightFace'), 'wall-door panel shelter boundary'));
-  g.add(role(post('wallDoorPanelLeftPost', -0.54, 0, 1.62), 'wall shell vertical post'));
-  g.add(role(post('wallDoorPanelRightPost', 0.54, 0, 1.62), 'wall shell vertical post'));
-  g.add(role(post('wallDoorPanelLeftJamb', -0.22, 0.02, 1.5), 'wall-door opening jamb'));
-  g.add(role(post('wallDoorPanelRightJamb', 0.22, 0.02, 1.5), 'wall-door opening jamb'));
-  g.add(role(mesh(box, materials.darkWood, [0, 1.58, 0], [1.16, 0.09, 0.14], 'wallDoorPanelTopCap'), 'wall shell top cap under roof join'));
-  g.add(role(mesh(box, materials.darkWood, [0, 1.42, 0.03], [0.62, 0.1, 0.12], 'wallDoorPanelLintel'), 'wall-door opening lintel'));
-  g.add(role(mesh(box, materials.darkWood, [0, 0.14, 0.08], [0.66, 0.055, 0.2], 'wallDoorPanelThreshold'), 'wall-door threshold'));
-  g.add(role(mesh(box, materials.wood, [-0.09, 0.72, 0.075], [0.18, 1.12, 0.055], 'wallDoorPanelOpenSlab'), 'wall-door open slab marker'));
-  g.add(role(mesh(cyl8, materials.metal, [0.06, 0.72, 0.13], [0.035, 0.045, 0.035], 'wallDoorPanelKnob'), 'wall-door hand target'));
-  return g;
-}
-
-function makeWallWindowPanel(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = 'structure-wall-window-panel';
-  g.add(role(mesh(box, materials.wood, [0, 0.38, 0], [1.02, 0.52, 0.1], 'wallWindowPanelLowerFace'), 'wall-window panel shelter boundary'));
-  g.add(role(mesh(box, materials.wood, [-0.39, 1.02, 0], [0.24, 0.72, 0.1], 'wallWindowPanelLeftFace'), 'wall-window panel shelter boundary'));
-  g.add(role(mesh(box, materials.wood, [0.39, 1.02, 0], [0.24, 0.72, 0.1], 'wallWindowPanelRightFace'), 'wall-window panel shelter boundary'));
-  g.add(role(mesh(box, materials.wood, [0, 1.36, 0], [1.02, 0.26, 0.1], 'wallWindowPanelUpperFace'), 'wall-window panel shelter boundary'));
-  g.add(role(post('wallWindowPanelLeftPost', -0.54, 0, 1.62), 'wall shell vertical post'));
-  g.add(role(post('wallWindowPanelRightPost', 0.54, 0, 1.62), 'wall shell vertical post'));
-  g.add(role(mesh(box, materials.darkWood, [0, 1.58, 0], [1.16, 0.09, 0.14], 'wallWindowPanelTopCap'), 'wall shell top cap under roof join'));
-  g.add(role(mesh(box, materials.darkWood, [0, 0.58, 0.06], [0.78, 0.08, 0.14], 'wallWindowPanelSill'), 'wall-window sill'));
-  g.add(role(mesh(box, materials.darkWood, [0, 1.22, 0.06], [0.78, 0.08, 0.12], 'wallWindowPanelHeader'), 'wall-window header'));
-  g.add(role(mesh(box, materials.darkWood, [0, 0.9, 0.08], [0.055, 0.56, 0.08], 'wallWindowPanelMullion'), 'wall-window centered opening'));
-  g.add(role(mesh(box, materials.glass, [0, 0.9, 0.03], [0.62, 0.44, 0.035], 'wallWindowPanelGlass'), 'wall-window glass opening'));
-  const glow = role(mesh(box, materials.home, [0, 0.9, 0.08], [0.52, 0.3, 0.025], 'wallWindowWarmLight'), 'wall-window warm shelter light');
-  glow.visible = false;
-  g.add(glow);
-  return g;
-}
-
-function makeWallCorner(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = 'structure-wall-corner';
-  g.add(role(mesh(box, materials.darkWood, [0, 0.82, 0], [0.18, 1.58, 0.18], 'wallCornerPost'), 'wall corner shelter boundary'));
-  const leftWing = role(mesh(box, materials.wood, [-0.28, 0.86, 0], [0.52, 1.22, 0.09], 'wallCornerLeftWing'), 'wall corner shelter boundary wing');
-  const rightWing = role(mesh(box, materials.wood, [0, 0.86, -0.28], [0.09, 1.22, 0.52], 'wallCornerRightWing'), 'wall corner shelter boundary wing');
-  g.add(leftWing, rightWing);
-  g.add(role(mesh(box, materials.darkWood, [-0.15, 1.58, 0], [0.6, 0.08, 0.13], 'wallCornerLeftCap'), 'wall shell corner cap'));
-  g.add(role(mesh(box, materials.darkWood, [0, 1.58, -0.15], [0.13, 0.08, 0.6], 'wallCornerRightCap'), 'wall shell corner cap'));
-  g.add(role(mesh(box, materials.darkWood, [-0.32, 0.18, 0.02], [0.56, 0.07, 0.14], 'wallCornerLeftSill'), 'wall shell corner sill'));
-  g.add(role(mesh(box, materials.darkWood, [0.02, 0.18, -0.32], [0.14, 0.07, 0.56], 'wallCornerRightSill'), 'wall shell corner sill'));
-  return g;
-}
-
-function makeRoofJoin(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = 'structure-roof-join';
-  const ridge = role(mesh(box, materials.darkWood, [0, 0.58, 0], [1.14, 0.12, 0.16], 'roofJoinRidge'), 'roof join ridge shelter cap');
-  ridge.rotation.z = 0.02;
-  g.add(ridge);
-  const leftBracket = role(mesh(box, materials.wood, [-0.34, 0.38, 0], [0.44, 0.08, 0.22], 'roofJoinLeftBracket'), 'roof join bracket');
-  leftBracket.rotation.z = -0.28;
-  const rightBracket = role(mesh(box, materials.wood, [0.34, 0.38, 0], [0.44, 0.08, 0.22], 'roofJoinRightBracket'), 'roof join bracket');
-  rightBracket.rotation.z = 0.28;
-  g.add(leftBracket, rightBracket);
-  g.add(role(mesh(box, materials.darkWood, [0, 0.24, 0], [1.0, 0.06, 0.28], 'roofJoinEaveBand'), 'roof join eave support'));
-  const glow = role(mesh(box, materials.home, [0, 0.24, 0.02], [0.76, 0.03, 0.28], 'roofJoinShelterGlow'), 'roof join shelter glow');
-  glow.visible = false;
-  g.add(glow);
-  return g;
-}
-
-function makeDoorKit(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = 'structure-door-kit';
-  g.add(post('leftJamb', -0.36, 0, 1.55));
-  g.add(post('rightJamb', 0.36, 0, 1.55));
-  g.add(mesh(box, materials.darkWood, [0, 1.42, 0], [0.9, 0.12, 0.12], 'lintel'));
-  g.add(mesh(box, materials.wood, [0, 0.72, 0.035], [0.58, 1.16, 0.08], 'doorSlab'));
-  g.add(mesh(cyl8, materials.metal, [0.2, 0.74, 0.1], [0.04, 0.06, 0.04], 'knob'));
-  return g;
-}
-
-function makeWindowFrame(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = 'structure-window-frame';
-  g.add(mesh(box, materials.darkWood, [0, 0.92, 0], [0.9, 0.08, 0.08], 'topRail'));
-  g.add(mesh(box, materials.darkWood, [0, 0.34, 0], [0.9, 0.08, 0.08], 'bottomRail'));
-  g.add(post('leftRail', -0.42, 0, 0.7));
-  g.add(post('rightRail', 0.42, 0, 0.7));
-  g.add(mesh(box, materials.glass, [0, 0.62, 0.02], [0.62, 0.4, 0.03], 'glassPane'));
-  const glow = role(mesh(box, materials.home, [0, 0.62, 0.055], [0.54, 0.32, 0.025], 'windowWarmLight'), 'window warm shelter light');
-  glow.visible = false;
-  g.add(glow);
-  return g;
-}
-
-function makeRoofBundle(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = 'structure-roof-bundle';
-  const left = mesh(box, materials.darkWood, [-0.32, 0.5, 0], [0.82, 0.1, 1.0], 'leftRoofPlane');
-  left.rotation.z = -0.45;
-  const right = mesh(box, materials.darkWood, [0.32, 0.5, 0], [0.82, 0.1, 1.0], 'rightRoofPlane');
-  right.rotation.z = 0.45;
-  g.add(left, right);
-  g.add(mesh(box, materials.wood, [0, 0.82, 0], [1.0, 0.09, 0.12], 'ridgeBeam'));
-  const glow = role(mesh(box, materials.home, [0, 0.32, 0], [0.82, 0.035, 0.72], 'roofShelterGlow'), 'roof coverage shelter glow');
-  glow.visible = false;
-  g.add(glow);
   return g;
 }
 
@@ -823,21 +436,8 @@ const FACTORIES: Record<StructureSave['item'], PropFactory> = {
   campfire: makeCampfire,
   chest: makeChest,
   bedroll: makeBedroll,
-  cropPlot: makeCropPlot,
-  compostBin: makeCompostBin,
   rainCistern: makeRainCistern,
   rootCellar: makeRootCellar,
-  caveAnchor: makeCaveAnchor,
-  floorFoundation: makeFloorFoundation,
-  wallPanel: makeWallPanel,
-  wallHalfRail: makeWallHalfRail,
-  wallDoorPanel: makeWallDoorPanel,
-  wallWindowPanel: makeWallWindowPanel,
-  wallCorner: makeWallCorner,
-  roofJoin: makeRoofJoin,
-  doorKit: makeDoorKit,
-  windowFrame: makeWindowFrame,
-  roofBundle: makeRoofBundle,
   dockSegment: makeDockSegment,
   fishTrap: makeFishTrap,
   shoreNet: makeShoreNet,
@@ -847,41 +447,16 @@ const FACTORIES: Record<StructureSave['item'], PropFactory> = {
   waystone: makeWaystone,
 };
 
-const KILN_SKIN_BY_STRUCTURE_ITEM: Partial<Record<StructureSave['item'], KilnStructureSkinSlug>> = {
-  workbench: 'workbench',
-  campfire: 'campfire',
-  chest: 'chest',
-  bedroll: 'bedroll',
-  cropPlot: 'crop-plot',
-  compostBin: 'compost-bin',
-  rainCistern: 'rain-cistern',
-  rootCellar: 'root-cellar',
-  caveAnchor: 'cave-anchor',
-  dockSegment: 'dock-segment',
-  fishTrap: 'fish-trap',
-  shoreNet: 'shore-net',
-  dryingRack: 'drying-rack',
-  weatherVane: 'weather-vane',
-  lantern: 'lantern-post',
-  waystone: 'waystone',
-  doorKit: 'door-kit',
-  windowFrame: 'window-frame',
-  roofBundle: 'roof-bundle',
-};
-
-type KilnSkinStatus = 'pending' | 'loaded' | 'fallback';
-
 export class StructureRenderer {
   readonly group = new THREE.Group();
   readonly snapPreviewGroup = new THREE.Group();
   private readonly objects = new Map<number, THREE.Group>();
-  private readonly kilnSkinStatus = new Map<number, KilnSkinStatus>();
   private snapPreviewObject: THREE.Group | null = null;
   private snapPreviewItem: StructureSave['item'] | null = null;
   private snapPreviewCacheKey: string | null = null;
   private lastSnapPreview: StructureSnapPreview | null = null;
 
-  constructor(scene: THREE.Scene, private readonly kilnAssets?: StructureSkinProvider) {
+  constructor(scene: THREE.Scene) {
     this.group.name = 'placed-structures';
     this.snapPreviewGroup.name = 'structure-snap-preview';
     this.snapPreviewGroup.visible = false;
@@ -895,7 +470,6 @@ export class StructureRenderer {
       if (!wanted.has(id)) {
         this.group.remove(obj);
         this.objects.delete(id);
-        this.kilnSkinStatus.delete(id);
       }
     }
     for (const s of structures) {
@@ -907,7 +481,6 @@ export class StructureRenderer {
       obj.userData.structureSocket = structureSocketOccupancy(s);
       this.objects.set(s.id, obj);
       this.group.add(obj);
-      this.attachKilnSkin(s, obj);
     }
   }
 
@@ -942,11 +515,9 @@ export class StructureRenderer {
     if (!preview?.active) {
       this.snapPreviewGroup.visible = false;
       delete this.snapPreviewGroup.userData.snapPreview;
-      delete this.snapPreviewGroup.userData.snapPreviewSilhouette;
       return;
     }
-    const silhouetteName = SNAP_PREVIEW_GUIDES[preview.item]?.silhouette ?? null;
-    const cacheKey = `${preview.item}:${preview.socket?.role ?? preview.socketRole ?? 'none'}:${silhouetteName ?? 'generic'}`;
+    const cacheKey = `${preview.item}:${preview.socket?.role ?? preview.socketRole ?? 'none'}`;
     if (!this.snapPreviewObject || this.snapPreviewItem !== preview.item || this.snapPreviewCacheKey !== cacheKey) {
       this.snapPreviewGroup.clear();
       this.snapPreviewObject = this.makeSnapPreviewObject(preview.item);
@@ -960,9 +531,7 @@ export class StructureRenderer {
       ...preview,
       socketRole: preview.socket?.role ?? preview.socketRole ?? null,
       socketCollider: preview.socket?.collider ?? null,
-      silhouette: silhouetteName,
     };
-    this.snapPreviewGroup.userData.snapPreviewSilhouette = silhouetteName;
     const frame = geo.frameOf(preview.tile);
     const vX = new THREE.Vector3();
     const vY = new THREE.Vector3();
@@ -985,9 +554,6 @@ export class StructureRenderer {
       if (name === 'snapPreviewBlockerA' || name === 'snapPreviewBlockerB') {
         child.visible = !ok;
         meshChild.material = materials.snapPreviewRingBlocked;
-      } else if (meshChild.userData.snapPreviewGuide === true) {
-        child.visible = true;
-        meshChild.material = ok ? materials.snapPreviewGuideOk : materials.snapPreviewGuideBlocked;
       } else if (name === 'snapPreviewFootprint' || name === 'snapPreviewFaceTick') {
         child.visible = true;
         meshChild.material = ok ? materials.snapPreviewRingOk : materials.snapPreviewRingBlocked;
@@ -1020,10 +586,7 @@ export class StructureRenderer {
         child.userData.structureReadabilityRole = 'snap preview prop silhouette';
       }
     });
-    const guides = makeSnapPreviewGuides(item);
-    if (guides) wrapper.userData.snapPreviewSilhouette = guides.userData.snapPreviewSilhouette;
     wrapper.add(footprint, faceTick);
-    if (guides) wrapper.add(guides);
     wrapper.add(ghost, blockerA, blockerB);
     return wrapper;
   }
@@ -1032,22 +595,13 @@ export class StructureRenderer {
     const lit = structure.state?.lit === true;
     const home = structure.state?.home === true;
     const shelterLocal = shelter.tiles.includes(structure.tile);
-    const shelterFunctional = shelter.functional && shelterLocal;
     const shelterProtected = shelter.protected && shelterLocal;
-    const livedIn = shelter.enclosure.comfortTier === 'lived-in';
     const stored = Object.values(structure.state?.storage ?? {}).some((count) => (count ?? 0) > 0);
-    const growth = Math.max(0, Math.min(3, Math.trunc(structure.state?.growth ?? 0)));
-    const crop = structure.state?.crop ?? 'berries';
-    const fertility = Math.max(0, Math.min(3, Math.trunc(structure.state?.fertility ?? 0)));
-    const composts = Math.max(0, Math.trunc(structure.state?.composts ?? 0));
     const water = Math.max(0, Math.min(4, Math.trunc(structure.state?.water ?? 0)));
     const provisions = Math.max(0, Math.min(6, Math.trunc(structure.state?.provisions ?? 0)));
     const preserves = Math.max(0, Math.trunc(structure.state?.preserves ?? 0));
     const forecastReads = Math.max(0, Math.trunc(structure.state?.forecastReads ?? 0));
     const forecastKind = structure.state?.forecastKind;
-    const anchorUses = Math.max(0, Math.trunc(structure.state?.anchorUses ?? 0));
-    const anchorKind = structure.state?.anchorKind;
-    const anchorSpring = structure.state?.anchorSpring === true;
     const trapSet = structure.state?.trapSetDay !== undefined;
     const trapBaited = structure.state?.trapBaited === true;
     const trapChecks = Math.max(0, Math.trunc(structure.state?.trapChecks ?? 0));
@@ -1073,57 +627,15 @@ export class StructureRenderer {
       if (child.name === 'homeMarker') child.visible = home;
       if (child.name === 'homeComfortRing') {
         child.visible = home && shelter.functional;
-        const base = livedIn ? 1.52 : 1.34;
+        const base = shelter.comfortTier === 'ready' ? 1.52 : 1.34;
         const pulse = 1 + Math.sin(timeSec * 1.15 + structure.id) * 0.035;
         child.scale.set(base * pulse, base * pulse, base * pulse);
-      }
-      if (child.name === 'roofShelterGlow') {
-        child.visible = shelterFunctional && structure.item === 'roofBundle';
-        const pulse = 1 + Math.sin(timeSec * 0.9 + structure.id) * 0.04;
-        child.scale.set(0.82 * pulse, 0.035, 0.72 * pulse);
-      }
-      if (child.name === 'roofJoinShelterGlow') {
-        child.visible = shelterFunctional && structure.item === 'roofJoin';
-        const pulse = 1 + Math.sin(timeSec * 0.9 + structure.id) * 0.04;
-        child.scale.set(0.76 * pulse, 0.03, 0.28 * pulse);
-      }
-      if (child.name === 'windowWarmLight' || child.name === 'wallWindowWarmLight') {
-        child.visible = shelter.hasWindow && shelter.hasLight && shelterLocal;
-        const glow = 1 + Math.sin(timeSec * 1.4 + structure.id) * 0.05;
-        const wallWindow = child.name === 'wallWindowWarmLight';
-        child.scale.set((wallWindow ? 0.52 : 0.54) * glow, (wallWindow ? 0.3 : 0.32) * glow, 0.025);
       }
       if (child.name.startsWith('waystoneGlyph-')) {
         const mark = structure.state?.waystone ?? 'survey';
         child.visible = child.name === `waystoneGlyph-${mark}`;
       }
       if (child.name === 'frontLatch') child.scale.set(stored ? 1.25 : 1, stored ? 1.25 : 1, 1);
-      if (child.name === 'sprout') {
-        child.visible = crop === 'berries' && growth > 0;
-        child.scale.y = 0.08 + growth * 0.08 + fertility * 0.025;
-      }
-      if (child.name === 'berryCluster') {
-        child.visible = crop === 'berries' && growth >= 3;
-        const fertileScale = 1 + fertility * 0.12;
-        child.scale.set(0.055 * fertileScale, 0.055 * fertileScale, 0.055 * fertileScale);
-      }
-      if (child.name === 'reedStalk') {
-        child.visible = crop === 'reeds' && growth > 0;
-        const sway = Math.sin(timeSec * 1.2 + structure.id + child.position.x * 7) * 0.08;
-        child.rotation.z = child.position.x * 0.4 + sway;
-        child.scale.y = 0.28 + growth * 0.16 + fertility * 0.04;
-      }
-      if (child.name === 'reedTip') {
-        child.visible = crop === 'reeds' && growth >= 2;
-        child.position.y = 0.58 + growth * 0.1 + fertility * 0.035;
-      }
-      if (child.name === 'compostBinHeap' || child.name === 'compostBinScrap') child.visible = composts > 0;
-      if (child.name.startsWith('compostBinSteam')) {
-        const i = Number(child.name.replace('compostBinSteam', '')) || 0;
-        child.visible = composts > 0;
-        child.position.y = 0.82 + i * 0.18 + Math.sin(timeSec * 0.8 + structure.id + i) * 0.035;
-        child.position.x = -0.16 + i * 0.16 + Math.sin(timeSec * 1.1 + i) * 0.035;
-      }
       if (child.name === 'rainCisternWater') {
         child.visible = water > 0;
         const fill = water / 4;
@@ -1148,27 +660,6 @@ export class StructureRenderer {
       if (child.name === 'rootCellarProvisionBundle') {
         const index = child.parent ? child.parent.children.filter((c) => c.name === 'rootCellarProvisionBundle').indexOf(child) : 0;
         child.visible = provisions > index;
-      }
-      if (child.name.startsWith('caveAnchorGlyph-')) {
-        child.visible = anchorUses > 0 && child.name === `caveAnchorGlyph-${anchorKind ?? 'arch'}`;
-      }
-      if (child.name === 'caveAnchorGlow') {
-        child.visible = anchorUses > 0;
-        const pulse = 1 + Math.sin(timeSec * 1.7 + structure.id) * 0.12;
-        child.scale.set(0.14 * pulse, 0.36 * pulse, 0.14 * pulse);
-      }
-      if (child.name.startsWith('caveAnchorRopePulse')) {
-        const i = Number(child.name.replace('caveAnchorRopePulse', '')) || 0;
-        child.visible = anchorUses > 0;
-        const pulse = 1 + Math.sin(timeSec * 1.2 + structure.id + i) * 0.05;
-        const base = 0.3 - i * 0.055;
-        child.scale.set(base * pulse, 0.018, base * pulse);
-      }
-      if (child.name === 'caveAnchorFloodMark') child.visible = anchorUses > 0 && structure.state?.anchorFlooded === true;
-      if (child.name === 'caveAnchorSpringMark') {
-        child.visible = anchorUses > 0 && anchorSpring;
-        const pulse = 1 + Math.sin(timeSec * 2.2 + structure.id) * 0.12;
-        child.scale.set(0.055 * pulse, 0.055 * pulse, 0.045 * pulse);
       }
       if (child.name === 'fishTrapBait') child.visible = trapSet && trapBaited;
       if (child.name === 'fishTrapFish') child.visible = trapChecks > 0 && !trapSet;
@@ -1213,68 +704,9 @@ export class StructureRenderer {
     });
   }
 
-  private attachKilnSkin(structure: StructureSave, obj: THREE.Group): void {
-    const slug = KILN_SKIN_BY_STRUCTURE_ITEM[structure.item];
-    if (!this.kilnAssets || !slug) return;
-    this.kilnSkinStatus.set(structure.id, 'pending');
-    obj.userData.kilnSkinStatus = 'pending';
-    obj.userData.kilnAssetSlug = slug;
-    obj.userData.kilnSkinItem = structure.item;
-    void this.kilnAssets.createStructureSkin(slug)
-      .then((skin) => {
-        const current = this.objects.get(structure.id);
-        if (current !== obj || obj.parent !== this.group) return;
-        if (!skin) {
-          this.kilnSkinStatus.set(structure.id, 'fallback');
-          obj.userData.kilnSkinStatus = 'fallback';
-          return;
-        }
-        obj.add(skin.object);
-        this.hideProceduralParts(obj, skin.hideProceduralNames);
-        this.kilnSkinStatus.set(structure.id, 'loaded');
-        obj.userData.kilnSkinStatus = 'loaded';
-        obj.userData.kilnAssetSlug = skin.slug;
-        obj.userData.kilnAssetFile = skin.manifest.file;
-        obj.userData.kilnAssetSourceUrl = skin.sourceUrl;
-        obj.userData.kilnSkinFit = skin.fit;
-      })
-      .catch((err: unknown) => {
-        const current = this.objects.get(structure.id);
-        if (current !== obj || obj.parent !== this.group) return;
-        this.kilnSkinStatus.set(structure.id, 'fallback');
-        obj.userData.kilnSkinStatus = 'fallback';
-        obj.userData.kilnSkinError = err instanceof Error ? err.message : String(err);
-      });
-  }
-
-  private hideProceduralParts(obj: THREE.Group, names: readonly string[]): void {
-    const hidden = new Set(names);
-    obj.traverse((child) => {
-      if (child.userData.kilnAssetSlug) return;
-      if (hidden.has(child.name)) child.visible = false;
-    });
-  }
-
   stats(): {
     groups: number;
     meshes: number;
-    routeSilhouettes: number;
-    routeReadabilityRoles: number;
-    shelterReadabilityRoles: number;
-    wallShellReadabilityRoles: number;
-    wallShellSignals: number;
-    wallShell: {
-      foundations: number;
-      fullWalls: number;
-      halfRails: number;
-      doorPanels: number;
-      windowPanels: number;
-      corners: number;
-      roofJoins: number;
-      edgeSockets: string[];
-      sameTileEdgeStacks: number;
-      visibleRoles: string[];
-    };
     homeComfortSignals: number;
     homeComfort: {
       visibleWarmthMeshes: number;
@@ -1282,13 +714,7 @@ export class StructureRenderer {
       visibleHomeMarkers: number;
       visibleSmokePuffs: number;
       litCampfires: number;
-      litLanterns: number;
     };
-    kilnSkinsLoaded: number;
-    kilnSkinsPending: number;
-    kilnSkinFallbacks: number;
-    kilnSkinsBySlug: Partial<Record<KilnStructureSkinSlug, { loaded: number; pending: number; fallback: number }>>;
-    kilnSkinFits: Partial<Record<KilnStructureSkinSlug, KilnSkinFitSnapshot>>;
     snapPreview: {
       active: boolean;
       ok: boolean;
@@ -1299,36 +725,13 @@ export class StructureRenderer {
       blocker: string | null;
       socketRole: StructureSocketSpec['role'] | string | null;
       socketCollider: StructureSocketSpec['collider'] | null;
-      silhouette: SnapPreviewSilhouette | null;
       meshes: number;
       readabilityRoles: number;
       meshNames: string[];
       visibleReadabilityRoles: string[];
     };
-    kilnAssets?: KilnAssetSnapshot;
   } {
     let meshes = 0;
-    const routeSilhouettes = new Set<string>();
-    const routeReadabilityRoles = new Set<string>();
-    const shelterReadabilityRoles = new Set<string>();
-    const wallShellReadabilityRoles = new Set<string>();
-    const wallShellVisibleRoles = new Set<string>();
-    const edgeSockets = new Set<string>();
-    const edgeSocketsByTile = new Map<number, Set<string>>();
-    const edgeStructureCountByTile = new Map<number, number>();
-    let wallShellSignals = 0;
-    const wallShell = {
-      foundations: 0,
-      fullWalls: 0,
-      halfRails: 0,
-      doorPanels: 0,
-      windowPanels: 0,
-      corners: 0,
-      roofJoins: 0,
-      edgeSockets: [] as string[],
-      sameTileEdgeStacks: 0,
-      visibleRoles: [] as string[],
-    };
     let homeComfortSignals = 0;
     const homeComfort = {
       visibleWarmthMeshes: 0,
@@ -1336,70 +739,22 @@ export class StructureRenderer {
       visibleHomeMarkers: 0,
       visibleSmokePuffs: 0,
       litCampfires: 0,
-      litLanterns: 0,
     };
-    let kilnSkinsLoaded = 0;
-    let kilnSkinsPending = 0;
-    let kilnSkinFallbacks = 0;
-    const kilnSkinsBySlug: Partial<Record<KilnStructureSkinSlug, { loaded: number; pending: number; fallback: number }>> = {};
-    const kilnSkinFits: Partial<Record<KilnStructureSkinSlug, KilnSkinFitSnapshot>> = {};
     let snapPreviewMeshes = 0;
     const snapPreviewRoles = new Set<string>();
     const snapPreviewVisibleRoles = new Set<string>();
     const snapPreviewMeshNames = new Set<string>();
     for (const obj of this.objects.values()) {
-      if (typeof obj.userData.structureSilhouette === 'string') routeSilhouettes.add(obj.userData.structureSilhouette);
-      if (obj.userData.structureItem === 'floorFoundation') wallShell.foundations++;
-      if (obj.userData.structureItem === 'wallPanel') wallShell.fullWalls++;
-      if (obj.userData.structureItem === 'wallHalfRail') wallShell.halfRails++;
-      if (obj.userData.structureItem === 'wallDoorPanel') wallShell.doorPanels++;
-      if (obj.userData.structureItem === 'wallWindowPanel') wallShell.windowPanels++;
-      if (obj.userData.structureItem === 'wallCorner') wallShell.corners++;
-      if (obj.userData.structureItem === 'roofJoin') wallShell.roofJoins++;
-      const socket = obj.userData.structureSocket as ReturnType<typeof structureSocketOccupancy> | undefined;
-      if (socket?.kind === 'edge') {
-        const byTile = edgeSocketsByTile.get(socket.tile) ?? new Set<string>();
-        edgeStructureCountByTile.set(socket.tile, (edgeStructureCountByTile.get(socket.tile) ?? 0) + 1);
-        for (const slot of socket.occupies) {
-          const key = `${socket.tile}:${slot}`;
-          edgeSockets.add(key);
-          byTile.add(slot);
-        }
-        edgeSocketsByTile.set(socket.tile, byTile);
-      }
-      const skinStatus = obj.userData.kilnSkinStatus as KilnSkinStatus | undefined;
-      const skinSlug = obj.userData.kilnAssetSlug as KilnStructureSkinSlug | undefined;
-      if (skinStatus === 'loaded') kilnSkinsLoaded++;
-      if (skinStatus === 'pending') kilnSkinsPending++;
-      if (skinStatus === 'fallback') kilnSkinFallbacks++;
-      if (skinSlug && skinStatus) {
-        const entry = kilnSkinsBySlug[skinSlug] ?? { loaded: 0, pending: 0, fallback: 0 };
-        entry[skinStatus] += 1;
-        kilnSkinsBySlug[skinSlug] = entry;
-      }
-      if (skinSlug && obj.userData.kilnSkinFit) kilnSkinFits[skinSlug] = obj.userData.kilnSkinFit as KilnSkinFitSnapshot;
       obj.traverse((child) => {
         if ((child as THREE.Mesh).isMesh) meshes++;
-        if (typeof child.userData.structureReadabilityRole === 'string') routeReadabilityRoles.add(child.userData.structureReadabilityRole);
-        if (typeof child.userData.structureReadabilityRole === 'string' && /shelter|warmth|roof coverage|window warm/.test(child.userData.structureReadabilityRole)) {
-          shelterReadabilityRoles.add(child.userData.structureReadabilityRole);
-        }
-        if (typeof child.userData.structureReadabilityRole === 'string' && /floor foundation|wall shell|full wall|half rail|wall-door|wall-window|wall corner|roof join|shelter boundary|porch/.test(child.userData.structureReadabilityRole)) {
-          wallShellReadabilityRoles.add(child.userData.structureReadabilityRole);
-          if (child.visible) {
-            wallShellSignals++;
-            wallShellVisibleRoles.add(child.userData.structureReadabilityRole);
-          }
-        }
-        if (child.visible && (child.name === 'homeComfortRing' || child.name === 'hearthWarmthHalo' || child.name === 'roofShelterGlow' || child.name === 'roofJoinShelterGlow' || child.name === 'windowWarmLight' || child.name === 'wallWindowWarmLight')) {
+        if (child.visible && (child.name === 'homeComfortRing' || child.name === 'hearthWarmthHalo')) {
           homeComfortSignals++;
         }
-        if (child.visible && (child.name === 'flameCore' || child.name === 'hearthWarmthHalo' || child.name === 'roofShelterGlow' || child.name === 'roofJoinShelterGlow')) homeComfort.visibleWarmthMeshes++;
-        if (child.visible && (child.name === 'lanternGlow' || child.name === 'windowWarmLight' || child.name === 'wallWindowWarmLight' || child.name === 'homeComfortRing')) homeComfort.visibleLightMeshes++;
+        if (child.visible && (child.name === 'flameCore' || child.name === 'hearthWarmthHalo')) homeComfort.visibleWarmthMeshes++;
+        if (child.visible && child.name === 'homeComfortRing') homeComfort.visibleLightMeshes++;
         if (child.visible && child.name === 'homeMarker') homeComfort.visibleHomeMarkers++;
         if (child.visible && child.name.startsWith('smokePuff')) homeComfort.visibleSmokePuffs++;
         if (child.visible && child.name === 'flameCore') homeComfort.litCampfires++;
-        if (child.visible && child.name === 'lanternGlow') homeComfort.litLanterns++;
       });
     }
     if (this.snapPreviewGroup.visible) {
@@ -1420,24 +775,8 @@ export class StructureRenderer {
     return {
       groups: this.objects.size,
       meshes,
-      routeSilhouettes: routeSilhouettes.size,
-      routeReadabilityRoles: routeReadabilityRoles.size,
-      shelterReadabilityRoles: shelterReadabilityRoles.size,
-      wallShellReadabilityRoles: wallShellReadabilityRoles.size,
-      wallShellSignals,
-      wallShell: {
-        ...wallShell,
-        edgeSockets: [...edgeSockets].sort(),
-        sameTileEdgeStacks: [...edgeStructureCountByTile.values()].filter((count) => count > 1).length,
-        visibleRoles: [...wallShellVisibleRoles].sort(),
-      },
       homeComfortSignals,
       homeComfort,
-      kilnSkinsLoaded,
-      kilnSkinsPending,
-      kilnSkinFallbacks,
-      kilnSkinsBySlug,
-      kilnSkinFits,
       snapPreview: {
         active: this.snapPreviewGroup.visible,
         ok: this.lastSnapPreview?.ok ?? false,
@@ -1448,13 +787,11 @@ export class StructureRenderer {
         blocker: this.lastSnapPreview?.blocker ?? null,
         socketRole: snapPreviewSocket?.role ?? this.lastSnapPreview?.socketRole ?? null,
         socketCollider: snapPreviewSocket?.collider ?? null,
-        silhouette: snapPreviewItem ? SNAP_PREVIEW_GUIDES[snapPreviewItem]?.silhouette ?? null : null,
         meshes: snapPreviewMeshes,
         readabilityRoles: snapPreviewRoles.size,
         meshNames: [...snapPreviewMeshNames].sort(),
         visibleReadabilityRoles: [...snapPreviewVisibleRoles].sort(),
       },
-      kilnAssets: this.kilnAssets?.snapshot?.(),
     };
   }
 }

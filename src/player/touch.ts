@@ -37,12 +37,6 @@ export interface TouchFrame {
   pack: boolean;
   /** grab/drop a nearby placed prop through the relocation cursor */
   relocate: boolean;
-  /** open the Route Slate */
-  chart: boolean;
-  /** pin or append the current Route Slate target */
-  pin: boolean;
-  /** clear the active route itinerary */
-  clearPin: boolean;
   /** taps to mine/chop at, in client px */
   mines: { x: number; y: number }[];
   /** long-press placements at, in client px */
@@ -62,9 +56,6 @@ export class TouchControls {
   private useTap = false;
   private packTap = false;
   private relocateTap = false;
-  private chartTap = false;
-  private pinTap = false;
-  private clearPinTap = false;
   private usePackedDuringPress = false;
   private useDownAt = 0;
   private useHoldTimer: ReturnType<typeof setTimeout> | null = null;
@@ -97,9 +88,6 @@ export class TouchControls {
   private btnPlane = document.getElementById('btn-plane')!;
   private btnUse = document.getElementById('btn-use')!;
   private btnMove = document.getElementById('btn-move')!;
-  private btnRoute = document.getElementById('btn-route')!;
-  private btnRoutePin = document.getElementById('btn-route-pin')!;
-  private btnRouteClear = document.getElementById('btn-route-clear')!;
   private planeState: PlaneButtonState = 'hidden';
   private planeLabel = '';
 
@@ -160,9 +148,6 @@ export class TouchControls {
       el.addEventListener('pointercancel', off);
       el.addEventListener('lostpointercapture', off);
     };
-    bindTap(this.btnRoute, () => { this.chartTap = true; });
-    bindTap(this.btnRoutePin, () => { this.pinTap = true; });
-    bindTap(this.btnRouteClear, () => { this.clearPinTap = true; });
     bindTap(this.btnMove, () => { this.relocateTap = true; });
     this.btnPlane.addEventListener('pointerdown', (e) => {
       e.preventDefault();
@@ -358,9 +343,6 @@ export class TouchControls {
     this.useTap = false;
     this.packTap = false;
     this.relocateTap = false;
-    this.chartTap = false;
-    this.pinTap = false;
-    this.clearPinTap = false;
     this.usePackedDuringPress = false;
     this.useDownAt = 0;
     if (this.useHoldTimer !== null) {
@@ -382,9 +364,6 @@ export class TouchControls {
     this.btnPlane.classList.remove('press');
     this.btnUse.classList.remove('press');
     this.btnMove.classList.remove('press');
-    this.btnRoute.classList.remove('press');
-    this.btnRoutePin.classList.remove('press');
-    this.btnRouteClear.classList.remove('press');
   };
 
   private pinch(): void {
@@ -421,9 +400,6 @@ export class TouchControls {
       use: this.useTap,
       pack: this.packTap,
       relocate: this.relocateTap,
-      chart: this.chartTap,
-      pin: this.pinTap,
-      clearPin: this.clearPinTap,
       mines: this.mines,
       places: this.places,
     };
@@ -431,9 +407,6 @@ export class TouchControls {
     this.useTap = false;
     this.packTap = false;
     this.relocateTap = false;
-    this.chartTap = false;
-    this.pinTap = false;
-    this.clearPinTap = false;
     this.mines = [];
     this.places = [];
     return out;
