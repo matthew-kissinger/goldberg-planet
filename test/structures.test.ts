@@ -1420,6 +1420,55 @@ describe('Hearth and Horizon structures', () => {
     expect(shelter.missing).toEqual(['workbench', 'chest']);
   });
 
+  it('turns a serviced wall-shell room into a functional lived-in shelter', () => {
+    const structures: StructureSave[] = [
+      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
+      { id: 2, item: 'roofJoin', tile: 101, layer: 2, yaw: 0 },
+      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
+      { id: 4, item: 'wallDoorPanel', tile: 103, layer: 2, yaw: 0 },
+      { id: 5, item: 'wallWindowPanel', tile: 104, layer: 2, yaw: 0 },
+      { id: 6, item: 'wallCorner', tile: 105, layer: 2, yaw: 0 },
+      { id: 7, item: 'campfire', tile: 106, layer: 2, yaw: 0, state: { lit: true } },
+      { id: 8, item: 'workbench', tile: 104, layer: 2, yaw: 0 },
+      { id: 9, item: 'chest', tile: 105, layer: 2, yaw: 0 },
+    ];
+
+    const shelter = shelterReport(structures, hubTopology);
+    expect(shelter).toMatchObject({
+      roofPieces: 2,
+      hasDoor: true,
+      hasWindow: true,
+      hasWarmth: true,
+      hasStation: true,
+      hasStorage: true,
+      protected: true,
+      functional: true,
+      comfort: 6,
+      label: 'shelter alive',
+      enclosure: {
+        wallTiles: [103, 104, 105],
+        cornerTiles: [105],
+        roofTiles: [101, 102],
+        roofJoinTiles: [101],
+        openingTiles: [103, 104],
+        utilityTiles: [106, 104, 105],
+        boundaryCoverageMode: 'edge',
+        boundaryCoverage: 0.75,
+        utilityCoverage: 1,
+        doorOnBoundary: true,
+        warmthInside: true,
+        workbenchInside: true,
+        storageInside: true,
+        enclosed: true,
+        serviceReady: true,
+        comfortTier: 'lived-in',
+        label: 'lived-in shelter room',
+      },
+    });
+    expect(shelter.missing).toEqual([]);
+    expect(homeScore(structures, hubTopology)).toMatchObject({ functional: true, label: 'shelter alive' });
+  });
+
   it('does not double-count an integrated door panel as two boundary tiles', () => {
     const structures: StructureSave[] = [
       { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },

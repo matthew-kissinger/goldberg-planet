@@ -268,7 +268,7 @@ async function main() {
 
     let setup = await page.evaluate(() => {
       const world = window.__world;
-      for (const item of ['bedroll', 'roofBundle', 'roofJoin', 'wallDoorPanel', 'wallWindowPanel', 'wallCorner', 'wallPanel', 'wallHalfRail', 'floorFoundation', 'campfire']) world.giveItem(item, 8);
+      for (const item of ['bedroll', 'roofBundle', 'roofJoin', 'wallDoorPanel', 'wallWindowPanel', 'wallCorner', 'wallPanel', 'wallHalfRail', 'floorFoundation', 'campfire', 'workbench', 'chest']) world.giveItem(item, 8);
       const baseline = world.save.export();
       const occupied = () => new Set(world.structures().items.map((entry) => entry.tile));
       const failures = [];
@@ -368,6 +368,13 @@ async function main() {
           world.save.import(baseline);
           continue;
         }
+        const workbench = place('workbench', boundary[3]);
+        const chest = place('chest', boundary[4]);
+        if (!workbench || !chest) {
+          world.save.import(baseline);
+          continue;
+        }
+        placed.push(workbench, chest);
         const halfRail = placeFirst('wallHalfRail', 5);
         const foundation = placeFirst('floorFoundation', 7, halfRail ? [halfRail.tile] : []);
         const looseWall = placeFirst('wallPanel', 7, [halfRail?.tile, foundation?.tile].filter((tile) => tile !== undefined));
@@ -422,7 +429,18 @@ async function main() {
       throw new Error(`wallShell catalog missing: ${JSON.stringify(setup.structures.sockets.wallShell)}`);
     }
     const readyHome = setup.structures.home;
-    if (!readyHome.shelter.protected || readyHome.functional) throw new Error(`wall shell room should be weather-safe but not fully functional: ${JSON.stringify(readyHome)}`);
+    if (!readyHome.shelter.protected || !readyHome.functional || readyHome.label !== 'shelter alive') {
+      throw new Error(`serviced wall shell room should be functional: ${JSON.stringify(readyHome)}`);
+    }
+    if (
+      !readyHome.shelter.hasWarmth
+      || !readyHome.shelter.hasStation
+      || !readyHome.shelter.hasStorage
+      || !readyHome.shelter.enclosure.serviceReady
+      || readyHome.shelter.enclosure.comfortTier !== 'lived-in'
+    ) {
+      throw new Error(`functional wall shell services did not register: ${JSON.stringify(readyHome.shelter)}`);
+    }
     if (!readyHome.shelter.hasWindow || readyHome.shelter.enclosure.openingTiles.length < 2) {
       throw new Error(`integrated window/door panels did not register openings: ${JSON.stringify(readyHome.shelter)}`);
     }
@@ -541,6 +559,25 @@ async function main() {
     const readyPixelProbe = pngPixelProbe(await fs.readFile(readyScreenshot));
     if (!readyPixelProbe.ok) throw new Error(`Ready screenshot pixel probe failed: ${JSON.stringify(readyPixelProbe)}`);
 
+    const readyRest = await page.evaluate((bedrollId) => {
+      const world = window.__world;
+      const before = world.survival();
+      const used = world.useStructure(bedrollId);
+      return {
+        used,
+        before,
+        after: world.survival(),
+        structures: world.structures(),
+        text: JSON.parse(window.render_game_to_text()),
+      };
+    }, setup.bedroll.id);
+    if (!readyRest.used || !readyRest.structures.lastAction.includes('shelter rest')) {
+      throw new Error(`functional wall shell bedroll did not rest as a shelter: ${JSON.stringify(readyRest)}`);
+    }
+    if (!readyRest.after.lastAction.includes('shelter sleep')) {
+      throw new Error(`survival rest action did not record shelter sleep: ${JSON.stringify(readyRest.after)}`);
+    }
+
     const weakened = await page.evaluate((wallId) => {
       const world = window.__world;
       const failures = [];
@@ -591,6 +628,7 @@ async function main() {
       collisions,
       cornerBefore,
       cornerAfter,
+      readyRest,
       setup,
       weakened,
       consoleErrors,
@@ -606,6 +644,8 @@ async function main() {
       ready: {
         protected: readyHome.shelter.protected,
         functional: readyHome.functional,
+        label: readyHome.label,
+        comfortTier: readyHome.shelter.enclosure.comfortTier,
         boundaryCoverage: readyHome.shelter.enclosure.boundaryCoverage,
         boundaryCoverageMode: readyHome.shelter.enclosure.boundaryCoverageMode,
         boundaryCoverageNeed: readyHome.shelter.enclosure.boundaryCoverageNeed,
@@ -613,6 +653,12 @@ async function main() {
         perimeterCoverage: readyHome.shelter.enclosure.perimeterCoverage,
         coveredBoundaryEdges: readyHome.shelter.enclosure.coveredBoundaryEdges,
         wallTiles: readyHome.shelter.enclosure.wallTiles,
+        services: {
+          warmth: readyHome.shelter.hasWarmth,
+          workbench: readyHome.shelter.hasStation,
+          storage: readyHome.shelter.hasStorage,
+        },
+        restAction: readyRest.after.lastAction,
       },
       weakened: {
         protected: weakened.structures.home.shelter.protected,

@@ -31,26 +31,14 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   mesh/triangle warning decisions, aquatic readability/boids, broader blind gameplay
   screenshot review, shared-scale house-shell skins, avatar/equipment authored assets,
   future ore/resource nodes, and deeper native-life/combat behavior.
-- Closed the first C6 edge-based shelter coverage slice. Wall-shell shelter reports now
-  normalize owned wall/opening sockets onto home-room boundary edge keys, so home-tile
-  edge walls count, adjacent walls only count when their yaw owns the room-facing edge,
-  doors only satisfy access when their edge is on the boundary, and wrong-facing walls no
-  longer fake enclosure. Diagnostics now expose `boundaryCoverageMode`,
-  `coveredBoundaryEdges`, door/window/wall edge sets, the four-edge weather-safe threshold,
-  total perimeter edge count, and true perimeter coverage. `npm run proof:c6-wall-shells`
-  now proves edge-based coverage, yaw-aligned wall-door/window/corner placement, wall
-  traversal collision, passable door edges, and stale collision clearing after relocation.
-  Remaining C6 work is broader room shapes and shared-scale house-shell skins.
-- Closed the next C6 wall-shell gameplay slice. `structureTraversalBlocker` now derives
-  player traversal blockers from the same edge sockets used by wall-shell placement:
-  full walls, integrated window walls, and corners block the relevant hex edge; integrated
-  door panels and half rails stay passable. `Player.update` accepts that collision callback
-  in the live movement path, and `__world.structureCollision()` plus
-  `debugWalkTowardTile()` expose proof diagnostics without making renderer geometry
-  authoritative. `npm run proof:c6-wall-shells` now proves wall/window/corner blockers,
-  passable door edges, real player movement hitting a wall blocker, and stale corner
-  collision clearing after relocation. Remaining C6 work is edge-based shelter coverage,
-  broader room shapes, and shared-scale house-shell skins.
+- Closed the C6 functional serviced wall-shell room proof. `npm run proof:c6-wall-shells`
+  now builds a bedroll-centered code-owned wall-shell room that reports protected shelter,
+  functional home label, lived-in comfort tier, workbench/chest/campfire service readiness,
+  and bedroll rest through the normal shelter sleep path, while retaining exact edge
+  coverage diagnostics, wall/window/corner blockers, passable door edges, real player
+  movement collision, stale collision clearing, and shelter weakening when a corner moves
+  out. Remaining C6 work is broader/multi-room shapes, cleaner beauty/readability captures,
+  and shared-scale house-shell skins.
 - Promoted, cataloged, and runtime-wired the exact K10 pickup/drop Kiln pack. The
   committed model set now includes 82 ready GLBs / 0 unused / 0 missing, including
   `drop-dirt-clod`, `drop-sand-pile`, `drop-snow-clump`, `drop-glow-crystal`,
@@ -178,10 +166,10 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   command coverage, and avatar prop colors. Shelter reporting now treats integrated
   door/window panels as both openings and wall boundary contributors without double-counting
   the same tile, counts `wallCorner` as boundary, and counts `roofJoin` as roof coverage.
-  `npm run proof:c6-wall-shells` now proves the expanded seven-piece wall-shell catalog,
-  places a weather-safe but not fully functional room, verifies foundation/rail/panel/join
-  renderer diagnostics, then moves a corner out so shelter drops back to `room boundary`
-  missing.
+  `npm run proof:c6-wall-shells` originally placed a weather-safe but not-yet-functional
+  room; later C6 proof now upgrades this to a functional serviced wall-shell room while
+  still verifying foundation/rail/panel/join renderer diagnostics and weakening when a
+  corner moves out.
 - Closed the first C6 wall/shell socket slice. `floorFoundation`, `wallPanel`, and
   `wallHalfRail` are now craftable/placeable code-owned building pieces with separate
   wall-shell socket specs, renderer silhouettes, avatar prop colors, and diagnostics.
