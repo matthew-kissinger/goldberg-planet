@@ -277,7 +277,7 @@ async function main() {
 
     let setup = await page.evaluate(() => {
       const world = window.__world;
-      for (const item of ['bedroll', 'roofBundle', 'roofJoin', 'wallDoorPanel', 'wallWindowPanel', 'wallCorner', 'wallPanel', 'wallHalfRail', 'floorFoundation', 'campfire', 'workbench', 'chest']) world.giveItem(item, 8);
+      for (const item of ['bedroll', 'roofBundle', 'roofJoin', 'wallDoorPanel', 'wallWindowPanel', 'wallCorner', 'wallPanel', 'wallHalfRail', 'floorFoundation', 'campfire', 'workbench', 'chest']) world.giveItem(item, 40);
       const baseline = world.save.export();
       const occupied = () => new Set(world.structures().items.map((entry) => entry.tile));
       const failures = [];
@@ -482,7 +482,7 @@ async function main() {
     const stackedKeys = setup.structures.items
       .filter((entry) => entry.tile === setup.stacked.tile)
       .flatMap((entry) => entry.socket?.occupancyKeys ?? []);
-    for (const key of [`${setup.stacked.tile}:center`, `${setup.stacked.tile}:edge:0`, `${setup.stacked.tile}:edge:1`, `${setup.stacked.tile}:edge:2`]) {
+    for (const key of [`${setup.stacked.tile}:floor`, `${setup.stacked.tile}:edge:0`, `${setup.stacked.tile}:edge:1`, `${setup.stacked.tile}:edge:2`]) {
       if (!stackedKeys.includes(key)) {
         throw new Error(`same-tile edge stack missing ${key}: ${JSON.stringify({ stacked: setup.stacked, stackedKeys, items: setup.structures.items.filter((entry) => entry.tile === setup.stacked.tile) })}`);
       }
@@ -691,6 +691,232 @@ async function main() {
     }, sixEdge.restoreSave);
     delete sixEdge.restoreSave;
 
+    const multiRoom = await page.evaluate(() => {
+      const world = window.__world;
+      const restoreSave = world.save.export();
+      const failures = [];
+      const edgeYaw = (edge) => edge * Math.PI / 3;
+      const sameSet = (a, b) => a.length === b.length && a.every((value) => b.includes(value));
+      const placedById = (id) => world.structures().items.find((entry) => entry.id === id) ?? null;
+      const beforeIds = () => new Set(world.structures().items.map((entry) => entry.id));
+      const occupiedTiles = () => new Set(world.structures().items.map((entry) => entry.tile));
+      const sharedEdge = (from, to) => {
+        const degree = world.geo.degreeOf(from);
+        for (let edge = 0; edge < degree; edge++) {
+          if (world.geo.neighbor(from, edge) === to) return edge;
+        }
+        return null;
+      };
+      const place = (item, tile, recordFailure = true) => {
+        const before = beforeIds();
+        if (!world.placeStructure(item, tile)) {
+          if (recordFailure) failures.push({ item, tile, phase: 'place', action: world.structures().lastAction, commands: world.buildCommands?.() });
+          return null;
+        }
+        const placed = world.structures().items.find((entry) => !before.has(entry.id)) ?? null;
+        if (!placed) failures.push({ item, tile, phase: 'find', action: world.structures().lastAction, commands: world.buildCommands?.() });
+        return placed;
+      };
+      const face = (entry, tile, yaw, recordFailure = true) => {
+        if (!entry) return null;
+        if (!world.relocateStructure(entry.id, tile, undefined, yaw)) {
+          const commands = world.buildCommands?.();
+          if (commands?.last?.blockers?.includes('same snap target')) return placedById(entry.id) ?? entry;
+          if (recordFailure) failures.push({ item: entry.item, tile, yaw, phase: 'face', action: world.structures().lastAction, commands });
+          return null;
+        }
+        return placedById(entry.id) ?? entry;
+      };
+      const placeFacing = (item, tile, edge) => {
+        const direct = place(item, tile, false);
+        if (direct) return face(direct, tile, edgeYaw(edge));
+        for (const stagingTile of freeTiles([tile])) {
+          const staged = place(item, stagingTile, false);
+          if (staged) return face(staged, tile, edgeYaw(edge));
+        }
+        failures.push({ item, tile, edge, phase: 'stage', action: world.structures().lastAction, commands: world.buildCommands?.() });
+        return null;
+      };
+      const outerEdgesFor = (roomTiles) => {
+        const room = new Set(roomTiles);
+        const edges = [];
+        for (const tile of roomTiles) {
+          const degree = world.geo.degreeOf(tile);
+          for (let edge = 0; edge < degree; edge++) {
+            const neighbor = world.geo.neighbor(tile, edge);
+            if (neighbor === tile || room.has(neighbor)) continue;
+            edges.push({
+              key: `${tile}:edge:${edge}`,
+              tile,
+              edge,
+              neighbor,
+              neighborEdge: sharedEdge(neighbor, tile),
+            });
+          }
+        }
+        return edges.sort((a, b) => a.tile - b.tile || a.edge - b.edge);
+      };
+      const freeTiles = (blocked = []) => {
+        const blockedSet = new Set([world.player.tile, ...blocked]);
+        const occupied = occupiedTiles();
+        return world.nearbyTiles(8).filter((tile) => !blockedSet.has(tile) && !occupied.has(tile));
+      };
+      const moveAway = (entry, blocked = []) => {
+        for (const tile of freeTiles(blocked)) {
+          const moved = face(entry, tile, 0, false);
+          if (moved) return moved;
+        }
+        return null;
+      };
+      const candidateCenters = world.nearbyTiles(7).filter((tile) => tile !== world.player.tile && world.geo.degreeOf(tile) >= 6);
+      for (const center of candidateCenters) {
+        const occupied = occupiedTiles();
+        if (occupied.has(center)) continue;
+        const branchEdges = [0, 2, 3];
+        const branches = branchEdges.map((edge) => world.geo.neighbor(center, edge));
+        const roomTiles = [center, ...branches];
+        if (new Set(roomTiles).size !== roomTiles.length) continue;
+        if (roomTiles.some((tile) => tile === world.player.tile || occupied.has(tile) || world.geo.degreeOf(tile) < 6)) continue;
+        const perimeter = outerEdgesFor(roomTiles);
+        if (perimeter.length < 12 || perimeter.some((edge) => edge.neighborEdge === null)) continue;
+        const baseline = world.save.export();
+        failures.length = 0;
+
+        const bedroll = place('bedroll', center);
+        if (!bedroll) {
+          world.save.import(baseline);
+          continue;
+        }
+        world.useStructure(bedroll.id);
+        const foundations = [];
+        const roofs = [];
+        for (const tile of branches) {
+          const foundation = place('floorFoundation', tile);
+          const inward = sharedEdge(tile, center);
+          const roof = inward === null ? null : placeFacing('roofJoin', tile, inward);
+          if (!foundation || !roof) break;
+          foundations.push(foundation);
+          roofs.push(roof);
+        }
+        if (foundations.length !== branches.length || roofs.length !== branches.length) {
+          world.save.import(baseline);
+          continue;
+        }
+        const fire = place('campfire', branches[0]);
+        const workbench = place('workbench', branches[1]);
+        const chest = place('chest', branches[2]);
+        if (!fire || !workbench || !chest) {
+          world.save.import(baseline);
+          continue;
+        }
+        world.useStructure(fire.id);
+
+        const seamDoor = placeFacing('wallDoorPanel', center, branchEdges[0]);
+        if (!seamDoor) {
+          world.save.import(baseline);
+          continue;
+        }
+        const perimeterWalls = [];
+        for (const [index, edge] of perimeter.entries()) {
+          const item = index === 0 ? 'wallDoorPanel' : index === 1 ? 'wallWindowPanel' : 'wallPanel';
+          const wall = placeFacing(item, edge.tile, edge.edge);
+          if (!wall) break;
+          perimeterWalls.push({ ...wall, expectedKey: edge.key });
+        }
+        if (perimeterWalls.length !== perimeter.length || failures.length > 0) {
+          world.save.import(baseline);
+          continue;
+        }
+
+        const home = world.structures().home;
+        const expectedEdges = perimeter.map((edge) => edge.key);
+        const boundaryEdges = home.shelter.enclosure.boundaryEdges;
+        const coveredEdges = home.shelter.enclosure.coveredBoundaryEdges;
+        const seamKeys = branchEdges.flatMap((edge, index) => {
+          const branch = branches[index];
+          const back = sharedEdge(branch, center);
+          return back === null ? [`${center}:edge:${edge}`] : [`${center}:edge:${edge}`, `${branch}:edge:${back}`];
+        });
+        const complete = home.shelter.protected
+          && home.functional
+          && home.shelter.enclosure.boundaryCoverage === 1
+          && home.shelter.enclosure.perimeterCoverage === 1
+          && home.shelter.enclosure.boundaryEdgeCount === expectedEdges.length
+          && sameSet(boundaryEdges, expectedEdges)
+          && sameSet(coveredEdges, expectedEdges)
+          && seamKeys.every((key) => !boundaryEdges.includes(key) && !coveredEdges.includes(key))
+          && home.shelter.enclosure.doorBoundaryEdges.length === 1
+          && home.shelter.enclosure.windowBoundaryEdges.length === 1
+          && !home.shelter.enclosure.doorBoundaryEdges.includes(`${center}:edge:${branchEdges[0]}`);
+        if (!complete) {
+          failures.push({ phase: 'assert-complete', home, expectedEdges, seamKeys });
+          world.save.import(baseline);
+          continue;
+        }
+
+        const fullSave = world.save.export();
+        const exteriorWall = perimeterWalls[perimeterWalls.length - 1];
+        const exteriorMoved = moveAway(exteriorWall, roomTiles);
+        const weakened = world.structures().home;
+        const exteriorWeakens = !!exteriorMoved
+          && !weakened.shelter.protected
+          && !weakened.functional
+          && weakened.shelter.missing.includes('room boundary');
+
+        world.save.import(fullSave);
+        const restoredSeamDoor = world.structures().items.find((entry) => entry.tile === center && entry.item === 'wallDoorPanel' && entry.turn === branchEdges[0]);
+        const seamMoved = restoredSeamDoor ? moveAway(restoredSeamDoor, roomTiles) : null;
+        const withoutInteriorSeam = world.structures().home;
+        const interiorSeamNotRequired = !!seamMoved
+          && withoutInteriorSeam.shelter.protected
+          && withoutInteriorSeam.functional
+          && sameSet(withoutInteriorSeam.shelter.enclosure.coveredBoundaryEdges, expectedEdges);
+
+        if (!exteriorWeakens || !interiorSeamNotRequired) {
+          failures.push({ phase: 'assert-mutations', exteriorWeakens, interiorSeamNotRequired, weakened, withoutInteriorSeam });
+          world.save.import(baseline);
+          continue;
+        }
+
+        world.save.import(fullSave);
+        return {
+          ok: true,
+          center,
+          roomTiles,
+          foundationTiles: foundations.map((entry) => entry.tile),
+          expectedEdges,
+          seamKeys,
+          home: world.structures().home,
+          exteriorWeakens,
+          interiorSeamNotRequired,
+          restoreSave,
+        };
+      }
+      world.save.import(restoreSave);
+      return { ok: false, failures, restoreSave };
+    });
+    if (!multiRoom.ok) {
+      throw new Error(`connected multi-room wall shell setup failed: ${JSON.stringify(multiRoom)}`);
+    }
+    await page.evaluate((input) => {
+      const world = window.__world;
+      const occupied = new Set(world.structures().items.map((entry) => entry.tile));
+      const blocked = new Set([...input.roomTiles]);
+      const viewTile = world.nearbyTiles(4).find((tile) => !blocked.has(tile) && !occupied.has(tile));
+      if (viewTile !== undefined) world.debugSetPlayerTile(viewTile);
+      world.debugAimAtTile(input.center);
+      world.setZoom?.(0.18);
+    }, { center: multiRoom.center, roomTiles: multiRoom.roomTiles });
+    await page.waitForTimeout(300);
+    const multiRoomScreenshot = path.join(outDir, 'wall-shells-multi-room.png');
+    await page.screenshot({ path: multiRoomScreenshot, fullPage: false });
+    const multiRoomPixelProbe = pngPixelProbe(await fs.readFile(multiRoomScreenshot));
+    if (!multiRoomPixelProbe.ok) throw new Error(`Multi-room screenshot pixel probe failed: ${JSON.stringify(multiRoomPixelProbe)}`);
+    await page.evaluate((save) => {
+      window.__world.save.import(save);
+    }, multiRoom.restoreSave);
+    delete multiRoom.restoreSave;
+
     const weakened = await page.evaluate((wallId) => {
       const world = window.__world;
       const failures = [];
@@ -743,6 +969,9 @@ async function main() {
       sixEdge,
       sixEdgeScreenshot,
       sixEdgePixelProbe,
+      multiRoom,
+      multiRoomScreenshot,
+      multiRoomPixelProbe,
       previews,
       collisions,
       cornerBefore,
@@ -786,6 +1015,21 @@ async function main() {
         perimeterCoverage: sixEdge.home.shelter.enclosure.perimeterCoverage,
         coveredBoundaryEdges: sixEdge.home.shelter.enclosure.coveredBoundaryEdges,
         additions: sixEdge.additions.map((entry) => ({ item: entry.item, tile: entry.tile, turn: entry.turn })),
+      },
+      multiRoom: {
+        screenshot: multiRoomScreenshot,
+        pixelProbe: multiRoomPixelProbe,
+        center: multiRoom.center,
+        roomTiles: multiRoom.roomTiles,
+        foundationTiles: multiRoom.foundationTiles,
+        boundaryCoverage: multiRoom.home.shelter.enclosure.boundaryCoverage,
+        perimeterCoverage: multiRoom.home.shelter.enclosure.perimeterCoverage,
+        boundaryEdgeCount: multiRoom.home.shelter.enclosure.boundaryEdgeCount,
+        expectedEdges: multiRoom.expectedEdges,
+        coveredBoundaryEdges: multiRoom.home.shelter.enclosure.coveredBoundaryEdges,
+        seamKeys: multiRoom.seamKeys,
+        exteriorWeakens: multiRoom.exteriorWeakens,
+        interiorSeamNotRequired: multiRoom.interiorSeamNotRequired,
       },
       weakened: {
         protected: weakened.structures.home.shelter.protected,

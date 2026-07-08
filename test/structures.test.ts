@@ -41,6 +41,31 @@ describe('Hearth and Horizon structures', () => {
     neighbor: (tile, edge) => (tile === 100 ? 101 + edge : 100),
   };
 
+  const multiRoomTopology: StructureTopology = (() => {
+    const links = new Map<string, number>();
+    const set = (tile: number, edge: number, neighbor: number) => {
+      links.set(`${tile}:${edge}`, neighbor);
+    };
+    const addExterior = (tile: number, edge: number) => {
+      const exterior = tile * 10 + edge;
+      set(tile, edge, exterior);
+      set(exterior, (edge + 3) % 6, tile);
+    };
+    for (const tile of [100, 101, 102, 103]) {
+      for (let edge = 0; edge < 6; edge++) addExterior(tile, edge);
+    }
+    set(100, 0, 101);
+    set(101, 3, 100);
+    set(100, 2, 103);
+    set(103, 5, 100);
+    set(100, 3, 102);
+    set(102, 0, 100);
+    return {
+      degreeOf: () => 6,
+      neighbor: (tile, edge) => links.get(`${tile}:${edge}`) ?? tile,
+    };
+  })();
+
   it('normalizes save data and rejects invalid or duplicate placed props', () => {
     const raw = [
       { id: 4, item: 'campfire', tile: 10, layer: 3, yaw: 0.5 },
@@ -123,10 +148,13 @@ describe('Hearth and Horizon structures', () => {
     const window = addStructure(structures, { item: 'wallWindowPanel', tile: 30, layer: 2, yaw: STRUCTURE_YAW_STEP })!;
 
     expect(foundation).toMatchObject({ item: 'floorFoundation', tile: 30 });
-    expect(structureSocketPlacement(foundation)).toMatchObject({ kind: 'center', occupies: ['center'] });
+    expect(structureSocketPlacement(foundation)).toMatchObject({ kind: 'floor', occupies: ['floor'] });
     expect(structureSocketPlacement(wall)).toMatchObject({ kind: 'edge', edge: 0, occupies: ['edge:0'] });
     expect(structureSocketPlacement(window)).toMatchObject({ kind: 'edge', edge: 1, occupies: ['edge:1'] });
-    expect(addStructure(structures, { item: 'campfire', tile: 30, layer: 2, yaw: 0 })).toBeNull();
+    const campfire = addStructure(structures, { item: 'campfire', tile: 30, layer: 2, yaw: 0 });
+    expect(campfire).toMatchObject({ item: 'campfire', tile: 30 });
+    expect(addStructure(structures, { item: 'workbench', tile: 30, layer: 2, yaw: 0 })).toBeNull();
+    expect(addStructure(structures, { item: 'floorFoundation', tile: 30, layer: 2, yaw: 0 })).toBeNull();
     expect(addStructure(structures, { item: 'wallDoorPanel', tile: 30, layer: 2, yaw: 0 })).toBeNull();
     expect(addStructure(structures, { item: 'wallCorner', tile: 30, layer: 2, yaw: STRUCTURE_YAW_STEP })).toBeNull();
 
@@ -1568,6 +1596,110 @@ describe('Hearth and Horizon structures', () => {
     expect(shelter.enclosure.railBoundaryEdges).toEqual([]);
     expect(shelter.missing).toEqual([]);
     expect(homeScore(structures, hubTopology)).toMatchObject({ functional: true, label: 'shelter alive' });
+  });
+
+  it('derives an outer perimeter for connected foundation-backed room tiles', () => {
+    const outerEdges: Array<{
+      tile: number;
+      edge: number;
+      item?: 'wallDoorPanel' | 'wallWindowPanel' | 'wallPanel';
+      placeTile?: number;
+      placeEdge?: number;
+    }> = [
+      { tile: 100, edge: 1, item: 'wallDoorPanel' },
+      { tile: 100, edge: 4 },
+      { tile: 100, edge: 5 },
+      { tile: 101, edge: 0 },
+      { tile: 101, edge: 1 },
+      { tile: 101, edge: 2 },
+      { tile: 101, edge: 4 },
+      { tile: 101, edge: 5, placeTile: 1015, placeEdge: 2 },
+      { tile: 102, edge: 1 },
+      { tile: 102, edge: 2 },
+      { tile: 102, edge: 3 },
+      { tile: 102, edge: 4 },
+      { tile: 102, edge: 5 },
+      { tile: 103, edge: 0, item: 'wallWindowPanel' },
+      { tile: 103, edge: 1 },
+      { tile: 103, edge: 2 },
+      { tile: 103, edge: 3 },
+      { tile: 103, edge: 4 },
+    ];
+    const wallShells: StructureSave[] = outerEdges.map((entry, index) => ({
+      id: 20 + index,
+      item: entry.item ?? 'wallPanel',
+      tile: entry.placeTile ?? entry.tile,
+      layer: 2,
+      yaw: STRUCTURE_YAW_STEP * (entry.placeEdge ?? entry.edge),
+    }));
+    const structures: StructureSave[] = [
+      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
+      { id: 2, item: 'floorFoundation', tile: 101, layer: 2, yaw: 0 },
+      { id: 3, item: 'floorFoundation', tile: 102, layer: 2, yaw: 0 },
+      { id: 4, item: 'floorFoundation', tile: 103, layer: 2, yaw: 0 },
+      { id: 5, item: 'roofBundle', tile: 101, layer: 2, yaw: 0 },
+      { id: 6, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
+      { id: 7, item: 'campfire', tile: 101, layer: 2, yaw: 0, state: { lit: true } },
+      { id: 8, item: 'workbench', tile: 102, layer: 2, yaw: 0 },
+      { id: 9, item: 'chest', tile: 103, layer: 2, yaw: 0 },
+      { id: 10, item: 'wallDoorPanel', tile: 100, layer: 2, yaw: 0 },
+      ...wallShells,
+    ];
+
+    const shelter = shelterReport(structures, multiRoomTopology);
+    const expectedBoundaryEdges = outerEdges.map((entry) => `${entry.tile}:edge:${entry.edge}`);
+
+    expect(shelter).toMatchObject({
+      centerTile: 100,
+      tiles: [100, 101, 102, 103],
+      protected: true,
+      functional: true,
+      label: 'shelter alive',
+      enclosure: {
+        roomTiles: [100, 101, 102, 103],
+        foundationTiles: [101, 102, 103],
+        roofTiles: [101, 102],
+        utilityTiles: [101, 102, 103],
+        boundaryCoverageMode: 'edge',
+        boundaryCoverageNeed: expectedBoundaryEdges.length,
+        boundaryEdgeCount: expectedBoundaryEdges.length,
+        boundaryCoverage: 1,
+        perimeterCoverage: 1,
+        doorOnBoundary: true,
+        enclosed: true,
+        serviceReady: true,
+      },
+    });
+    expect(shelter.enclosure.boundaryEdges).toEqual(expectedBoundaryEdges);
+    expect(shelter.enclosure.coveredBoundaryEdges).toEqual(expectedBoundaryEdges);
+    expect(shelter.enclosure.wallBoundaryEdges).toEqual(expectedBoundaryEdges);
+    expect(shelter.enclosure.doorBoundaryEdges).toEqual(['100:edge:1']);
+    expect(shelter.enclosure.windowBoundaryEdges).toEqual(['103:edge:0']);
+    expect(shelter.enclosure.wallBoundaryEdges).toContain('101:edge:5');
+    expect(shelter.enclosure.boundaryEdges).not.toContain('100:edge:0');
+    expect(shelter.enclosure.boundaryEdges).not.toContain('101:edge:3');
+    expect(shelter.enclosure.boundaryEdges).not.toContain('100:edge:3');
+    expect(shelter.enclosure.boundaryEdges).not.toContain('102:edge:0');
+    expect(shelter.enclosure.boundaryEdges).not.toContain('100:edge:2');
+    expect(shelter.enclosure.boundaryEdges).not.toContain('103:edge:5');
+    expect(shelter.missing).toEqual([]);
+
+    const weakened = shelterReport(
+      structures.filter((entry) => !(entry.tile === 102 && structureYawTurn(entry.yaw) === 5)),
+      multiRoomTopology,
+    );
+    expect(weakened.protected).toBe(false);
+    expect(weakened.functional).toBe(false);
+    expect(weakened.missing).toContain('room boundary');
+    expect(weakened.enclosure.boundaryEdgeCount).toBe(expectedBoundaryEdges.length);
+    expect(weakened.enclosure.coveredBoundaryEdges).not.toContain('102:edge:5');
+
+    const withoutDivider = shelterReport(
+      structures.filter((entry) => !(entry.item === 'wallDoorPanel' && entry.tile === 100 && structureYawTurn(entry.yaw) === 0)),
+      multiRoomTopology,
+    );
+    expect(withoutDivider.protected).toBe(true);
+    expect(withoutDivider.enclosure.coveredBoundaryEdges).toEqual(expectedBoundaryEdges);
   });
 
   it('does not double-count an integrated door panel as two boundary tiles', () => {

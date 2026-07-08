@@ -287,13 +287,15 @@ Deferred until scale, snap, budget, readability, or animation proof exists:
   supports and joins. The second C6 slice now adds code-owned `floorFoundation`,
   `wallPanel`, `wallDoorPanel`, `wallWindowPanel`, `wallCorner`, `wallHalfRail`, and
   `roofJoin` sockets and proves integrated walls seal while rails/foundations do not fake
-  enclosure. The edge-socket slice adds true edge-addressed occupancy: center foundations and
-  multiple wall edges can share a hex only when sockets do not overlap. Edge-based shelter
-  coverage, traversal collision, functional serviced single-room shelter, and full six-edge
-  single-room perimeter coverage now have browser proof; before more craftable house pieces
-  ship, finish connected/multi-room outer-perimeter solving and cleaner beauty/readability
-  proof. New Kiln wall pieces should be generated only after that as one shared-scale
-  house-shell pack and then treated as decorative skins over measured sockets.
+  enclosure. The edge-socket slice adds true edge-addressed occupancy: floor foundations,
+  center furniture, and multiple wall edges can share a hex only when sockets do not
+  overlap. Edge-based shelter coverage, traversal collision, functional serviced
+  single-room shelter, full six-edge single-room perimeter coverage, and a first connected
+  four-tile foundation-backed outer-perimeter room now have browser proof; before more
+  craftable house pieces ship, prove arbitrary/broader footprints, pentagon-degree edge
+  cases, and cleaner beauty/readability captures. New Kiln wall pieces should be generated
+  only after that as one shared-scale house-shell pack and then treated as decorative skins
+  over measured sockets.
 - Shrine landmark shells: defer for blind screenshot readability, world-placement scale,
   water/glow/threshold ownership, repetition/LOD policy, and collision proof. Craters are no
   longer deferred for the first skyfall-shell slice. Trees are no longer deferred for the
