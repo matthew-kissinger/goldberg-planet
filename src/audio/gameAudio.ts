@@ -23,7 +23,6 @@ export interface GameAudioState {
   pendingEvents: number;
   playCounts: Partial<Record<AudioEventId, number>>;
   assetPlayCounts: Partial<Record<AudioAssetId, number>>;
-  ambiencePlaying: boolean;
   musicStarted: boolean;
   musicPlaying: boolean;
   musicQueued: boolean;
@@ -57,7 +56,6 @@ export class GameAudio {
   private readonly eventCounts = new Map<AudioEventId, number>();
   private readonly assetCounts = new Map<AudioAssetId, number>();
   private readonly errors: string[] = [];
-  private ambienceSource: AudioBufferSourceNode | null = null;
   private musicEl: HTMLAudioElement | null = null;
   private musicSource: MediaElementAudioSourceNode | null = null;
   private musicOrder: number[] = [];
@@ -135,28 +133,11 @@ export class GameAudio {
       gain.gain.value = Math.max(0, Math.min(1.5, def.volume * volume));
       source.connect(gain).connect(this.gains.get(def.group) ?? ctx.destination);
       source.start();
-      if (def.loop) this.ambienceSource = source;
       return true;
     } catch (err) {
       this.recordError(`play ${id} failed: ${errorMessage(err)}`);
       return false;
     }
-  }
-
-  startAmbience(): boolean {
-    if (this.ambienceSource || this.muted) return false;
-    return this.playAsset('planetWindLoop');
-  }
-
-  stopAmbience(): void {
-    if (!this.ambienceSource) return;
-    try {
-      this.ambienceSource.stop();
-    } catch {
-      // Already stopped by the browser.
-    }
-    this.ambienceSource.disconnect();
-    this.ambienceSource = null;
   }
 
   /**
@@ -295,7 +276,6 @@ export class GameAudio {
 
   setPageVisible(visible: boolean): void {
     if (!visible) {
-      this.stopAmbience();
       this.pauseMusic();
       return;
     }
@@ -353,7 +333,6 @@ export class GameAudio {
       pendingEvents: this.pendingEvents,
       playCounts: Object.fromEntries(this.eventCounts) as Partial<Record<AudioEventId, number>>,
       assetPlayCounts: Object.fromEntries(this.assetCounts) as Partial<Record<AudioAssetId, number>>,
-      ambiencePlaying: this.ambienceSource !== null,
       musicStarted: this.musicStarted,
       musicPlaying: this.musicEl !== null && !this.musicEl.paused,
       musicQueued: this.musicGapTimer !== null,
@@ -366,7 +345,6 @@ export class GameAudio {
   }
 
   dispose(): void {
-    this.stopAmbience();
     this.stopMusic();
     this.buffers.clear();
     this.loading.clear();
@@ -402,7 +380,6 @@ export class GameAudio {
   private startUnlockedAudio(): void {
     if (!this.unlocked || this.muted) return;
     this.loadAll();
-    void this.loadAsset('planetWindLoop').then(() => this.startAmbience());
     if (this.musicStarted) this.resumeMusic();
     else this.startMusic();
   }

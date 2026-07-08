@@ -197,13 +197,12 @@ function emitTree(
   const tint = p.tint;
   const phase = tint * 7.3;
 
-  // base sits a touch below the surface so it roots into the terrain step
-  const shake = Math.max(0, Math.min(0.98, damage));
-  const leanA = Math.sin(phase) * 0.14 * shake;
-  const leanB = Math.cos(phase * 1.3) * 0.12 * shake;
-  const bx = ux * (rG - 0.2) + t1x * (p.offA + leanA) + t2x * (p.offB + leanB);
-  const by = uy * (rG - 0.2) + t1y * (p.offA + leanA) + t2y * (p.offB + leanB);
-  const bz = uz * (rG - 0.2) + t1z * (p.offA + leanA) + t2z * (p.offB + leanB);
+  // base sits a touch below the surface so it roots into the terrain step — fixed in
+  // place regardless of chop damage (matches pickTree's un-shifted trunk axis; damage
+  // reads only through the crack darkening below, not a positional shift)
+  const bx = ux * (rG - 0.2) + t1x * p.offA + t2x * p.offB;
+  const by = uy * (rG - 0.2) + t1y * p.offA + t2y * p.offB;
+  const bz = uz * (rG - 0.2) + t1z * p.offA + t2z * p.offB;
   const trunkTop = 0.2 + p.trunk;
 
   const tr = TRUNK_COLOR[0] * tint, tg = TRUNK_COLOR[1] * tint, tb = TRUNK_COLOR[2] * tint;

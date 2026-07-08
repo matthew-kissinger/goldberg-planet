@@ -12,8 +12,7 @@ export type AudioAssetId =
   | 'hearthRest'
   | 'caveRead'
   | 'waterCatch'
-  | 'landmarkAwaken'
-  | 'planetWindLoop';
+  | 'landmarkAwaken';
 
 export interface AudioAssetDef {
   id: AudioAssetId;
@@ -41,7 +40,6 @@ export const AUDIO_ASSETS: Record<AudioAssetId, AudioAssetDef> = {
   caveRead: { id: 'caveRead', url: audioUrl('audio/sfx/cave-read.mp3'), group: 'sfx', volume: 0.48 },
   waterCatch: { id: 'waterCatch', url: audioUrl('audio/sfx/water-catch.mp3'), group: 'sfx', volume: 0.47 },
   landmarkAwaken: { id: 'landmarkAwaken', url: audioUrl('audio/sfx/landmark-awaken.mp3'), group: 'sfx', volume: 0.6 },
-  planetWindLoop: { id: 'planetWindLoop', url: audioUrl('audio/ambience/planet-wind-loop.mp3'), group: 'ambience', volume: 0.28, loop: true },
 };
 
 export type AudioEventId =

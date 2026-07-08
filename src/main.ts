@@ -2930,7 +2930,6 @@ async function boot(): Promise<void> {
     toggleMute: () => {
       const muted = audio.toggleMuted();
       hud.flash(muted ? 'sound muted' : 'sound on', 1.8);
-      if (!muted && audio.state().unlocked) audio.startAmbience();
       return audio.state();
     },
     triggerCharacterAction: (action: CharacterAction, held: CharacterPropId = 'hands', duration = 0.6) => triggerCharacterAction(action, held, duration),
@@ -3587,7 +3586,6 @@ async function boot(): Promise<void> {
     if (nPressed || (gp.mute && !gpPanelConsumed)) {
       const muted = audio.toggleMuted();
       hud.flash(muted ? 'sound muted' : 'sound on', 1.8);
-      if (!muted && audio.state().unlocked) audio.startAmbience();
     }
     if (f3Pressed || (gp.diag && !gpPanelConsumed)) showDiag = !showDiag;
     if (hPressed || (gp.help && !gpPanelConsumed)) hud.toggleHelp();

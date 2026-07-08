@@ -128,12 +128,11 @@ describe('Hearth and Horizon audio events', () => {
     })));
 
     const assets = {
-      planetWindLoop: {
-        id: 'planetWindLoop',
-        url: '/audio/ambience/planet-wind-loop.mp3',
-        group: 'ambience',
-        volume: 0.28,
-        loop: true,
+      gatherSoft: {
+        id: 'gatherSoft',
+        url: '/audio/sfx/gather-soft.mp3',
+        group: 'sfx',
+        volume: 0.42,
       },
     } as Record<AudioAssetId, AudioAssetDef>;
     const audio = new GameAudio(assets, () => new FakeAudioContext() as unknown as AudioContext);
@@ -166,12 +165,11 @@ describe('Hearth and Horizon audio events', () => {
       arrayBuffer: async () => new ArrayBuffer(8),
     })));
     const assets = {
-      planetWindLoop: {
-        id: 'planetWindLoop',
-        url: audioUrl('audio/ambience/planet-wind-loop.mp3'),
-        group: 'ambience',
-        volume: 0.28,
-        loop: true,
+      gatherSoft: {
+        id: 'gatherSoft',
+        url: audioUrl('audio/sfx/gather-soft.mp3'),
+        group: 'sfx',
+        volume: 0.42,
       },
     } as Record<AudioAssetId, AudioAssetDef>;
     const audio = new GameAudio(assets, () => new FakeAudioContext() as unknown as AudioContext);
