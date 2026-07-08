@@ -3,17 +3,31 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 
 ## 2026-07-08
 
+- Implemented the K9.2 player-facing fishing cue/readback slice. `fishingCueForSchool`
+  now formats compact cast/setup cues without changing `fishSchoolAt` or catch math, and
+  main surfaces `currentFishingCue()` through vitals, F3, `__world.fishingCue()`, and
+  `render_game_to_text().inventory.food.fishingCue`. The normal use path now keeps
+  near-water no-rod and no-catch fishing messages from being overwritten by forage, while
+  dry-land no-water still falls through to forage; already-tended harmless native life no
+  longer consumes the generic `R`/use fallback before fishing. Added
+  `npm run proof:k9-fishing-cues`, which proves a live shore fish cue, synthetic gamepad
+  use input through `useStructure -> tryFish`, HUD toast, inventory/`lastAction` deltas,
+  a no-rod setup denial, committed `fish-shore-minnow.glb` provenance, zero generated-path
+  requests, and screenshots under `output/playwright/k9-fishing-cues/`. Validation passed:
+  `npx vitest run test\fishing.test.ts`, `npm run typecheck`, `npm run
+  proof:k9-fishing-cues` with shared Playwright `NODE_PATH`, `npm run build`, and a generic
+  develop-web-game smoke run under `output/web-game/k9-fishing-cues-smoke/`. Remaining K9
+  work is richer trap/net/cast verbs and beauty-grade fishing framing, not basic cue
+  visibility.
 - Night closeout is now documented as a cycle-completion handoff instead of a new feature
   expansion. Two parallel read-only lanes converged on the same K9 conclusion: fish bodies,
-  live route reachability, near-only school flow, and provenance are proven, but the next
-  honest runtime slice is player-facing fishing cues and readback, not more beauty claims or
-  new asset generation. The next K9.2 implementation should add a compact `R cast` cue from
-  the existing `currentFishSchool()` result, expose it through HUD/readback and
-  `__world`/`render_game_to_text`, and add a focused `proof:k9-fishing-cues` lane that uses
-  real input and HUD toast/text evidence. Existing live-route screenshots remain
-  state/provenance proof, not final art-review shots. C6, G5/K6R, and H5 stay active with
-  their current remaining gates; the goal is not complete, but tonight's in-flight insight
-  work is closed and ready for compaction.
+  live route reachability, near-only school flow, and provenance were proven, but the next
+  honest runtime slice was player-facing fishing cues and readback, not more beauty claims or
+  new asset generation. That K9.2 slice is now implemented through compact cast/setup cues,
+  HUD/readback/`__world` exposure, and `proof:k9-fishing-cues`. Existing live-route
+  screenshots remain state/provenance proof, not final art-review shots. C6, G5/K6R, and H5
+  stay active with their current remaining gates; the goal is not complete, but tonight's
+  in-flight insight work is closed and ready for compaction.
 - Closed the night with a first G0/G5 native-life reaction-readability slice on top of the
   sparse K6R roaming actors. `NativeLifeRenderer` now maps existing transient states into
   explicit pose roles (`curious-focus`, `flee-retreat`, `telegraph-windup`,
@@ -39,8 +53,9 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   accepted aquatic GLBs. `npm run proof:k9-fish-visuals` and `npm run
   proof:k9-live-fish-routes` pass with focus screenshots and committed model requests; the
   visual/provenance focus crops are proof-grade for waterline streaks, while live-route
-  screenshots remain state/provenance evidence rather than beauty-grade fish shots. Remaining
-  K9 work is player-facing fishing cues, richer fishing verbs, and cleaner beauty framing.
+  screenshots remain state/provenance evidence rather than beauty-grade fish shots. K9.2
+  later closed the first player-facing cue/readback pass; remaining K9 work is richer
+  fishing verbs and cleaner beauty framing.
 - C6 now has its first connected foundation-backed outer-perimeter proof. `shelterReport`
   keeps the legacy home-spoke single-room path unless at least two connected
   `floorFoundation` tiles extend the home footprint, then derives boundary edges from the
@@ -76,9 +91,9 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   now covers tree, creature, resource, landmark, skyfall, aquatic GLB visual/provenance,
   and asset-viewer orientation contracts, and the remaining GLB debt is specific: exact
   seed/drop art instead of the `node-root-pod` alias, shrine/crater semantic yaw review,
-  mesh/triangle warning decisions, aquatic fishing cues/beauty framing, broader blind
-  gameplay screenshot review, shared-scale house-shell skins, avatar/equipment authored assets,
-  future ore/resource nodes, and deeper native-life/combat behavior.
+  mesh/triangle warning decisions, aquatic beauty framing plus richer fishing verbs, broader
+  blind gameplay screenshot review, shared-scale house-shell skins, avatar/equipment authored
+  assets, future ore/resource nodes, and deeper native-life/combat behavior.
 - Closed the C6 functional serviced wall-shell room proof. `npm run proof:c6-wall-shells`
   now builds a bedroll-centered code-owned wall-shell room that reports protected shelter,
   functional home label, lived-in comfort tier, workbench/chest/campfire service readiness,

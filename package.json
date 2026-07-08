@@ -31,6 +31,7 @@
     "proof:cave-mouth-dressing": "node scripts/proof-cave-mouth-dressing.mjs",
     "proof:k9-fish-visuals": "node scripts/proof-k9-fish-visuals.mjs",
     "proof:k9-live-fish-routes": "node scripts/proof-k9-live-fish-routes.mjs",
+    "proof:k9-fishing-cues": "node scripts/proof-k9-fishing-cues.mjs",
     "proof:k11-sky-life": "node scripts/proof-k11-sky-life.mjs",
     "proof:k7-native-targeting": "node scripts/proof-k7-native-creature-targeting.mjs",
     "proof:d2-caves": "node scripts/proof-d2-threshold-spaces.mjs",

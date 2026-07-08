@@ -239,8 +239,11 @@ The asset-pack adoption track is done when:
   and keep fallback, console errors, and page errors at zero. `npm run proof:k9-live-fish-routes`
   then proves the same five slugs through live `currentFishSchool()` and
   `currentFishVisualSite()` state: baited shore, storm front, real sea cave, salt-tide run,
-  and reed-water run. The K9.1 screenshots are proof-grade for waterline streaks; richer
-  player-facing fishing cues and beauty-grade framing remain.
+  and reed-water run. `npm run proof:k9-fishing-cues` then closes the first player-facing
+  cue/readback pass with compact cast/setup prompts, HUD/text readback, live use input,
+  inventory/`lastAction` deltas, no-rod denial, committed-model provenance, and screenshots.
+  The K9.1 screenshots are proof-grade for waterline streaks; richer trap/net/cast verbs and
+  beauty-grade fishing framing remain.
 - K11 sky life is runtime-wired for `bird-sky-kite`, `bird-shore-gull`,
   `bird-forest-flutter`, and `bird-storm-finch`. `KilnRuntimeAssets` preserves authored
   Y-up, normalizes each singleton body into a sky-life socket, requires `idle` plus
@@ -492,25 +495,23 @@ prove the repeated static-family, utility/waterline skin, first animated-family,
 targetability, sparse creature-roaming, aquatic singleton, sky-life singleton, and
 code-owned house-shell socket paths. Continue with broader room-shape polish, richer
 G5/K6R creature behavior, future ore/resource expansion, shared-scale house-shell skin
-decisions, K9.2 fishing cue/readback polish, and the avatar/equipment authored-asset path.
-The night-closeout decision is to avoid new fish generation or beauty claims until the
-existing fishing loop tells the player what to do through HUD/readback and a focused
-interaction proof.
+decisions, richer fishing verbs/beauty framing after the closed K9.2 cue slice, and the
+avatar/equipment authored-asset path. The night-closeout decision is to avoid new fish
+generation or beauty claims now that the existing fishing loop tells the player what to do
+through HUD/readback and a focused interaction proof.
 
 ## End-Of-Night Remaining Atomic Tasks
 
 1. Run a blind gameplay-context screenshot review of the current spawn, shoreline, forest,
    creature, shrine, and build-site scenes so each visible GLB reads as its intended noun and
    verb without the asset viewer labels.
-2. Implement **K9.2 fishing cues and readback** now that live reachability and a first
-   near-only swim-path proof are in. Add a compact cue from the existing
-   `currentFishSchool()` result, for example `R cast: storm fish run +2 raw fish bait
-   helps`; expose it through HUD/readback, `__world`, and `render_game_to_text`; and add a
-   separate `proof:k9-fishing-cues` lane that presses real use/cast input, checks HUD toast
-   text, validates `lastAction` plus inventory deltas or failure reasons, and keeps model
-   provenance/fallback checks as supporting evidence. Make casts/traps/nets point players
-   toward visible schools before capturing cleaner beauty-grade fishing shots. The current
-   K9 live-route screenshots are state/provenance proof, not final art-review framing.
+2. Extend fishing beyond the closed **K9.2 first cue/readback** slice. The current build now
+   has compact `currentFishSchool()` cast/setup cues in HUD/readback, `__world`, and
+   `render_game_to_text`, with `proof:k9-fishing-cues` covering live use input, HUD toast,
+   `lastAction`, inventory deltas, no-rod setup denial, and model provenance. Next K9 work
+   should make casts, traps, and nets point players toward visible schools, add richer
+   verb-specific outcomes, and capture cleaner beauty-grade fishing shots. The current K9
+   live-route screenshots are state/provenance proof, not final art-review framing.
 3. Replace the temporary `node-root-pod` seed pickup alias with an exact seed/drop GLB or a
    clearer approved alias before native-life seed rewards become player-facing.
 4. Add the K7 semantic orientation pass: shrine upright/facing math already uses authored

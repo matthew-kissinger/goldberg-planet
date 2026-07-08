@@ -172,11 +172,15 @@ you to clear their state first.
 With a fishing rod, `R` casts from shore when no nearby prop is in reach, or from a nearby
 dock segment for stronger dockside runs. Fish schools now move with tile, time, weather,
 docks, and cave water: quiet water can be baited, storms create stronger runs, docks steady
-local catches, and sea caves can produce richer catches. Sea-cave fishing now has native
-risk too: Tide Lurkers hide around actual sea-cave mouths, a successful cave cast can stir
-one into a stamina/exposure surge, and lanterns, an echo lantern, a Stone Blade,
-hatchet/axe, or whistling arrow can startle it once so raw-fish pickups scatter onto the
-ground. Fish traps and shore nets turn those same shore,
+local catches, and sea caves can produce richer catches. The vitals line now previews the
+current cast as a compact cue such as `R cast: baited shore nibble · +2 raw fish · bait
+ready`, with matching `B cast`/touch labels and `render_game_to_text` readback for proof.
+If you stand at fishable water without a rod, the setup cue stays on the fishing action
+instead of falling through to unrelated forage. Sea-cave fishing now has native risk too:
+Tide Lurkers hide around actual sea-cave mouths, a successful cave cast can stir one into a
+stamina/exposure surge, and lanterns, an echo lantern, a Stone Blade, hatchet/axe, or
+whistling arrow can startle it once so raw-fish pickups scatter onto the ground. Fish traps
+and shore nets turn those same shore,
 dock, storm, and sea-cave readings into a return-later camp chore with Route Slate, Hearth
 Journal, F3, `__world.structures()`, and `render_game_to_text` readbacks. When fishing is not available, `R`
 can forage the land itself: berry patches on mild ground, snow herbs on cold ridges, kelp
@@ -501,7 +505,7 @@ water, or a cliff stows it; E brings it back mid-fall.
 - GitHub Pages deploys from the `main` branch workflow in `.github/workflows/deploy.yml`.
   The app is static: no server secrets, runtime API keys, or backend configuration are expected.
 
-Test suite: 279 tests — icosahedron invariants; 10m²+2 counts with exactly 12 pentagons;
+Test suite coverage includes icosahedron invariants; 10m²+2 counts with exactly 12 pentagons;
 neighbor symmetry; CCW winding and bit-identical shared corners; id round-trips; seam
 agreement; `tileOf` vs brute force; layer-grid inverses; terrain determinism and
 ocean/land/mountain balance; column edit semantics incl. tunnels and immutable bedrock;

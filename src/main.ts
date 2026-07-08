@@ -84,7 +84,7 @@ import {
 } from './sim/nativeLife';
 import { buildInventoryLedger, packBurdenForInventory, packCapacityBonusForInventory } from './sim/inventoryLedger';
 import { cavePressureAt } from './sim/cavePressure';
-import { applyFishingCatch, fishSchoolAt, type FishSchoolReport } from './sim/fishing';
+import { applyFishingCatch, fishingCueForSchool, fishSchoolAt, type FishSchoolReport } from './sim/fishing';
 import { applyForage, forageAt } from './sim/forage';
 import { skyLifeSitesAround, type SkyLifeCandidate, type SkyLifeSite } from './sim/skyLife';
 import { caveResourceAt } from './sim/caveResources';
@@ -3098,6 +3098,24 @@ async function boot(): Promise<void> {
     refreshUseButton();
   };
 
+  const setDebugItemCount = (item: unknown, amount: unknown) => {
+    if (typeof item !== 'string' || !(item in ITEM_DEFS)) return { ok: false, reason: 'unknown item', item };
+    const id = item as ItemId;
+    const next = Math.max(0, Math.trunc(Number.isFinite(amount) ? Number(amount) : 0));
+    const materialSlot = SLOTS.findIndex((slot) => slot.name === id);
+    if (materialSlot >= 0) {
+      counts[materialSlot] = next;
+    } else if (next > 0) {
+      craftedItems[id] = next;
+    } else {
+      delete craftedItems[id];
+    }
+    refreshCraftingHud();
+    refreshUseButton();
+    markSaveDirty();
+    return { ok: true, item: id, count: itemCount(counts, craftedItems, id) };
+  };
+
   const tryDomainResource = (): boolean => {
     const site = nearbyDomainResource();
     if (!site) return false;
@@ -3352,7 +3370,7 @@ async function boot(): Promise<void> {
     return true;
   };
 
-  const tryNativeCreature = (site: NativeCreatureSite | null = nearbyNativeCreature()): boolean => {
+  const tryNativeCreature = (site: NativeCreatureSite | null = nearbyNativeCreature(), consumeRepeat = true): boolean => {
     if (!site) return false;
     if (player.mode === 'plane') {
       lastNativeLifeAction = 'native life:in plane';
@@ -3371,6 +3389,7 @@ async function boot(): Promise<void> {
     const result = tendNativeCreature(tendedNativeCreatures, site);
     lastNativeLifeAction = result.message;
     if (!result.ok) {
+      if (!consumeRepeat) return false;
       triggerCharacterAction('interact', tendProp, 0.55);
       playAudio('uiConfirm');
       hud.flash(result.message, 2.8);
@@ -3723,6 +3742,45 @@ async function boot(): Promise<void> {
       id: waterTile * 17 + timeState.day * 131 + Math.trunc(timeState.minute / 30),
       tile: waterTile,
       school,
+    };
+  };
+
+  const fishingCastLabel = (): string => {
+    if (currentUxProfile.inputMode === 'gamepad' || currentUxProfile.inputMode === 'hybrid') return 'B cast';
+    if (touch.enabled) return 'use cast';
+    return 'R cast';
+  };
+
+  const currentFishingCue = () => {
+    const nearWater = nearFishingWater();
+    const dock = nearDock();
+    const school = currentFishSchool();
+    const cue = fishingCueForSchool(school, {
+      hasRod: itemCount(counts, craftedItems, 'fishingRod') > 0,
+      nearWater,
+      nearDock: dock,
+      inPlane: player.mode === 'plane',
+      castLabel: fishingCastLabel(),
+    });
+    const renderer = fishSchoolRenderer.stats();
+    const visibleSchool = renderer.active > 0
+      && renderer.fallbackVisible === 0
+      && (renderer.glbAnchorsVisible > 0 || renderer.pointSchoolSprites > 0);
+    return {
+      ...cue,
+      nearWater,
+      nearDock: dock,
+      hasRod: itemCount(counts, craftedItems, 'fishingRod') > 0,
+      inputLabel: fishingCastLabel(),
+      visual: {
+        slug: renderer.slug,
+        visibleSchool,
+        anchors: renderer.glbAnchorsVisible,
+        points: renderer.pointSchoolSprites,
+        nearBoids: renderer.nearBoidSprites,
+        swimPathBeads: renderer.swimPathBeads,
+        motionBand: renderer.motionBand,
+      },
     };
   };
 
@@ -5091,20 +5149,23 @@ async function boot(): Promise<void> {
 
   const tryFish = (force = false): boolean => {
     if (player.mode === 'plane' && !force) {
+      const cue = currentFishingCue();
       playAudio(audioEventForFoodAction('fish', false));
-      hud.flash('land before fishing', 2);
+      hud.flash(cue.detail.replace(/\.$/, ''), 2);
       lastFoodAction = 'fish:in plane';
-      return false;
+      return true;
     }
     if (!force && itemCount(counts, craftedItems, 'fishingRod') <= 0) {
+      const cue = currentFishingCue();
       playAudio(audioEventForFoodAction('fish', false));
-      hud.flash('no nearby prop · craft a fishing rod to cast from shore', 3);
+      hud.flash(cue.detail.replace(/\.$/, ''), 3);
       lastFoodAction = 'fish:no rod';
-      return false;
+      return cue.showInVitals;
     }
     if (!force && !nearFishingWater()) {
+      const cue = currentFishingCue();
       playAudio(audioEventForFoodAction('fish', false));
-      hud.flash('fishing needs water beside you', 2.5);
+      hud.flash(cue.detail.replace(/\.$/, ''), 2.5);
       lastFoodAction = 'fish:no water';
       return false;
     }
@@ -5119,13 +5180,14 @@ async function boot(): Promise<void> {
       return true;
     }
     const school = currentFishSchool();
+    const cue = currentFishingCue();
     const result = applyFishingCatch(craftedItems, school);
     lastFoodAction = `fish:${school.kind}:${result.message}`;
     if (!result.ok) {
       triggerCharacterAction('fish', 'fishingRod', 0.6);
       playAudio(audioEventForFoodAction('fish', false));
-      hud.flash(result.message, 2.5);
-      return false;
+      hud.flash(cue.detail.replace(/\.$/, ''), 2.5);
+      return true;
     }
     triggerCharacterAction('fish', 'fishingRod', 0.95);
     playAudio(audioEventForFoodAction('fish', true));
@@ -5310,7 +5372,7 @@ async function boot(): Promise<void> {
         if (trySkyfall()) return true;
         if (tryMurmur()) return true;
         if (trySeasonAfterglow()) return true;
-        if (tryNativeCreature()) return true;
+        if (tryNativeCreature(undefined, false)) return true;
         if (tryRangedNativeWard()) return true;
         if (tryThresholdChamber()) return true;
         if (useLandmark()) return true;
@@ -5480,7 +5542,7 @@ async function boot(): Promise<void> {
       craftedItems: { ...craftedItems },
       inventory: packLedger(),
       tools: { ...toolSummary(craftedItems, toolWear), wear: { ...toolWear }, lastAction: lastToolAction, reach: playerReach() },
-      food: { ...foodCounts(), lastAction: lastFoodAction, nearWater: nearFishingWater(), nearDock: nearDock(), school: currentFishSchool(), fishVisuals: fishSchoolRenderer.stats(), forage: currentForage(), crops: cropDiagnostics(), fishTraps: fishTrapDiagnostics(), shoreNets: shoreNetDiagnostics() },
+      food: { ...foodCounts(), lastAction: lastFoodAction, nearWater: nearFishingWater(), nearDock: nearDock(), school: currentFishSchool(), fishingCue: currentFishingCue(), fishVisuals: fishSchoolRenderer.stats(), forage: currentForage(), crops: cropDiagnostics(), fishTraps: fishTrapDiagnostics(), shoreNets: shoreNetDiagnostics() },
       skyLife: { sites: currentSkyLifeSites(), renderer: skyLifeRenderer.stats() },
       audio: audio.state(),
       controls: { ux: uxManager.snapshot(), gamepad: gamepad.snapshot(), touch: touch.enabled, inputActive: input.active(), aimActive: input.active() || gamepad.active(), panels: currentPanelOwnership() },
@@ -5667,9 +5729,11 @@ async function boot(): Promise<void> {
       markSaveDirty();
       return { ...timeState };
     },
+    debugSetItem: setDebugItemCount,
     eat: () => tryEatPackedFood(),
     fish: (force = false) => tryFish(force),
     fishSchool: () => currentFishSchool(),
+    fishingCue: () => currentFishingCue(),
     fishVisuals: () => ({ site: currentFishVisualSite(), renderer: fishSchoolRenderer.stats() }),
     debugSetFishVisualScenario,
     debugSetLiveFishScenario,
@@ -6213,7 +6277,7 @@ async function boot(): Promise<void> {
       crafted: { ...craftedItems },
       ledger: packLedger(),
       tools: { ...toolSummary(craftedItems, toolWear), wear: { ...toolWear }, lastAction: lastToolAction, reach: playerReach() },
-      food: { ...foodCounts(), lastAction: lastFoodAction, nearWater: nearFishingWater(), nearDock: nearDock(), school: currentFishSchool(), fishVisuals: fishSchoolRenderer.stats(), forage: currentForage(), crops: cropDiagnostics(), fishTraps: fishTrapDiagnostics(), shoreNets: shoreNetDiagnostics() },
+      food: { ...foodCounts(), lastAction: lastFoodAction, nearWater: nearFishingWater(), nearDock: nearDock(), school: currentFishSchool(), fishingCue: currentFishingCue(), fishVisuals: fishSchoolRenderer.stats(), forage: currentForage(), crops: cropDiagnostics(), fishTraps: fishTrapDiagnostics(), shoreNets: shoreNetDiagnostics() },
       survival: { ...survivalSnapshot(), time: { ...timeState }, pack: packBurden(), lastAction: lastSurvivalAction },
       audio: audio.state(),
       controls: { ux: uxManager.snapshot(), gamepad: gamepad.snapshot(), touch: touch.enabled, panels: currentPanelOwnership() },
@@ -6870,7 +6934,8 @@ async function boot(): Promise<void> {
       const netReady = netStats.filter((net) => net.ready).length;
       const landmarkProgress = progressionState();
       const landmarkNearby = nearbyLandmarkTile() !== null;
-      hud.setVitals(`${metrics.fpsEma.toFixed(0)} fps${metrics.active() ? ` · ● ${metrics.active()}` : ''} · ${survival.status} ${survival.stamina}/${survival.exposure}${!creativeActive && burden.status !== 'light' ? ` · ${burden.label}` : ''}${structures.length > 0 ? ` · ${home.label}` : ''}${foodTotal > 0 ? ` · food ${foodTotal}` : ''}${domain ? ` · ${domain.domainLabel}` : ''}${landmarkProgress.count > 0 || landmarkNearby ? ` · ${landmarkProgress.label}` : ''}`);
+      const fishingCueNow = currentFishingCue();
+      hud.setVitals(`${metrics.fpsEma.toFixed(0)} fps${metrics.active() ? ` · ● ${metrics.active()}` : ''} · ${survival.status} ${survival.stamina}/${survival.exposure}${!creativeActive && burden.status !== 'light' ? ` · ${burden.label}` : ''}${structures.length > 0 ? ` · ${home.label}` : ''}${foodTotal > 0 ? ` · food ${foodTotal}` : ''}${domain ? ` · ${domain.domainLabel}` : ''}${landmarkProgress.count > 0 || landmarkNearby ? ` · ${landmarkProgress.label}` : ''}${fishingCueNow.showInVitals ? ` · ${fishingCueNow.hud}` : ''}`);
       if (showDiag) {
         const s = streamer.stats();
         const propStats = structureRenderer.stats();
@@ -6890,6 +6955,7 @@ async function boot(): Promise<void> {
         const gamepadState = gamepad.snapshot();
         const audioState = audio.state();
         const tools = toolSummary(craftedItems, toolWear);
+        const fishSchoolStats = currentFishSchool();
         const modeLabel = autopilot.active ? 'autopilot'
           : player.mode === 'plane' ? 'plane'
           : player.submerged > 0.4 ? 'swim'
@@ -6909,7 +6975,7 @@ async function boot(): Promise<void> {
           `audio ${audioState.muted ? 'muted' : audioState.unlocked ? 'on' : 'locked'} · loaded ${audioState.loaded.length} · music ${audioState.musicStarted ? audioState.musicPlaying ? 'playing' : audioState.musicQueued ? 'waiting' : 'paused' : 'idle'}${audioState.musicTrack ? ` ${audioState.musicTrack}` : ''} · last ${audioState.lastEvent ?? 'none'}${audioState.errors.length ? ` · errors ${audioState.errors.length}` : ''}`,
           `structures ${structures.length} · prop meshes ${propStats.meshes} · route marker roles ${propStats.routeReadabilityRoles}/${propStats.routeSilhouettes} · ${home.label}${cisternWater > 0 ? ` · cistern water ${cisternWater}` : ''}${cellarProvisions > 0 ? ` · cellar provisions ${cellarProvisions}` : ''}`,
           `food bait ${food.bait} · seeds ${food.seeds} · compost ${food.compost} · berries ${food.berries} · mushroom/herb/kelp/reeds ${food.caveMushroom}/${food.snowHerb}/${food.kelp}/${food.reeds} · raw/cooked fish ${food.rawFish}/${food.cookedFish} · traps ${trapReady}/${trapStats.length} ready · nets ${netReady}/${netStats.length} ready · meals/rations/stews ${food.campMeal}/${food.trailRation}/${food.expeditionStew} · cellar ${food.cellarProvisions}`,
-          `fish ${currentFishSchool().label} · strength ${currentFishSchool().strength.toFixed(2)} · catch ${currentFishSchool().catchCount} · visual ${fishVisualStats.slug ?? 'none'} anchors ${fishVisualStats.glbAnchorsVisible}/${fishVisualStats.glbAnchors} pts ${fishVisualStats.pointSchoolSprites} path ${fishVisualStats.swimPathBeads}`,
+          `fish ${fishSchoolStats.label} · strength ${fishSchoolStats.strength.toFixed(2)} · catch ${fishSchoolStats.catchCount} · cue ${fishingCueNow.hud} · visual ${fishVisualStats.slug ?? 'none'} anchors ${fishVisualStats.glbAnchorsVisible}/${fishVisualStats.glbAnchors} pts ${fishVisualStats.pointSchoolSprites} path ${fishVisualStats.swimPathBeads}`,
           `sky life ${skyLifeStats.kinds.join(',') || 'none'} · birds ${skyLifeStats.glbBirdsVisible}/${skyLifeStats.glbBirds} pts ${skyLifeStats.pointFlockSprites} · loaded ${skyLifeStats.kilnBirdSkinsLoaded} fallback ${skyLifeStats.fallbackVisible}`,
           `forage ${currentForage().label} · strength ${currentForage().strength.toFixed(2)}`,
           `cave pressure ${currentCavePressure().label} · light ${currentCavePressure().light} · exposure ${currentCavePressure().exposureRate.toFixed(2)}${currentCavePressure().focus?.active ? ` · focus ${currentCavePressure().focus?.minutes}m` : ''}`,

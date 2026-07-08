@@ -39,6 +39,30 @@ export interface FishCatchResult {
   message: string;
 }
 
+export type FishingCueAction = 'land' | 'craftRod' | 'moveToWater' | 'cast' | 'wait';
+
+export interface FishingCueOptions {
+  hasRod: boolean;
+  nearWater: boolean;
+  nearDock?: boolean;
+  inPlane?: boolean;
+  castLabel?: string;
+}
+
+export interface FishingCueReport {
+  action: FishingCueAction;
+  canCast: boolean;
+  showInVitals: boolean;
+  schoolKind: FishSchoolKind;
+  schoolLabel: string;
+  catchCount: number;
+  usesBait: boolean;
+  baitUseful: boolean;
+  hud: string;
+  detail: string;
+  failureReason?: string;
+}
+
 function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
@@ -211,5 +235,74 @@ export function applyFishingCatch(items: InventoryItems, school: FishSchoolRepor
     usedBait,
     school,
     message: `caught raw fish ${school.catchCount} · ${school.label}${usedBait ? ' · bait used' : ''}`,
+  };
+}
+
+export function fishingCueForSchool(school: FishSchoolReport, opts: FishingCueOptions): FishingCueReport {
+  const castLabel = opts.castLabel ?? 'R cast';
+  const nearFishingWater = opts.nearWater || opts.nearDock === true || school.kind === 'cave';
+  const base = {
+    schoolKind: school.kind,
+    schoolLabel: school.label,
+    catchCount: school.catchCount,
+    usesBait: school.usesBait,
+    baitUseful: school.baitUseful,
+  };
+
+  if (opts.inPlane) {
+    return {
+      ...base,
+      action: 'land',
+      canCast: false,
+      showInVitals: false,
+      hud: 'land to fish',
+      detail: 'Land before fishing.',
+      failureReason: 'in plane',
+    };
+  }
+
+  if (!opts.hasRod) {
+    return {
+      ...base,
+      action: 'craftRod',
+      canCast: false,
+      showInVitals: nearFishingWater,
+      hud: 'craft fishing rod to cast',
+      detail: 'Craft fishing rod to cast here.',
+      failureReason: 'no rod',
+    };
+  }
+
+  if (!nearFishingWater) {
+    return {
+      ...base,
+      action: 'moveToWater',
+      canCast: false,
+      showInVitals: false,
+      hud: 'find shore water to fish',
+      detail: 'Fishing needs water beside you.',
+      failureReason: 'no water',
+    };
+  }
+
+  if (school.catchCount <= 0) {
+    return {
+      ...base,
+      action: 'wait',
+      canCast: true,
+      showInVitals: true,
+      hud: `${castLabel}: ${school.label}${school.baitUseful ? ' · bait may help' : ''}`,
+      detail: `${castLabel}: ${school.label}${school.baitUseful ? ' · bait may help' : ''}.`,
+    };
+  }
+
+  const bait = school.usesBait ? ' · bait ready' : school.baitUseful ? ' · bait helps' : '';
+  return {
+    ...base,
+    action: 'cast',
+    canCast: true,
+    showInVitals: true,
+    hud: `${castLabel}: ${school.label} · +${school.catchCount} raw fish${bait}`,
+    detail: `${castLabel}: ${school.label} · +${school.catchCount} raw fish${bait}.`,
   };
 }

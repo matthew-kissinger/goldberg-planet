@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyFishingCatch, fishSchoolAt } from '../src/sim/fishing';
+import { applyFishingCatch, fishingCueForSchool, fishSchoolAt } from '../src/sim/fishing';
 import type { InventoryItems } from '../src/sim/crafting';
 
 describe('Hearth and Horizon fishing ecology', () => {
@@ -119,6 +119,49 @@ describe('Hearth and Horizon fishing ecology', () => {
       label: 'tide underpass run fish run',
       catchCount: 2,
       baitUseful: true,
+    });
+  });
+
+  it('formats compact player-facing fishing cues without changing catch math', () => {
+    const storm = fishSchoolAt({
+      tile: 8,
+      day: 1,
+      minute: 7 * 60,
+      nearWater: true,
+      bait: 1,
+      weatherKind: 'storm',
+      caveKind: null,
+    });
+    const quiet = fishSchoolAt({
+      tile: 0,
+      day: 0,
+      minute: 18 * 60,
+      nearWater: true,
+      bait: 0,
+      weatherKind: 'clear',
+      caveKind: null,
+    });
+
+    expect(fishingCueForSchool(storm, { hasRod: true, nearWater: true, castLabel: 'B cast' })).toMatchObject({
+      action: 'cast',
+      canCast: true,
+      showInVitals: true,
+      hud: 'B cast: storm fish run · +3 raw fish · bait ready',
+      catchCount: 3,
+      usesBait: true,
+    });
+    expect(fishingCueForSchool(quiet, { hasRod: true, nearWater: true })).toMatchObject({
+      action: 'wait',
+      canCast: true,
+      hud: 'R cast: quiet water · bait may help',
+      catchCount: 0,
+    });
+    expect(fishingCueForSchool(quiet, { hasRod: false, nearWater: true })).toMatchObject({
+      action: 'craftRod',
+      canCast: false,
+      showInVitals: true,
+      hud: 'craft fishing rod to cast',
+      failureReason: 'no rod',
     });
   });
 });
