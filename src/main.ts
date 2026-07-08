@@ -455,7 +455,17 @@ async function boot(): Promise<void> {
   const hud = new Hud();
   const audio = new GameAudio();
   if (params.get('mute') === '1') audio.setMuted(true);
-  const unlockAudio = (): void => { void audio.unlock(); };
+  // Only needs to fire once (first gesture satisfies the browser's audio-unlock
+  // requirement) — leaving these bound would call audio.unlock() -> resumeMusic() on
+  // every mine/build click for the rest of the session, repeatedly resetting the
+  // soundtrack's between-track gap timer and starving it of a chance to ever fire.
+  const unlockAudio = (): void => {
+    void audio.unlock().then((ok) => {
+      if (!ok) return;
+      window.removeEventListener('pointerdown', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    });
+  };
   window.addEventListener('pointerdown', unlockAudio, { passive: true });
   window.addEventListener('keydown', unlockAudio);
   const playAudio = (id: AudioEventId): void => { audio.playEvent(id); };

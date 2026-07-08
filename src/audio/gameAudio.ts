@@ -239,7 +239,11 @@ export class GameAudio {
 
   private scheduleNextMusic(): void {
     if (!this.musicStarted || !this.musicEl) return;
-    if (this.musicGapTimer) clearTimeout(this.musicGapTimer);
+    // Idempotent: a redundant call while a gap is already queued (e.g. resumeMusic()
+    // re-triggered by an unrelated unlock/mute/visibility event) must not reset the
+    // wait or skip a track — only the timer firing (or a genuine pause/resume cycle,
+    // which clears musicGapTimer first) should advance musicPos.
+    if (this.musicGapTimer) return;
     this.musicPos += 1;
     if (this.musicPos >= this.musicOrder.length) {
       this.musicOrder = this.shuffledTrackOrder();

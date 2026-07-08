@@ -153,6 +153,65 @@ describe('Hearth and Horizon audio events', () => {
     expect(audio.state().musicPlaying).toBe(false);
   });
 
+  it('does not stall the between-track gap when something re-triggers resumeMusic mid-gap', async () => {
+    // Regression: main.ts's click/keydown "unlock audio" listeners used to stay bound
+    // for the whole session, so every mine/build click called resumeMusic() again.
+    // While a track was playing that was harmless, but once it ended and the soundtrack
+    // entered its deliberate silence gap, each of those clicks reset the gap timer and
+    // advanced past a track without ever playing it — so the game fell silent after the
+    // first track and never recovered, no matter how long you waited.
+    vi.useFakeTimers();
+    try {
+      const audioEl = new FakeAudioElement();
+      (globalThis as { Audio?: unknown }).Audio = class {
+        constructor() {
+          return audioEl;
+        }
+      };
+      vi.stubGlobal('fetch', vi.fn(async () => ({
+        ok: true,
+        arrayBuffer: async () => new ArrayBuffer(8),
+      })));
+      const assets = {
+        gatherSoft: {
+          id: 'gatherSoft',
+          url: '/audio/sfx/gather-soft.mp3',
+          group: 'sfx',
+          volume: 0.42,
+        },
+      } as Record<AudioAssetId, AudioAssetDef>;
+      const audio = new GameAudio(assets, () => new FakeAudioContext() as unknown as AudioContext);
+
+      await audio.unlock();
+      expect(audio.state().musicPlaying).toBe(true);
+
+      // Track 1 ends -> the soundtrack's built-in silence gap begins (28-75s). Real
+      // HTMLMediaElement sets ended/paused before firing 'ended'; mirror that here.
+      audioEl.ended = true;
+      audioEl.paused = true;
+      audioEl.dispatch('ended');
+      expect(audio.state().musicQueued).toBe(true);
+      expect(audio.state().musicPlaying).toBe(false);
+
+      // Simulate ~10 minutes of constant player clicks (every 20s, well under even the
+      // minimum 28s gap) each re-invoking resumeMusic(), exactly like the old unlock
+      // listener firing on every pointerdown during normal mining/building.
+      for (let i = 0; i < 30; i++) {
+        await vi.advanceTimersByTimeAsync(20_000);
+        audio.resumeMusic();
+      }
+
+      // The original gap (max 75s) had far more than enough undisturbed time to fire
+      // somewhere in that 600s window. If resumeMusic() were still resetting it on every
+      // call, it would still be silently queued right now.
+      expect(audio.state().musicQueued).toBe(false);
+      expect(audio.state().musicPlaying).toBe(true);
+      expect(audio.state().musicTrackId).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('surfaces streamed music media errors in diagnostics', async () => {
     const audioEl = new FakeAudioElement();
     (globalThis as { Audio?: unknown }).Audio = class {
@@ -246,6 +305,9 @@ class FakeAudioElement {
   }
 
   async play(): Promise<void> {
+    // Real HTMLMediaElement resets `ended` whenever a new `src` starts playing;
+    // mirror that so repeated play() calls after a track change behave correctly.
+    this.ended = false;
     this.paused = false;
   }
 
