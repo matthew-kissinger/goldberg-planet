@@ -4,14 +4,15 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 ## 2026-07-08
 
 - Night wrap insight for the next Hearth and Horizon continuation: do not claim true
-  multi-room housing yet. The current C6 proof is a functional serviced wall-shell room
-  around the home bedroll, and the current solver derives boundary edges as spokes from
-  that home tile to its one-ring boundary. The next safe C6 slice is either a full six-edge
-  wall-shell room/beauty proof using the existing `hubTopology`, or the real source change:
-  teach `shelterBoundaryEdges` to compute the outer perimeter of all intended room interior
-  tiles before treating connected foundation-backed rooms as multi-room shelter. Shared-scale
-  Kiln house-shell skins should wait until that perimeter contract and cleaner building
-  screenshots are proven.
+  multi-room housing yet. The current C6 proof is now a functional serviced wall-shell room
+  plus a full six-edge single-room perimeter proof around the home bedroll. The proof records
+  complete covered boundary edges, perimeter coverage `1`, browser screenshot pixels, and the
+  existing weaken/collision regressions, but the solver still derives boundary edges as
+  spokes from that home tile to its one-ring boundary. The next C6 source change is to teach
+  `shelterBoundaryEdges` to compute the outer perimeter of all intended room interior tiles
+  before treating connected foundation-backed rooms as multi-room shelter. Cleaner
+  beauty/readability screenshots and shared-scale Kiln house-shell skins should wait until
+  that perimeter contract and cleaner building screenshots are proven.
 - Expanded the K9 aquatic GLB proof from the single cave-shimmer path to all five accepted
   singleton bodies: `fish-shore-minnow`, `fish-storm-runner`, `fish-cave-shimmer`,
   `creature-driftjelly`, and `fish-reed-fry`. `debugSetFishVisualScenario` now builds
@@ -43,11 +44,12 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
 - Closed the C6 functional serviced wall-shell room proof. `npm run proof:c6-wall-shells`
   now builds a bedroll-centered code-owned wall-shell room that reports protected shelter,
   functional home label, lived-in comfort tier, workbench/chest/campfire service readiness,
-  and bedroll rest through the normal shelter sleep path, while retaining exact edge
-  coverage diagnostics, wall/window/corner blockers, passable door edges, real player
-  movement collision, stale collision clearing, and shelter weakening when a corner moves
-  out. Remaining C6 work is broader/multi-room shapes, cleaner beauty/readability captures,
-  and shared-scale house-shell skins.
+  and bedroll rest through the normal shelter sleep path, then extends the same harness to a
+  full six-edge single-room wall shell with all six boundary edges covered and perimeter
+  coverage `1`. It still retains exact edge coverage diagnostics, wall/window/corner blockers,
+  passable door edges, real player movement collision, stale collision clearing, and shelter
+  weakening when a corner moves out. Remaining C6 work is broader/multi-room outer-perimeter
+  solving, cleaner beauty/readability captures, and shared-scale house-shell skins.
 - Promoted, cataloged, and runtime-wired the exact K10 pickup/drop Kiln pack. The
   committed model set now includes 82 ready GLBs / 0 unused / 0 missing, including
   `drop-dirt-clod`, `drop-sand-pile`, `drop-snow-clump`, `drop-glow-crystal`,
@@ -166,9 +168,10 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   `StructureRenderer.stats()` expose socket keys plus same-tile edge-stack diagnostics.
   `npm run proof:c6-wall-shells` now proves a foundation with two wall edges on the same
   hex, rejects a duplicate wall-door edge, and still verifies shelter weakening when a wall
-  piece moves out. Later C6 work added first wall traversal collision; remaining C6 work is
-  edge-based shelter coverage, broader room shapes, and shared-scale decorative skins over
-  the code-owned wall shell.
+  piece moves out. Later C6 work added traversal collision, edge-based shelter coverage, a
+  functional serviced single-room shell, and a full six-edge single-room perimeter proof;
+  remaining C6 work is connected/multi-room outer-perimeter solving, beauty/readability
+  proof, and shared-scale Kiln skins over the code-owned wall shell.
 - Closed the second C6 wall/shell socket slice. `wallDoorPanel`, `wallWindowPanel`,
   `wallCorner`, and `roofJoin` are now craftable/placeable code-owned building pieces with
   socket specs, snap-preview silhouettes, renderer diagnostics, save coverage, build
@@ -176,9 +179,9 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   door/window panels as both openings and wall boundary contributors without double-counting
   the same tile, counts `wallCorner` as boundary, and counts `roofJoin` as roof coverage.
   `npm run proof:c6-wall-shells` originally placed a weather-safe but not-yet-functional
-  room; later C6 proof now upgrades this to a functional serviced wall-shell room while
-  still verifying foundation/rail/panel/join renderer diagnostics and weakening when a
-  corner moves out.
+  room; later C6 proof now upgrades this to a functional serviced wall-shell room and a full
+  six-edge single-room perimeter check while still verifying foundation/rail/panel/join
+  renderer diagnostics and weakening when a corner moves out.
 - Closed the first C6 wall/shell socket slice. `floorFoundation`, `wallPanel`, and
   `wallHalfRail` are now craftable/placeable code-owned building pieces with separate
   wall-shell socket specs, renderer silhouettes, avatar prop colors, and diagnostics.
@@ -187,9 +190,11 @@ Current operating goal: Hearth and Horizon full crafting-survival cycle under th
   but do not fake sealed walls. `npm run proof:c6-wall-shells` captures ready and weakened
   browser screenshots under `output/playwright/c6-wall-shells/`, proves the room is
   weather-safe at 0.75 wall coverage, then relocates one wall so the shelter drops to
-  `room boundary` missing. True edge-addressed sockets, corners, wall-with-door/window
-  panels, roof joins, multi-piece-per-tile building, and GLB skins for shared-scale house
-  shells remain future C6 work.
+  `room boundary` missing. Later C6 slices add true edge-addressed sockets, corners,
+  wall-with-door/window panels, roof joins, multi-piece-per-tile building, traversal
+  blockers, a functional serviced single-room shell, and a full six-edge single-room
+  perimeter proof. Connected/multi-room outer-perimeter solving and GLB skins for
+  shared-scale house shells remain future C6 work.
 - Promoted and wired the K11 singleton bird pack. `bird-sky-kite`, `bird-shore-gull`,
   `bird-forest-flutter`, and `bird-storm-finch` now live under committed
   `public/assets/kiln/models/`. After the cave-mouth correction, the manifest is rebuilt at

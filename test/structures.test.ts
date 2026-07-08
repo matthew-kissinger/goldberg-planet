@@ -1491,6 +1491,85 @@ describe('Hearth and Horizon structures', () => {
     expect(homeScore(structures, hubTopology)).toMatchObject({ functional: true, label: 'shelter alive' });
   });
 
+  it('proves a full six-edge wall-shell room without treating it as multi-room shelter', () => {
+    const structures: StructureSave[] = [
+      { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
+      { id: 2, item: 'roofJoin', tile: 100, layer: 2, yaw: STRUCTURE_YAW_STEP * 5 },
+      { id: 3, item: 'roofBundle', tile: 102, layer: 2, yaw: 0 },
+      { id: 4, item: 'wallDoorPanel', tile: 101, layer: 2, yaw: 0 },
+      { id: 5, item: 'wallPanel', tile: 102, layer: 2, yaw: 0 },
+      { id: 6, item: 'wallWindowPanel', tile: 103, layer: 2, yaw: 0 },
+      { id: 7, item: 'wallPanel', tile: 104, layer: 2, yaw: 0 },
+      { id: 8, item: 'wallCorner', tile: 105, layer: 2, yaw: 0 },
+      { id: 9, item: 'wallPanel', tile: 106, layer: 2, yaw: 0 },
+      { id: 10, item: 'campfire', tile: 104, layer: 2, yaw: 0, state: { lit: true } },
+      { id: 11, item: 'workbench', tile: 105, layer: 2, yaw: 0 },
+      { id: 12, item: 'chest', tile: 106, layer: 2, yaw: 0 },
+      { id: 13, item: 'floorFoundation', tile: 103, layer: 2, yaw: 0 },
+    ];
+
+    const occupancy = structures.flatMap((structure) => structureSocketOccupancy(structure).occupancyKeys);
+    expect(new Set(occupancy).size).toBe(occupancy.length);
+
+    const shelter = shelterReport(structures, hubTopology);
+    expect(shelter).toMatchObject({
+      centerTile: 100,
+      tiles: [100, 101, 102, 103, 104, 105, 106],
+      roofPieces: 2,
+      hasDoor: true,
+      hasWindow: true,
+      hasWarmth: true,
+      hasStation: true,
+      hasStorage: true,
+      protected: true,
+      functional: true,
+      comfort: 7,
+      label: 'shelter alive',
+      enclosure: {
+        roomTiles: [100, 101, 102, 103, 104, 105, 106],
+        boundaryTiles: [101, 102, 103, 104, 105, 106],
+        wallTiles: [101, 102, 103, 104, 105, 106],
+        railTiles: [],
+        cornerTiles: [105],
+        roofTiles: [100, 102],
+        roofJoinTiles: [100],
+        openingTiles: [101, 103],
+        utilityTiles: [104, 105, 106],
+        foundationTiles: [103],
+        boundaryCoverageMode: 'edge',
+        boundaryCoverage: 1,
+        boundaryCoverageNeed: 4,
+        boundaryEdgeCount: 6,
+        perimeterCoverage: 1,
+        utilityCoverage: 1,
+        doorOnBoundary: true,
+        warmthInside: true,
+        workbenchInside: true,
+        storageInside: true,
+        enclosed: true,
+        serviceReady: true,
+        comfortTier: 'lived-in',
+        label: 'lived-in shelter room',
+      },
+    });
+    expect(shelter.enclosure.boundaryEdges).toEqual([
+      '100:edge:0',
+      '100:edge:1',
+      '100:edge:2',
+      '100:edge:3',
+      '100:edge:4',
+      '100:edge:5',
+    ]);
+    expect(shelter.enclosure.coveredBoundaryEdges).toEqual(shelter.enclosure.boundaryEdges);
+    expect(shelter.enclosure.wallBoundaryEdges).toEqual(shelter.enclosure.boundaryEdges);
+    expect(shelter.enclosure.openingBoundaryEdges).toEqual(['100:edge:0', '100:edge:2']);
+    expect(shelter.enclosure.doorBoundaryEdges).toEqual(['100:edge:0']);
+    expect(shelter.enclosure.windowBoundaryEdges).toEqual(['100:edge:2']);
+    expect(shelter.enclosure.railBoundaryEdges).toEqual([]);
+    expect(shelter.missing).toEqual([]);
+    expect(homeScore(structures, hubTopology)).toMatchObject({ functional: true, label: 'shelter alive' });
+  });
+
   it('does not double-count an integrated door panel as two boundary tiles', () => {
     const structures: StructureSave[] = [
       { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },

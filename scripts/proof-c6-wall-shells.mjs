@@ -607,6 +607,90 @@ async function main() {
       throw new Error(`survival rest action did not record shelter sleep: ${JSON.stringify(readyRest.after)}`);
     }
 
+    const sixEdge = await page.evaluate((input) => {
+      const world = window.__world;
+      const restoreSave = world.save.export();
+      const failures = [];
+      const placeAndFace = (item, tile, yaw) => {
+        const beforeIds = new Set(world.structures().items.map((entry) => entry.id));
+        if (!world.placeStructure(item, tile)) {
+          failures.push({ item, tile, yaw, phase: 'place', action: world.structures().lastAction, commands: world.buildCommands?.() });
+          return null;
+        }
+        const placed = world.structures().items.find((entry) => !beforeIds.has(entry.id)) ?? null;
+        if (!placed) {
+          failures.push({ item, tile, yaw, phase: 'find', action: world.structures().lastAction, commands: world.buildCommands?.() });
+          return null;
+        }
+        if (!world.relocateStructure(placed.id, tile, undefined, yaw)) {
+          const commands = world.buildCommands?.();
+          if (commands?.last?.blockers?.includes('same snap target')) {
+            return world.structures().items.find((entry) => entry.id === placed.id) ?? placed;
+          }
+          failures.push({ item, tile, yaw, phase: 'face', action: world.structures().lastAction, commands });
+          return null;
+        }
+        return world.structures().items.find((entry) => entry.id === placed.id) ?? placed;
+      };
+      const inwardYaw = (tile, centerTile) => {
+        const degree = world.geo.degreeOf(tile);
+        for (let edge = 0; edge < degree; edge++) {
+          if (world.geo.neighbor(tile, edge) === centerTile) return edge * Math.PI / 3;
+        }
+        return 0;
+      };
+      const additions = [
+        placeAndFace('wallPanel', input.center, 0),
+        placeAndFace('wallPanel', input.boundary[1], inwardYaw(input.boundary[1], input.center)),
+        placeAndFace('wallPanel', input.boundary[5], inwardYaw(input.boundary[5], input.center)),
+      ].filter(Boolean);
+      const structures = world.structures();
+      const home = structures.home;
+      const text = JSON.parse(window.render_game_to_text());
+      const result = {
+        ok: failures.length === 0,
+        additions,
+        failures,
+        structures,
+        home,
+        text,
+        expectedEdges: Array.from({ length: 6 }, (_, edge) => `${input.center}:edge:${edge}`),
+        restoreSave,
+      };
+      return result;
+    }, { center: setup.center, boundary: setup.boundary });
+    if (!sixEdge.ok) {
+      throw new Error(`full six-edge wall shell setup failed: ${JSON.stringify(sixEdge.failures)}`);
+    }
+    if (
+      !sixEdge.home.shelter.protected
+      || !sixEdge.home.functional
+      || sixEdge.home.shelter.enclosure.boundaryCoverage !== 1
+      || sixEdge.home.shelter.enclosure.perimeterCoverage !== 1
+      || sixEdge.home.shelter.enclosure.coveredBoundaryEdges.length !== sixEdge.home.shelter.enclosure.boundaryEdgeCount
+      || sixEdge.expectedEdges.some((edge) => !sixEdge.home.shelter.enclosure.coveredBoundaryEdges.includes(edge))
+    ) {
+      throw new Error(`full six-edge room did not report complete coverage: ${JSON.stringify(sixEdge.home)}`);
+    }
+    await page.evaluate((input) => {
+      const world = window.__world;
+      const occupied = new Set(world.structures().items.map((entry) => entry.tile));
+      const blocked = new Set([input.center, ...input.boundary]);
+      const viewTile = world.nearbyTiles(3).find((tile) => !blocked.has(tile) && !occupied.has(tile));
+      if (viewTile !== undefined) world.debugSetPlayerTile(viewTile);
+      world.debugAimAtTile(input.center);
+      world.setZoom?.(0.22);
+    }, { center: setup.center, boundary: setup.boundary });
+    await page.waitForTimeout(300);
+    const sixEdgeScreenshot = path.join(outDir, 'wall-shells-six-edge.png');
+    await page.screenshot({ path: sixEdgeScreenshot, fullPage: false });
+    const sixEdgePixelProbe = pngPixelProbe(await fs.readFile(sixEdgeScreenshot));
+    if (!sixEdgePixelProbe.ok) throw new Error(`Six-edge screenshot pixel probe failed: ${JSON.stringify(sixEdgePixelProbe)}`);
+    await page.evaluate((save) => {
+      window.__world.save.import(save);
+    }, sixEdge.restoreSave);
+    delete sixEdge.restoreSave;
+
     const weakened = await page.evaluate((wallId) => {
       const world = window.__world;
       const failures = [];
@@ -656,6 +740,9 @@ async function main() {
       screenshot,
       readyPixelProbe,
       pixelProbe,
+      sixEdge,
+      sixEdgeScreenshot,
+      sixEdgePixelProbe,
       previews,
       collisions,
       cornerBefore,
@@ -691,6 +778,14 @@ async function main() {
           storage: readyHome.shelter.hasStorage,
         },
         restAction: readyRest.after.lastAction,
+      },
+      sixEdge: {
+        screenshot: sixEdgeScreenshot,
+        pixelProbe: sixEdgePixelProbe,
+        boundaryCoverage: sixEdge.home.shelter.enclosure.boundaryCoverage,
+        perimeterCoverage: sixEdge.home.shelter.enclosure.perimeterCoverage,
+        coveredBoundaryEdges: sixEdge.home.shelter.enclosure.coveredBoundaryEdges,
+        additions: sixEdge.additions.map((entry) => ({ item: entry.item, tile: entry.tile, turn: entry.turn })),
       },
       weakened: {
         protected: weakened.structures.home.shelter.protected,
