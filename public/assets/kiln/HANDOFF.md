@@ -3,7 +3,7 @@
 This folder contains the promoted Kiln Drop 1 runtime candidates:
 
 - `ASSET_MANIFEST.json`: authoritative per-asset manifest.
-- `models/`: 61 curated committed GLBs.
+- `models/`: 82 curated committed GLBs.
 
 The canonical intake, promotion, runtime wiring, rejection, and proof guidance lives in:
 

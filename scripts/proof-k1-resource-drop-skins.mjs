@@ -19,8 +19,39 @@ function loadPlaywright() {
 }
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const outDir = path.join(root, 'output', 'playwright', 'k1-resource-drop-skins');
+const outDir = path.join(root, 'output', 'playwright', 'k10-resource-drop-skins');
 const requestedPort = Number(process.env.PROOF_PORT || 0);
+
+const expectedDropSkins = [
+  'drop-wood-logs',
+  'drop-ore-chunk',
+  'drop-dirt-clod',
+  'drop-sand-pile',
+  'drop-snow-clump',
+  'drop-glow-crystal',
+  'drop-raw-fish',
+  'drop-kelp-reeds',
+  'drop-compost-pellet',
+  'drop-cave-mushroom',
+  'drop-creature-fiber',
+  'node-root-pod',
+];
+
+const dropSpawnPlan = [
+  { item: 'wood', source: 'tree', skin: 'drop-wood-logs' },
+  { item: 'rock', source: 'mine', skin: 'drop-ore-chunk' },
+  { item: 'dirt', source: 'mine', skin: 'drop-dirt-clod' },
+  { item: 'sand', source: 'mine', skin: 'drop-sand-pile' },
+  { item: 'snow', source: 'mine', skin: 'drop-snow-clump' },
+  { item: 'glowCrystal', source: 'mine', skin: 'drop-glow-crystal' },
+  { item: 'rawFish', source: 'debug', skin: 'drop-raw-fish' },
+  { item: 'kelp', source: 'debug', skin: 'drop-kelp-reeds' },
+  { item: 'reeds', source: 'debug', skin: 'drop-kelp-reeds' },
+  { item: 'reeds', source: 'creature', skin: 'drop-creature-fiber' },
+  { item: 'seeds', source: 'creature', skin: 'node-root-pod' },
+  { item: 'compost', source: 'creature', skin: 'drop-compost-pellet' },
+  { item: 'caveMushroom', source: 'creature', skin: 'drop-cave-mushroom' },
+];
 
 async function getFreePort() {
   if (requestedPort > 0) return requestedPort;
@@ -205,53 +236,42 @@ async function waitForWorld(page) {
 }
 
 async function seedDropProof(page) {
-  return page.evaluate(() => {
+  return page.evaluate((plan) => {
     const world = window.__world;
     const save = JSON.parse(world.save.export());
     save.drops = [];
     save.inventory = Array.isArray(save.inventory) ? save.inventory.map(() => 0) : save.inventory;
-    if (!world.save.import(JSON.stringify(save))) throw new Error('failed to reset K1 proof save');
+    save.craftedItems = {};
+    if (!world.save.import(JSON.stringify(save))) throw new Error('failed to reset K10 proof save');
     const tile = world.player?.tile ?? save.player?.tile ?? 0;
-    const wood = world.debugSpawnWoodDrops(tile);
-    const rock = world.debugSpawnResourceDrops('rock', 2, tile);
-    const stats = world.stats?.();
+    const spawned = plan.map((entry) => {
+      const result = world.debugSpawnResourceDrops(entry.item, 1, tile, entry.source);
+      return { ...entry, ok: result.ok, drops: result.drops ?? [], diagnostics: result.diagnostics };
+    });
+    const saved = JSON.parse(world.save.export());
     return {
       tile,
-      spawned: {
-        woodDrops: wood.drops?.length ?? 0,
-        woodItems: wood.drops?.reduce((sum, drop) => sum + drop.count, 0) ?? 0,
-        rockDrops: rock.drops?.length ?? 0,
-        rockItems: rock.drops?.reduce((sum, drop) => sum + drop.count, 0) ?? 0,
-      },
-      baselineInventory: {
-        wood: stats?.wood ?? 0,
-        rock: stats?.rock ?? 0,
-      },
+      spawned,
+      baselineSave: saved,
       diagnostics: world.resourceDrops(),
     };
-  });
+  }, dropSpawnPlan);
 }
 
 function assertDropRenderer(renderer, label) {
   if (!renderer || typeof renderer !== 'object') throw new Error(`${label}: missing drop renderer diagnostics`);
-  if ((renderer.kilnSkinsLoaded ?? 0) < 2) throw new Error(`${label}: expected at least 2 loaded Kiln drop-skin instances, got ${renderer.kilnSkinsLoaded}`);
+  if ((renderer.kilnSkinsLoaded ?? 0) < dropSpawnPlan.length) throw new Error(`${label}: expected at least ${dropSpawnPlan.length} loaded Kiln drop-skin instances, got ${renderer.kilnSkinsLoaded}`);
   if ((renderer.kilnSkinsPending ?? 0) !== 0) throw new Error(`${label}: Kiln drop skins still pending ${renderer.kilnSkinsPending}`);
   if ((renderer.kilnSkinFallbacks ?? 0) !== 0) throw new Error(`${label}: Kiln drop skin fallback triggered ${renderer.kilnSkinFallbacks}`);
-  if ((renderer.batchedInstances ?? 0) < 2) throw new Error(`${label}: expected batched instances for spawned wood/rock drops ${JSON.stringify(renderer)}`);
-  if ((renderer.instancedDrawCalls ?? 999) > 5) throw new Error(`${label}: draw-call budget exceeded; expected <= 5 material-batched draw calls, got ${renderer.instancedDrawCalls}`);
+  if ((renderer.batchedInstances ?? 0) < dropSpawnPlan.length) throw new Error(`${label}: expected batched instances for spawned pickup drops ${JSON.stringify(renderer)}`);
+  if ((renderer.instancedDrawCalls ?? 999) > 32) throw new Error(`${label}: draw-call budget exceeded; expected <= 32 material-batched draw calls, got ${renderer.instancedDrawCalls}`);
 
-  const wood = renderer.kilnDropSkinsBySlug?.['drop-wood-logs'];
-  const ore = renderer.kilnDropSkinsBySlug?.['drop-ore-chunk'];
-  if (!wood?.loaded || !wood?.instancedMeshes) throw new Error(`${label}: wood GLB skin did not load into an instanced batch`);
-  if (!ore?.loaded || !ore?.instancedMeshes) throw new Error(`${label}: ore GLB skin did not load into an instanced batch`);
-
-  const woodFit = renderer.kilnSkinFits?.['drop-wood-logs'];
-  const oreFit = renderer.kilnSkinFits?.['drop-ore-chunk'];
-  if (woodFit?.batchingPolicy !== 'instanced-merged-by-material' || oreFit?.batchingPolicy !== 'instanced-merged-by-material') {
-    throw new Error(`${label}: batching policy drifted ${JSON.stringify({ woodFit, oreFit })}`);
-  }
-  if (woodFit?.animationPolicy !== 'matrix-bob-only' || oreFit?.animationPolicy !== 'matrix-bob-only') {
-    throw new Error(`${label}: pickup animation policy drifted ${JSON.stringify({ woodFit, oreFit })}`);
+  for (const slug of expectedDropSkins) {
+    const skin = renderer.kilnDropSkinsBySlug?.[slug];
+    if (!skin?.loaded || !skin?.instancedMeshes) throw new Error(`${label}: ${slug} GLB skin did not load into an instanced batch`);
+    const fit = renderer.kilnSkinFits?.[slug];
+    if (fit?.batchingPolicy !== 'instanced-merged-by-material') throw new Error(`${label}: ${slug} batching policy drifted ${JSON.stringify(fit)}`);
+    if (fit?.animationPolicy !== 'matrix-bob-only') throw new Error(`${label}: ${slug} pickup animation policy drifted ${JSON.stringify(fit)}`);
   }
 }
 
@@ -277,24 +297,21 @@ async function runViewport(browser, targetUrl, name, viewport) {
   await page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
   await waitForWorld(page);
   const seeded = await seedDropProof(page);
-  await page.waitForFunction(() => {
+  await page.waitForFunction((expectedCount) => {
     const renderer = window.__world?.resourceDrops?.().renderer;
     return renderer
-      && (renderer.kilnSkinsLoaded ?? 0) >= 2
+      && (renderer.kilnSkinsLoaded ?? 0) >= expectedCount
       && (renderer.kilnSkinsPending ?? 1) === 0
       && (renderer.kilnSkinFallbacks ?? 1) === 0
-      && (renderer.batchedInstances ?? 0) >= 2;
-  }, null, { timeout: 20000 });
+      && (renderer.batchedInstances ?? 0) >= expectedCount;
+  }, dropSpawnPlan.length, { timeout: 20000 });
   await page.waitForTimeout(500);
 
   const beforeCollect = await page.evaluate(() => ({
     drops: window.__world.resourceDrops(),
-    inventory: {
-      wood: window.__world.stats?.().wood ?? 0,
-      rock: window.__world.stats?.().rock ?? 0,
-    },
+    save: JSON.parse(window.__world.save.export()),
   }));
-  const screenshot = path.join(outDir, `${name}-k1-resource-drop-skins.png`);
+  const screenshot = path.join(outDir, `${name}-k10-resource-drop-skins.png`);
   const screenshotBuffer = await page.screenshot({ path: screenshot, fullPage: true });
   const pixelProbe = await canvasPixelProbe(page);
   const screenshotProbe = pngPixelProbe(screenshotBuffer);
@@ -304,18 +321,16 @@ async function runViewport(browser, targetUrl, name, viewport) {
     const afterStats = window.__world.stats?.();
     return {
       before: { wood: beforeStats?.wood ?? 0, rock: beforeStats?.rock ?? 0 },
-      result: { wood: result.wood, rock: result.rock, drops: result.drops },
+      result: { wood: result.wood, rock: result.rock, drops: result.drops, inventory: result.inventory },
       after: { wood: afterStats?.wood ?? 0, rock: afterStats?.rock ?? 0 },
       drops: window.__world.resourceDrops(),
+      save: JSON.parse(window.__world.save.export()),
     };
   });
   await page.waitForTimeout(250);
   const afterCollect = await page.evaluate(() => ({
     drops: window.__world.resourceDrops(),
-    inventory: {
-      wood: window.__world.stats?.().wood ?? 0,
-      rock: window.__world.stats?.().rock ?? 0,
-    },
+    save: JSON.parse(window.__world.save.export()),
   }));
   await page.close();
 
@@ -324,13 +339,31 @@ async function runViewport(browser, targetUrl, name, viewport) {
   const responsesOk = (suffix) => kilnAssetResponses.some((asset) => asset.url.includes(suffix) && asset.status >= 200 && asset.status < 300);
   const generatedRequests = kilnAssetRequests.filter((url) => url.includes('/assets/kiln/generated/'));
   if (!responsesOk('/assets/kiln/ASSET_MANIFEST.json')) throw new Error(`${name}: missing successful Kiln manifest response`);
-  if (!responsesOk('/assets/kiln/models/drop-wood-logs.glb')) throw new Error(`${name}: missing successful drop-wood-logs.glb response`);
-  if (!responsesOk('/assets/kiln/models/drop-ore-chunk.glb')) throw new Error(`${name}: missing successful drop-ore-chunk.glb response`);
+  for (const slug of expectedDropSkins) {
+    if (!responsesOk(`/assets/kiln/models/${slug}.glb`)) throw new Error(`${name}: missing successful ${slug}.glb response`);
+  }
   if (generatedRequests.length > 0) throw new Error(`${name}: runtime requested raw generated Kiln assets ${JSON.stringify(generatedRequests)}`);
   if (!pixelProbe.ok && !screenshotProbe.ok) throw new Error(`${name}: pixel probe failed ${JSON.stringify({ canvas: pixelProbe, screenshot: screenshotProbe })}`);
   if ((afterCollect.drops.count ?? 1) !== 0) throw new Error(`${name}: spawned drops did not collect cleanly ${JSON.stringify(afterCollect.drops)}`);
-  if ((afterCollect.inventory?.wood ?? 0) <= (seeded.baselineInventory?.wood ?? 0)) throw new Error(`${name}: wood inventory did not increase from seeded baseline`);
-  if ((afterCollect.inventory?.rock ?? 0) <= (seeded.baselineInventory?.rock ?? 0)) throw new Error(`${name}: rock inventory did not increase from seeded baseline`);
+  const materialInventory = afterCollect.save?.inventory ?? [];
+  const craftedItems = afterCollect.save?.craftedItems ?? {};
+  const collectedCounts = {
+    dirt: materialInventory[0] ?? 0,
+    rock: materialInventory[1] ?? 0,
+    sand: materialInventory[2] ?? 0,
+    snow: materialInventory[3] ?? 0,
+    wood: materialInventory[4] ?? 0,
+    glowCrystal: craftedItems.glowCrystal ?? 0,
+    rawFish: craftedItems.rawFish ?? 0,
+    kelp: craftedItems.kelp ?? 0,
+    reeds: craftedItems.reeds ?? 0,
+    seeds: craftedItems.seeds ?? 0,
+    compost: craftedItems.compost ?? 0,
+    caveMushroom: craftedItems.caveMushroom ?? 0,
+  };
+  for (const item of ['wood', 'rock', 'dirt', 'sand', 'snow', 'glowCrystal', 'rawFish', 'kelp', 'reeds', 'seeds', 'compost', 'caveMushroom']) {
+    if ((collectedCounts[item] ?? 0) <= 0) throw new Error(`${name}: ${item} did not collect into inventory ${JSON.stringify(collectedCounts)}`);
+  }
   if (consoleErrors.length || pageErrors.length) throw new Error(`${name}: browser errors ${JSON.stringify({ consoleErrors, pageErrors })}`);
 
   return {
@@ -338,8 +371,8 @@ async function runViewport(browser, targetUrl, name, viewport) {
     viewport,
     screenshot,
     seeded,
-    beforeCollect: { drops: beforeCollect.drops, inventory: beforeCollect.inventory },
-    afterCollect: { drops: afterCollect.drops, inventory: afterCollect.inventory },
+    beforeCollect: { drops: beforeCollect.drops, save: beforeCollect.save },
+    afterCollect: { drops: afterCollect.drops, save: afterCollect.save, collectedCounts },
     collection: collected,
     kilnAssets: {
       requests: kilnAssetRequests,

@@ -29,7 +29,19 @@ export type KilnStructureSkinSlug =
   | 'drying-rack'
   | 'weather-vane'
   | 'lantern-post';
-export type KilnResourceDropSkinSlug = 'drop-wood-logs' | 'drop-ore-chunk';
+export type KilnResourceDropSkinSlug =
+  | 'drop-wood-logs'
+  | 'drop-ore-chunk'
+  | 'drop-dirt-clod'
+  | 'drop-sand-pile'
+  | 'drop-snow-clump'
+  | 'drop-glow-crystal'
+  | 'drop-raw-fish'
+  | 'drop-kelp-reeds'
+  | 'drop-compost-pellet'
+  | 'drop-cave-mushroom'
+  | 'drop-creature-fiber'
+  | 'node-root-pod';
 export type KilnDomainResourceSkinSlug =
   | 'node-hearth-coal'
   | 'node-rain-reed'
@@ -880,6 +892,46 @@ const RUNTIME_RESOURCE_DROP_SKINS: Record<KilnResourceDropSkinSlug, {
   'drop-ore-chunk': {
     item: 'rock',
     acceptanceNote: 'accepted as instanced ground pickup skin for mined rock; collection timing and pickup glint remain code-authored',
+  },
+  'drop-dirt-clod': {
+    item: 'dirt',
+    acceptanceNote: 'accepted as exact instanced ground pickup skin for mined or dug dirt; collection timing and pickup glint remain code-authored',
+  },
+  'drop-sand-pile': {
+    item: 'sand',
+    acceptanceNote: 'accepted as exact instanced ground pickup skin for beach and glass-prep sand; collection timing and pickup glint remain code-authored',
+  },
+  'drop-snow-clump': {
+    item: 'snow',
+    acceptanceNote: 'accepted as exact instanced ground pickup skin for cold-region snow clumps; collection timing and pickup glint remain code-authored',
+  },
+  'drop-glow-crystal': {
+    item: 'glowCrystal',
+    acceptanceNote: 'accepted as exact instanced ground pickup skin for cave crystals and light-hazard rewards; collection timing and pickup glint remain code-authored',
+  },
+  'drop-raw-fish': {
+    item: 'rawFish',
+    acceptanceNote: 'accepted as exact instanced ground pickup skin for caught fish rewards; cooking, collection timing, and pickup glint remain code-authored',
+  },
+  'drop-kelp-reeds': {
+    item: 'kelp/reeds',
+    acceptanceNote: 'accepted as instanced waterline forage pickup skin for kelp and non-creature reeds; source-specific collection truth remains code-authored',
+  },
+  'drop-compost-pellet': {
+    item: 'compost',
+    acceptanceNote: 'accepted as exact instanced ground pickup skin for farm compost pellets; fertility use and collection timing remain code-authored',
+  },
+  'drop-cave-mushroom': {
+    item: 'caveMushroom',
+    acceptanceNote: 'accepted as exact instanced ground pickup skin for cave mushroom rewards; food effects and collection timing remain code-authored',
+  },
+  'drop-creature-fiber': {
+    item: 'reeds',
+    acceptanceNote: 'accepted as instanced native-life fiber reward skin for creature-sourced reeds; hazard/ward source truth remains code-authored',
+  },
+  'node-root-pod': {
+    item: 'seeds',
+    acceptanceNote: 'accepted as a temporary seed-pickup alias until an exact seed drop body exists; seed reward truth and pickup glint remain code-authored',
   },
 };
 
@@ -1918,7 +1970,20 @@ export class KilnRuntimeAssets implements StructureSkinProvider, ResourceDropSki
     'weather-vane',
     'lantern-post',
   ]);
-  private readonly enabledResourceDrops = new Set<KilnResourceDropSkinSlug>(['drop-wood-logs', 'drop-ore-chunk']);
+  private readonly enabledResourceDrops = new Set<KilnResourceDropSkinSlug>([
+    'drop-wood-logs',
+    'drop-ore-chunk',
+    'drop-dirt-clod',
+    'drop-sand-pile',
+    'drop-snow-clump',
+    'drop-glow-crystal',
+    'drop-raw-fish',
+    'drop-kelp-reeds',
+    'drop-compost-pellet',
+    'drop-cave-mushroom',
+    'drop-creature-fiber',
+    'node-root-pod',
+  ]);
   private readonly enabledDomainResourceSkins = new Set<KilnDomainResourceSkinSlug>([
     'node-hearth-coal',
     'node-rain-reed',

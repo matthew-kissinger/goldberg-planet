@@ -9,8 +9,8 @@
     "note": "bboxLocal.size is in raw GLB units, unscaled and transforms NOT baked — rescale per asset so footprint matches its hex tile(s)."
   },
   "counts": {
-    "total": 73,
-    "ready": 73,
+    "total": 82,
+    "ready": 82,
     "unused": 0,
     "missing": 0
   },
@@ -3442,6 +3442,393 @@
       "kilnTris": 256,
       "instanceability": "B",
       "source": "generated/drop-ore-chunk/model.glb (gitignored raw drop)"
+    },
+    {
+      "slug": "drop-dirt-clod",
+      "title": "Drop · Dirt Clod",
+      "category": "prop",
+      "role": "fill",
+      "tier": "background",
+      "footprint": "small",
+      "status": "ready",
+      "replaces": "src/render/resourceDrops.ts Drop · Dirt Clod drop group",
+      "prompt": "A small low-poly dirt clod pickup: lumpy brown soil chunk with a few tiny root hairs, compact and readable on a hex tile.",
+      "file": "models/drop-dirt-clod.glb",
+      "bytes": 68908,
+      "geometry": {
+        "triangles": 2388,
+        "meshCount": 10,
+        "nodeCount": 11,
+        "materialCount": 2,
+        "hasSkin": false,
+        "bboxLocal": {
+          "min": [
+            -0.217,
+            -0.046,
+            -0.189
+          ],
+          "max": [
+            0.22,
+            0.3,
+            0.208
+          ],
+          "size": [
+            0.437,
+            0.346,
+            0.397
+          ]
+        }
+      },
+      "animations": [],
+      "animationPlayback": "static",
+      "paletteId": "sphere-planet",
+      "kilnTris": 2388,
+      "instanceability": "B",
+      "source": "generated/drop-dirt-clod/model.glb (gitignored raw drop)"
+    },
+    {
+      "slug": "drop-sand-pile",
+      "title": "Drop · Sand Pile",
+      "category": "prop",
+      "role": "fill",
+      "tier": "background",
+      "footprint": "small",
+      "status": "ready",
+      "replaces": "src/render/resourceDrops.ts Drop · Sand Pile drop group",
+      "prompt": "A small low-poly sand pile pickup: soft faceted mound with two or three pale shell flecks, compact and readable.",
+      "file": "models/drop-sand-pile.glb",
+      "bytes": 4072,
+      "geometry": {
+        "triangles": 32,
+        "meshCount": 2,
+        "nodeCount": 8,
+        "materialCount": 2,
+        "hasSkin": false,
+        "bboxLocal": {
+          "min": [
+            -1,
+            -0.5,
+            -1
+          ],
+          "max": [
+            1,
+            0.5,
+            1
+          ],
+          "size": [
+            2,
+            1,
+            2
+          ]
+        }
+      },
+      "animations": [],
+      "animationPlayback": "static",
+      "paletteId": "sphere-planet",
+      "kilnTris": 112,
+      "instanceability": "B",
+      "source": "generated/drop-sand-pile/model.glb (gitignored raw drop)"
+    },
+    {
+      "slug": "drop-snow-clump",
+      "title": "Drop · Snow Clump",
+      "category": "prop",
+      "role": "fill",
+      "tier": "background",
+      "footprint": "small",
+      "status": "ready",
+      "replaces": "src/render/resourceDrops.ts Drop · Snow Clump drop group",
+      "prompt": "A small low-poly snow clump pickup: rounded white chunk with a faint blue shadow side, compact and readable.",
+      "file": "models/drop-snow-clump.glb",
+      "bytes": 13744,
+      "geometry": {
+        "triangles": 240,
+        "meshCount": 8,
+        "nodeCount": 11,
+        "materialCount": 3,
+        "hasSkin": false,
+        "bboxLocal": {
+          "min": [
+            -0.682,
+            -0.45,
+            -0.631
+          ],
+          "max": [
+            0.682,
+            0.45,
+            0.7
+          ],
+          "size": [
+            1.365,
+            0.9,
+            1.331
+          ]
+        }
+      },
+      "animations": [],
+      "animationPlayback": "static",
+      "paletteId": "sphere-planet",
+      "kilnTris": 256,
+      "instanceability": "B",
+      "source": "generated/drop-snow-clump/model.glb (gitignored raw drop)"
+    },
+    {
+      "slug": "drop-glow-crystal",
+      "title": "Drop · Glow Crystal",
+      "category": "prop",
+      "role": "fill",
+      "tier": "standard",
+      "footprint": "small",
+      "status": "ready",
+      "replaces": "src/render/resourceDrops.ts Drop · Glow Crystal drop group",
+      "prompt": "A small low-poly glowing crystal pickup: two or three faceted shards on a dark pebble base, bright but not huge.",
+      "file": "models/drop-glow-crystal.glb",
+      "bytes": 12588,
+      "geometry": {
+        "triangles": 236,
+        "meshCount": 7,
+        "nodeCount": 8,
+        "materialCount": 2,
+        "hasSkin": false,
+        "bboxLocal": {
+          "min": [
+            -0.3,
+            -0.3,
+            -0.3
+          ],
+          "max": [
+            0.3,
+            0.3,
+            0.3
+          ],
+          "size": [
+            0.6,
+            0.6,
+            0.6
+          ]
+        }
+      },
+      "animations": [],
+      "animationPlayback": "static",
+      "paletteId": "sphere-planet",
+      "kilnTris": 236,
+      "instanceability": "B",
+      "source": "generated/drop-glow-crystal/model.glb (gitignored raw drop)"
+    },
+    {
+      "slug": "drop-raw-fish",
+      "title": "Drop · Raw Fish",
+      "category": "prop",
+      "role": "fill",
+      "tier": "standard",
+      "footprint": "small",
+      "status": "ready",
+      "replaces": "src/render/resourceDrops.ts Drop · Raw Fish drop group",
+      "prompt": "A small low-poly raw fish pickup: one compact fish body with simple fins and eye, slightly curved, readable as food on the ground.",
+      "file": "models/drop-raw-fish.glb",
+      "bytes": 42512,
+      "geometry": {
+        "triangles": 616,
+        "meshCount": 24,
+        "nodeCount": 41,
+        "materialCount": 3,
+        "hasSkin": false,
+        "bboxLocal": {
+          "min": [
+            -0.09,
+            -0.08,
+            -0.08
+          ],
+          "max": [
+            0.09,
+            0.08,
+            0.08
+          ],
+          "size": [
+            0.18,
+            0.16,
+            0.16
+          ]
+        }
+      },
+      "animations": [],
+      "animationPlayback": "static",
+      "paletteId": "sphere-planet",
+      "kilnTris": 872,
+      "instanceability": "B",
+      "source": "generated/drop-raw-fish/model.glb (gitignored raw drop)"
+    },
+    {
+      "slug": "drop-kelp-reeds",
+      "title": "Drop · Kelp Reeds",
+      "category": "prop",
+      "role": "fill",
+      "tier": "standard",
+      "footprint": "small",
+      "status": "ready",
+      "replaces": "src/render/resourceDrops.ts Drop · Kelp Reeds drop group",
+      "prompt": "A small low-poly bundle of kelp and reeds tied with a cord, green-brown strands, compact collectible pickup.",
+      "file": "models/drop-kelp-reeds.glb",
+      "bytes": 74712,
+      "geometry": {
+        "triangles": 2260,
+        "meshCount": 16,
+        "nodeCount": 22,
+        "materialCount": 2,
+        "hasSkin": false,
+        "bboxLocal": {
+          "min": [
+            -0.102,
+            -0.391,
+            -0.139
+          ],
+          "max": [
+            0.155,
+            0.96,
+            0.163
+          ],
+          "size": [
+            0.257,
+            1.35,
+            0.302
+          ]
+        }
+      },
+      "animations": [],
+      "animationPlayback": "static",
+      "paletteId": "sphere-planet",
+      "kilnTris": 2716,
+      "instanceability": "C",
+      "source": "generated/drop-kelp-reeds/model.glb (gitignored raw drop)"
+    },
+    {
+      "slug": "drop-compost-pellet",
+      "title": "Drop · Compost Pellet",
+      "category": "prop",
+      "role": "fill",
+      "tier": "background",
+      "footprint": "small",
+      "status": "ready",
+      "replaces": "src/render/resourceDrops.ts Drop · Compost Pellet drop group",
+      "prompt": "A small low-poly compost pellet pickup: dark crumbly ball with tiny leaf bits, compact and readable as farming material.",
+      "file": "models/drop-compost-pellet.glb",
+      "bytes": 27316,
+      "geometry": {
+        "triangles": 884,
+        "meshCount": 8,
+        "nodeCount": 25,
+        "materialCount": 3,
+        "hasSkin": false,
+        "bboxLocal": {
+          "min": [
+            -0.18,
+            -0.18,
+            -0.171
+          ],
+          "max": [
+            0.18,
+            0.444,
+            0.171
+          ],
+          "size": [
+            0.36,
+            0.624,
+            0.342
+          ]
+        }
+      },
+      "animations": [],
+      "animationPlayback": "static",
+      "paletteId": "sphere-planet",
+      "kilnTris": 1648,
+      "instanceability": "B",
+      "source": "generated/drop-compost-pellet/model.glb (gitignored raw drop)"
+    },
+    {
+      "slug": "drop-cave-mushroom",
+      "title": "Drop · Cave Mushroom",
+      "category": "prop",
+      "role": "fill",
+      "tier": "standard",
+      "footprint": "small",
+      "status": "ready",
+      "replaces": "src/render/resourceDrops.ts Drop · Cave Mushroom drop group",
+      "prompt": "A small low-poly cave mushroom pickup: two squat glowing caps and a stubby stem cluster, compact collectible size.",
+      "file": "models/drop-cave-mushroom.glb",
+      "bytes": 24796,
+      "geometry": {
+        "triangles": 430,
+        "meshCount": 9,
+        "nodeCount": 24,
+        "materialCount": 2,
+        "hasSkin": false,
+        "bboxLocal": {
+          "min": [
+            -0.523,
+            -0.3,
+            -0.55
+          ],
+          "max": [
+            0.523,
+            0.35,
+            0.55
+          ],
+          "size": [
+            1.046,
+            0.65,
+            1.1
+          ]
+        }
+      },
+      "animations": [],
+      "animationPlayback": "static",
+      "paletteId": "sphere-planet",
+      "kilnTris": 870,
+      "instanceability": "B",
+      "source": "generated/drop-cave-mushroom/model.glb (gitignored raw drop)"
+    },
+    {
+      "slug": "drop-creature-fiber",
+      "title": "Drop · Creature Fiber",
+      "category": "prop",
+      "role": "fill",
+      "tier": "background",
+      "footprint": "small",
+      "status": "ready",
+      "replaces": "src/render/resourceDrops.ts Drop · Creature Fiber drop group",
+      "prompt": "A small low-poly tuft of soft creature fiber: rounded woolly puff clump with a tied thread, compact pickup size.",
+      "file": "models/drop-creature-fiber.glb",
+      "bytes": 41596,
+      "geometry": {
+        "triangles": 1752,
+        "meshCount": 8,
+        "nodeCount": 15,
+        "materialCount": 2,
+        "hasSkin": false,
+        "bboxLocal": {
+          "min": [
+            -0.136,
+            -0.136,
+            -0.105
+          ],
+          "max": [
+            0.16,
+            0.196,
+            0.105
+          ],
+          "size": [
+            0.296,
+            0.332,
+            0.209
+          ]
+        }
+      },
+      "animations": [],
+      "animationPlayback": "static",
+      "paletteId": "sphere-planet",
+      "kilnTris": 2592,
+      "instanceability": "B",
+      "source": "generated/drop-creature-fiber/model.glb (gitignored raw drop)"
     }
   ],
   "runtimePath": "public/assets/kiln/models/<slug>.glb (committed). Raw drops stay in generated/ (gitignored)."

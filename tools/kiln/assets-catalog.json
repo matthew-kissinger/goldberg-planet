@@ -700,6 +700,87 @@
       "tier": "background",
       "footprint": "small",
       "prompt": "A small faceted grey ore rock chunk with a hint of metallic flecks, a tiny game pickup."
+    },
+    {
+      "slug": "drop-dirt-clod",
+      "title": "Drop · Dirt Clod",
+      "category": "prop",
+      "role": "fill",
+      "tier": "background",
+      "footprint": "small",
+      "prompt": "A small low-poly dirt clod pickup: lumpy brown soil chunk with a few tiny root hairs, compact and readable on a hex tile."
+    },
+    {
+      "slug": "drop-sand-pile",
+      "title": "Drop · Sand Pile",
+      "category": "prop",
+      "role": "fill",
+      "tier": "background",
+      "footprint": "small",
+      "prompt": "A small low-poly sand pile pickup: soft faceted mound with two or three pale shell flecks, compact and readable."
+    },
+    {
+      "slug": "drop-snow-clump",
+      "title": "Drop · Snow Clump",
+      "category": "prop",
+      "role": "fill",
+      "tier": "background",
+      "footprint": "small",
+      "prompt": "A small low-poly snow clump pickup: rounded white chunk with a faint blue shadow side, compact and readable."
+    },
+    {
+      "slug": "drop-glow-crystal",
+      "title": "Drop · Glow Crystal",
+      "category": "prop",
+      "role": "fill",
+      "tier": "standard",
+      "footprint": "small",
+      "prompt": "A small low-poly glowing crystal pickup: two or three faceted shards on a dark pebble base, bright but not huge."
+    },
+    {
+      "slug": "drop-raw-fish",
+      "title": "Drop · Raw Fish",
+      "category": "prop",
+      "role": "fill",
+      "tier": "standard",
+      "footprint": "small",
+      "prompt": "A small low-poly raw fish pickup: one compact fish body with simple fins and eye, slightly curved, readable as food on the ground."
+    },
+    {
+      "slug": "drop-kelp-reeds",
+      "title": "Drop · Kelp Reeds",
+      "category": "prop",
+      "role": "fill",
+      "tier": "standard",
+      "footprint": "small",
+      "prompt": "A small low-poly bundle of kelp and reeds tied with a cord, green-brown strands, compact collectible pickup."
+    },
+    {
+      "slug": "drop-compost-pellet",
+      "title": "Drop · Compost Pellet",
+      "category": "prop",
+      "role": "fill",
+      "tier": "background",
+      "footprint": "small",
+      "prompt": "A small low-poly compost pellet pickup: dark crumbly ball with tiny leaf bits, compact and readable as farming material."
+    },
+    {
+      "slug": "drop-cave-mushroom",
+      "title": "Drop · Cave Mushroom",
+      "category": "prop",
+      "role": "fill",
+      "tier": "standard",
+      "footprint": "small",
+      "prompt": "A small low-poly cave mushroom pickup: two squat glowing caps and a stubby stem cluster, compact collectible size."
+    },
+    {
+      "slug": "drop-creature-fiber",
+      "title": "Drop · Creature Fiber",
+      "category": "prop",
+      "role": "fill",
+      "tier": "background",
+      "footprint": "small",
+      "prompt": "A small low-poly tuft of soft creature fiber: rounded woolly puff clump with a tied thread, compact pickup size."
     }
   ]
 }

@@ -33,12 +33,37 @@ const sphere8 = new THREE.SphereGeometry(0.5, 8, 6);
 const KILN_DROP_SKIN_BY_ITEM: Partial<Record<ResourceDropSave['item'], KilnResourceDropSkinSlug>> = {
   wood: 'drop-wood-logs',
   rock: 'drop-ore-chunk',
+  dirt: 'drop-dirt-clod',
+  sand: 'drop-sand-pile',
+  snow: 'drop-snow-clump',
+  glowCrystal: 'drop-glow-crystal',
+  rawFish: 'drop-raw-fish',
+  kelp: 'drop-kelp-reeds',
+  reeds: 'drop-kelp-reeds',
+  seeds: 'node-root-pod',
+  compost: 'drop-compost-pellet',
+  caveMushroom: 'drop-cave-mushroom',
 };
 
 const KILN_DROP_SKIN_SCALE: Record<KilnResourceDropSkinSlug, number> = {
   'drop-wood-logs': 1.12,
   'drop-ore-chunk': 0.74,
+  'drop-dirt-clod': 0.72,
+  'drop-sand-pile': 0.72,
+  'drop-snow-clump': 0.78,
+  'drop-glow-crystal': 0.82,
+  'drop-raw-fish': 0.84,
+  'drop-kelp-reeds': 0.76,
+  'drop-compost-pellet': 0.68,
+  'drop-cave-mushroom': 0.72,
+  'drop-creature-fiber': 0.72,
+  'node-root-pod': 0.52,
 };
+
+function kilnSkinSlugForDrop(drop: ResourceDropSave): KilnResourceDropSkinSlug | undefined {
+  if (drop.item === 'reeds' && drop.source === 'creature') return 'drop-creature-fiber';
+  return KILN_DROP_SKIN_BY_ITEM[drop.item];
+}
 
 type DropSkinStatus = 'pending' | 'loaded' | 'fallback';
 
@@ -155,7 +180,7 @@ export class ResourceDropRenderer {
     const wanted = new Set(drops.map((drop) => drop.id));
     const wantedBySkin = new Map<KilnResourceDropSkinSlug, number>();
     for (const drop of drops) {
-      const slug = KILN_DROP_SKIN_BY_ITEM[drop.item];
+      const slug = kilnSkinSlugForDrop(drop);
       if (slug) wantedBySkin.set(slug, (wantedBySkin.get(slug) ?? 0) + 1);
     }
     for (const [slug, count] of wantedBySkin) this.ensureSkin(slug, count);
@@ -167,7 +192,7 @@ export class ResourceDropRenderer {
       }
     }
     for (const drop of drops) {
-      const slug = KILN_DROP_SKIN_BY_ITEM[drop.item];
+      const slug = kilnSkinSlugForDrop(drop);
       if (slug && this.skinBatches.has(slug)) {
         const fallback = this.objects.get(drop.id);
         if (fallback) {
@@ -210,7 +235,7 @@ export class ResourceDropRenderer {
         }
         this.skinTemplates.set(slug, loaded);
         this.skinStatus.set(slug, 'loaded');
-        const count = this.currentDrops.filter((drop) => KILN_DROP_SKIN_BY_ITEM[drop.item] === slug).length;
+        const count = this.currentDrops.filter((drop) => kilnSkinSlugForDrop(drop) === slug).length;
         this.ensureBatch(slug, loaded, count);
         this.setDrops(this.currentDrops);
         return loaded;
@@ -262,7 +287,7 @@ export class ResourceDropRenderer {
     }
     for (const drop of drops) {
       const obj = this.objects.get(drop.id);
-      const slug = KILN_DROP_SKIN_BY_ITEM[drop.item];
+      const slug = kilnSkinSlugForDrop(drop);
       const batch = slug ? this.skinBatches.get(slug) : undefined;
       const frame = geo.frameOf(drop.tile);
       const yaw = drop.id * 1.173 + drop.tile * 0.013;
@@ -344,7 +369,7 @@ export class ResourceDropRenderer {
     }
     const countsBySlug: Partial<Record<KilnResourceDropSkinSlug, number>> = {};
     for (const drop of this.currentDrops) {
-      const slug = KILN_DROP_SKIN_BY_ITEM[drop.item];
+      const slug = kilnSkinSlugForDrop(drop);
       if (slug) countsBySlug[slug] = (countsBySlug[slug] ?? 0) + 1;
     }
     let instancedMeshes = 0;
@@ -361,7 +386,9 @@ export class ResourceDropRenderer {
     let kilnSkinsLoaded = 0;
     let kilnSkinsPending = 0;
     let kilnSkinFallbacks = 0;
-    for (const slug of Object.values(KILN_DROP_SKIN_BY_ITEM) as KilnResourceDropSkinSlug[]) {
+    const supportedSlugs = new Set(Object.values(KILN_DROP_SKIN_BY_ITEM) as KilnResourceDropSkinSlug[]);
+    supportedSlugs.add('drop-creature-fiber');
+    for (const slug of supportedSlugs) {
       const count = countsBySlug[slug] ?? 0;
       if (count <= 0 && !this.skinStatus.has(slug)) continue;
       const batch = this.skinBatches.get(slug);

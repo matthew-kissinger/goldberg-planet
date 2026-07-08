@@ -116,7 +116,20 @@ const FAMILY_SLUGS: Record<KilnViewerFamily, readonly string[]> = {
     'weather-vane',
     'lantern-post',
   ],
-  drops: ['drop-wood-logs', 'drop-ore-chunk'],
+  drops: [
+    'drop-wood-logs',
+    'drop-ore-chunk',
+    'drop-dirt-clod',
+    'drop-sand-pile',
+    'drop-snow-clump',
+    'drop-glow-crystal',
+    'drop-raw-fish',
+    'drop-kelp-reeds',
+    'drop-compost-pellet',
+    'drop-cave-mushroom',
+    'drop-creature-fiber',
+    'node-root-pod',
+  ],
   nodes: [
     'node-hearth-coal',
     'node-rain-reed',
@@ -181,7 +194,7 @@ const FAMILY_SLUGS: Record<KilnViewerFamily, readonly string[]> = {
   generated: [],
 };
 
-FAMILY_SLUGS.adopted = [
+FAMILY_SLUGS.adopted = [...new Set([
   ...FAMILY_SLUGS.structures,
   ...FAMILY_SLUGS.drops,
   ...FAMILY_SLUGS.nodes,
@@ -190,7 +203,7 @@ FAMILY_SLUGS.adopted = [
   ...FAMILY_SLUGS.fish,
   ...FAMILY_SLUGS.birds,
   ...FAMILY_SLUGS.wonders,
-];
+])];
 
 function publicAssetUrl(relativePath: string): string {
   const base = import.meta.env.BASE_URL || '/';

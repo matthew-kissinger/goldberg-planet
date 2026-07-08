@@ -22,6 +22,7 @@
     "proof:k3-home-props": "node scripts/proof-k3-home-prop-skins.mjs",
     "proof:k4-utilities": "node scripts/proof-k4-utility-structure-skins.mjs",
     "proof:k1-resource-drops": "node scripts/proof-k1-resource-drop-skins.mjs",
+    "proof:k10-resource-drops": "node scripts/proof-k1-resource-drop-skins.mjs",
     "proof:k2-domain-resources": "node scripts/proof-k2-domain-resource-skins.mjs",
     "proof:k5-trees": "node scripts/proof-k5-tree-skins.mjs",
     "proof:k6-creatures": "node scripts/proof-k6-creature-skins.mjs",

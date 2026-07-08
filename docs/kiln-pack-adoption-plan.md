@@ -60,7 +60,7 @@ scene graphs. The default implementation target is:
 
 ## Scope
 
-The current promoted pack contains 73 ready GLBs and 0 unused records. The adoption goal is
+The current promoted pack contains 82 ready GLBs and 0 unused records. The adoption goal is
 to use the approved assets broadly across the game, including the three cave-mouth GLBs as
 runtime dressing skins over real carved cave signals.
 
@@ -69,7 +69,7 @@ runtime dressing skins over real carved cave signals.
 | Wave | Asset Families | Runtime Owner | Proof Gate |
 | --- | --- | --- | --- |
 | K0 loader contract | Shared GLB template cache, fit diagnostics, palette/material reuse, instancing policy, distance animation policy, fallback state, and review alignment bench | `src/render/kilnAssets.ts`, `src/tools/kilnAssetViewer.ts`, plus family renderers | Unit tests prove normalization metadata, batching metadata, distance gates, and failed-load fallback for each owner; `npm run proof:kiln-asset-viewer` captures socket-local screenshots for every ready GLB |
-| K1 pickups and rocks | `drop-wood-logs`, `drop-ore-chunk` | `ResourceDropRenderer` | Passing first slice: `npm run proof:k1-resource-drops` spawns wood/rock drops, loads committed GLBs, proves 5 batched instances on 5 instanced draw calls, collects into inventory, records desktop/phone screenshots, and rejects `generated/` runtime requests |
+| K1/K10 pickup and drop skins | `drop-wood-logs`, `drop-ore-chunk`, `drop-dirt-clod`, `drop-sand-pile`, `drop-snow-clump`, `drop-glow-crystal`, `drop-raw-fish`, `drop-kelp-reeds`, `drop-compost-pellet`, `drop-cave-mushroom`, `drop-creature-fiber`, plus `node-root-pod` as the seed pickup alias | `ResourceDropRenderer` | Passing expanded slice: `npm run proof:k10-resource-drops` spawns 13 source-aware drops, loads all 11 exact pickup/drop GLBs plus the committed seed alias, proves instanced material batches, collects wood/rock/dirt/sand/snow plus crafted food/forage/reward items into inventory, records desktop/phone screenshots, and rejects `generated/` runtime requests. `npm run proof:k1-resource-drops` remains a backward-compatible alias for this expanded gate |
 | K2 harvest nodes | all 12 `node-*` harvest/resource assets | `DomainResourceRenderer`, domain hooks | Passing first slice: `npm run proof:k2-domain-resources` reveals all 36 domain nodes, loads all 12 committed node GLBs, proves 36 batched instances on 33 instanced draw calls, keeps code-owned harvest glows/base overlays, records desktop/phone screenshots, and rejects `generated/` runtime requests |
 | K3 camp and home props | `campfire`, `bedroll`, `chest`, `crop-plot`, `drying-rack`, `weather-vane`, `workbench` | `StructureRenderer` | Passing first slice: `npm run proof:k3-home-props` places all seven props, loads committed GLB skins from `assets/kiln/models/`, keeps state overlays, storage, fire, warmth, crop, drying, and weather behavior readable, records desktop/phone screenshots, and rejects `generated/` runtime requests |
 | K3W wall and house shell contract | Code-authored/procedural wall panels, corners, wall-with-window openings, wall-with-door openings, half walls/rails, roof joins, foundations, and snap sockets; Kiln skins only after the wall contract exists | `src/sim/structures.ts`, `src/render/structures.ts`, `StructureRenderer` | Edge-socket slice passing: `npm run proof:c6-wall-shells` proves `floorFoundation`, `wallPanel`, `wallDoorPanel`, `wallWindowPanel`, `wallCorner`, `wallHalfRail`, and `roofJoin` sockets, weather-safe wall coverage, rail/foundation non-enclosure, integrated opening rules, same-hex center-plus-edge stacking, duplicate edge blocking, and shelter weakening when a corner moves out. Remaining proof must add edge-based shelter coverage/collision polish, broader room shapes, and shared-scale decorative skins |
@@ -82,7 +82,7 @@ runtime dressing skins over real carved cave signals.
 | K8 remaining modular kits | door/window/roof already started; expand to any remaining build pieces | `StructureRenderer` and build sockets | Measured fit, socket-local preview, fallback, and room/shelter proof for each modular family |
 | K9 aquatic life and fish visibility | Generated Kiln single fish bodies: shore minnow, storm runner, cave shimmer, reed fry, plus a single driftjelly body over existing fishing systems | Fishing sim, waterline structures, `FishSchoolRenderer`, `KilnRuntimeAssets` | Passing first slice: corrected singleton fish are promoted to `models/`, fish-school state selects the matching body, the renderer shows up to two animated GLB anchors plus a point school, mixers are distance-gated, and `npm run proof:k9-fish-visuals` proves the cave-shimmer GLB loads from committed assets with fallback at zero |
 | K11 sky life and biome expansion | Promoted Kiln singleton bird bodies and future new-biome tree variants | `SkyLifeRenderer`, `KilnRuntimeAssets`, weather/shore/forest site selection | Passing first slice: four bird bodies are promoted to `models/`, reviewed in the asset viewer, selected from sky/shore/forest/storm cues, rendered as a few distance-gated animated GLB anchors plus point flocks, and `npm run proof:k11-sky-life` proves all four committed bird GLBs load with fallback at zero |
-| K10 drop and ore expansion | Future pickup/drop skins plus new ore/resource node taxonomy after item design | `ResourceDropRenderer`, `DomainResourceRenderer` | Proof keeps drops/nodes instanced, collectable, and readable while new ores have explicit recipes and route/cave reasons |
+| K10 ore/resource expansion | Future ore/resource node taxonomy after item design | `DomainResourceRenderer`, resource and recipe rules | Pickup/drop skins are now wired. Remaining K10 work is new ore/resource nodes with explicit recipes, route/cave reasons, instanced proof, collection proof, and no generated runtime requests |
 
 ## Definition Of Done
 
@@ -113,10 +113,17 @@ The asset-pack adoption track is done when:
   direction, local `+Z` as tile-forward tangent, center-XZ/bottom-Y pivots, socket rings,
   bounds, orientation metadata, and review warnings for modular-kit, mesh-count, material,
   triangle, and axis-correction risk.
-- `npm run proof:kiln-asset-viewer` covers 9 overview screenshots plus 73 single-asset
+- `npm run proof:kiln-asset-viewer` covers 10 overview screenshots plus 82 single-asset
   screenshots under `output/playwright/kiln-asset-viewer/assets/`, proves every ready GLB
   is requested from committed `assets/kiln/models/`, rejects `generated/` runtime requests,
   and writes `proof.json` with per-slug fit/socket diagnostics.
+- K1/K10 pickup/drop skins are runtime-wired for all 11 committed `drop-*` GLBs plus
+  `node-root-pod` as a seed pickup alias.
+  `ResourceDropRenderer` maps material chips, cave crystals, raw fish, kelp/reeds, compost,
+  cave mushrooms, creature-sourced fiber, and native-life seeds to source-aware GLB skins,
+  keeps pickup bob and collection logic code-owned, and `npm run proof:k10-resource-drops`
+  proves desktop/phone committed model requests, zero generated requests, zero fallback,
+  instanced batching, and collection into inventory/crafted items.
 - K3 camp/home props are runtime-wired for `workbench`, `campfire`, `chest`, `bedroll`,
   `crop-plot`, `drying-rack`, and `weather-vane`. `StructureRenderer` adds approved GLB
   skins as decorative children, hides only duplicated procedural bodies, and keeps
@@ -386,9 +393,11 @@ Prepared request packs:
   `bird-shore-gull`, `bird-forest-flutter`, and `bird-storm-finch` with
   idle/flap/glide/turn clips. Flocks are runtime points, impostors, boids, or migration
   signals, never authored multi-bird GLB scenes.
-- Pickup skins: `drop-dirt-clod`, `drop-sand-pile`, `drop-snow-clump`,
-  `drop-glow-crystal`, `drop-raw-fish`, `drop-kelp-reeds`, `drop-compost-pellet`, and
-  `drop-cave-mushroom`.
+- Pickup skins: the first exact pickup/drop bodies are promoted and wired:
+  `drop-wood-logs`, `drop-ore-chunk`, `drop-dirt-clod`, `drop-sand-pile`,
+  `drop-snow-clump`, `drop-glow-crystal`, `drop-raw-fish`, `drop-kelp-reeds`,
+  `drop-compost-pellet`, `drop-cave-mushroom`, and `drop-creature-fiber`; `node-root-pod`
+  is also wired as the temporary GLB seed-pickup alias until an exact seed drop is needed.
 - Ore/resource nodes after item taxonomy: `node-iron-vein`, `node-copper-patina`,
   `node-coal-seam`, `node-glow-crystal-vein`, `node-clay-bank`, and
   `node-geode-pocket`.
@@ -410,7 +419,7 @@ shader, or instanced runtime systems keyed to the palette.
 
 These are still procedural or code-authored, with different reasons:
 
-- **Approved-pack GLBs not yet runtime-wired**: none. All 73 ready GLBs are adopted
+- **Approved-pack GLBs not yet runtime-wired**: none. All 82 ready GLBs are adopted
   as runtime skins or runtime dressing, including cave-mouth skins over carved cave signals.
 - **Intentional code-owned systems**: terrain hex materials, block faces, mining cracks,
   water, sky, route ribbons, telegraph rings, warmth/light/glow overlays, particles, and
@@ -426,14 +435,15 @@ These are still procedural or code-authored, with different reasons:
   house-shell pack after edge-based shelter coverage, collision, and broader room-shape
   rules are proven.
 - **Runtime families still awaiting new GLB generation or later art decisions**: K8
-  shared-scale house shell skins, K10 additional drop/ore expansion after item taxonomy,
+  shared-scale house shell skins, future ore/resource node expansion after item taxonomy,
   avatar/equipment authored assets, and optional future wonder/cave dressing beyond the
   current approved pack.
 
 Current sidecar asset audit priority, 2026-07-07: house shell pieces are the highest
-player-facing visual debt, generic non-wood/non-rock pickup drops are next, and player-held
-equipment/avatar props follow. Cave mouths are no longer the highest-risk asset gap unless
-future playtest screenshots show the embedded terrain threshold still failing to read.
+player-facing visual debt, player-held equipment/avatar props follow, and future ore nodes
+should wait for recipes and route/cave reasons. Cave mouths and generic pickup/drop skins
+are no longer the highest-risk asset gaps unless future playtest screenshots show the
+embedded terrain threshold or pickup readability still failing to read.
 
 ## Next Critical Slice
 
@@ -441,5 +451,5 @@ K1, K2, K3, K4, K5, K6, K6T, K6R, K7, K9, K11, and the edge-socket K3W/C6 wall-s
 prove the repeated static-family, utility/waterline skin, first animated-family, native
 targetability, sparse creature-roaming, aquatic singleton, sky-life singleton, and
 code-owned house-shell socket paths. Continue with edge-based shelter coverage/collision
-polish, richer G5/K6R creature behavior, K10 pickup/ore expansion, shared-scale house-shell
-skin decisions, and the avatar/equipment authored-asset path.
+polish, richer G5/K6R creature behavior, future ore/resource expansion, shared-scale
+house-shell skin decisions, and the avatar/equipment authored-asset path.

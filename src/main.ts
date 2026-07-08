@@ -67,6 +67,7 @@ import {
   spawnMinedItemDrops,
   spawnTreeWoodDrops,
   type ResourceDropSave,
+  type ResourceDropSource,
 } from './sim/resourceDrops';
 import {
   nativeCreatureAt,
@@ -5334,12 +5335,16 @@ async function boot(): Promise<void> {
       markSaveDirty();
       return { drops, diagnostics: resourceDropDiagnostics() };
     },
-    debugSpawnResourceDrops: (item: string = 'rock', total = 1, tile?: number) => {
+    debugSpawnResourceDrops: (item: string = 'rock', total = 1, tile?: number, source: ResourceDropSource = 'mine') => {
       if (!(item in ITEM_DEFS)) return { ok: false, reason: 'unknown item', item, diagnostics: resourceDropDiagnostics() };
       const target = Math.max(0, Math.min(geo.count - 1, Number.isFinite(tile) ? Math.trunc(tile!) : player.tile));
-      const drops = spawnMineDrops(target, item as ItemId, Math.max(1, Math.trunc(Number.isFinite(total) ? total : 1)));
+      const dropSource: ResourceDropSource = source === 'creature' || source === 'debug' || source === 'tree' ? source : 'mine';
+      const spawned = spawnItemDrops(target, nextDropId, item as ItemId, Math.max(1, Math.trunc(Number.isFinite(total) ? total : 1)), dropSource, Math.min(3, Math.max(1, Math.trunc(Number.isFinite(total) ? total : 1))));
+      nextDropId = spawned.nextId;
+      resourceDrops = [...resourceDrops, ...spawned.drops];
+      resourceDropRenderer.setDrops(resourceDrops);
       markSaveDirty();
-      return { ok: true, item, drops, diagnostics: resourceDropDiagnostics() };
+      return { ok: true, item, drops: spawned.drops, diagnostics: resourceDropDiagnostics() };
     },
     debugCollectDrops: (seconds = 1.2) => {
       tickResourceDrops(Math.max(0, Number.isFinite(seconds) ? seconds : 1.2));

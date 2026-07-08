@@ -1,6 +1,26 @@
 Original prompt: complete courier frontier plan
 Current operating goal: Hearth and Horizon full crafting-survival cycle under the DAG/subagent workflow.
 
+## 2026-07-08
+
+- Promoted, cataloged, and runtime-wired the exact K10 pickup/drop Kiln pack. The
+  committed model set now includes 82 ready GLBs / 0 unused / 0 missing, including
+  `drop-dirt-clod`, `drop-sand-pile`, `drop-snow-clump`, `drop-glow-crystal`,
+  `drop-raw-fish`, `drop-kelp-reeds`, `drop-compost-pellet`, `drop-cave-mushroom`,
+  and `drop-creature-fiber`. `ResourceDropRenderer` now maps all material chips,
+  cave crystals, raw fish, kelp/reeds, compost, cave mushrooms, creature-sourced
+  fiber, and native-life seeds to committed GLB skins with source-aware batching;
+  `drop-creature-fiber` is reserved for creature-sourced reeds so native-life rewards do
+  not read as shoreline forage, and `node-root-pod` is the temporary seed pickup alias
+  until an exact seed drop is needed. Proofs passed:
+  `npx vitest run test\resourceDropRenderer.test.ts`,
+  `npm run typecheck`, `npm run proof:kiln-assets`, `npm run proof:k10-resource-drops`
+  with shared Playwright `NODE_PATH`, `npm run proof:kiln-asset-viewer` with shared
+  Playwright `NODE_PATH`, and `npm run build`. Current remaining asset debt is
+  shared-scale house-shell skins, avatar/equipment authored assets, future ore/resource
+  nodes after item taxonomy, and deeper creature/combat polish rather than generic
+  non-wood pickup visuals.
+
 ## 2026-07-07
 
 - Promoted and wired the three cave-mouth GLBs instead of leaving them as unused

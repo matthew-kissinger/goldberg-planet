@@ -19,15 +19,15 @@ craftable plane.
 The Drop 1 promoted pack is accepted as curated source material:
 
 - `public/assets/kiln/ASSET_MANIFEST.json` is the authoritative manifest.
-- `public/assets/kiln/models/` contains 73 committed GLBs, 6.56 MiB total.
-- The manifest has 73 records: 73 `ready`, 0 `unused`, 0 `missing`.
+- `public/assets/kiln/models/` contains 82 committed GLBs, 6.85 MiB total.
+- The manifest has 82 records: 82 `ready`, 0 `unused`, 0 `missing`.
 - The cave-mouth records `cave-mouth-arch`, `cave-mouth-dry`, and `cave-mouth-sea`
   are promoted and wired as GLB skins over real carved cave signals. The carved void,
   route glyph, tide line, and spring seep remain code-owned overlays/fallbacks.
 - Raw generated drops remain quarantine/provenance material under
   `public/assets/kiln/generated/` when present. They must stay ignored and out of commits.
 
-The current target is to adopt the 73 ready assets across runtime families, not to leave
+The current target is to adopt the 82 ready assets across runtime families, not to leave
 them as a passive library. Each ready asset should become runtime wired, runtime dressing,
 or an explicit regeneration/supersession decision. Repeated families must be implemented
 through palette/material reuse, instanced or batched geometry, and distance-gated animation
@@ -39,13 +39,13 @@ Run:
 npm run proof:kiln-assets
 ```
 
-Current proof result, 2026-07-07:
+Current proof result, 2026-07-08:
 
-- 73 curated assets accepted into the committed pack.
-- 32 runtime pilot candidates.
-- 41 runtime-deferred assets.
+- 82 curated assets accepted into the committed pack.
+- 40 runtime pilot candidates.
+- 42 runtime-deferred assets.
 - 0 runtime-rejected assets.
-- 27 warnings, 0 failures.
+- 28 warnings, 0 failures.
 - The proof also checks GLB headers/lengths, manifest/file parity, palette ids, animation
   metadata, secret/presigned URL leakage, and tracked raw-drop hygiene.
 
@@ -68,11 +68,11 @@ Run:
 npm run proof:kiln-asset-viewer
 ```
 
-Current proof result, 2026-07-07:
+Current proof result, 2026-07-08:
 
-- Loads all 73 ready GLBs from committed `assets/kiln/models/` paths.
+- Loads all 82 ready GLBs from committed `assets/kiln/models/` paths.
 - Captures overview screenshots for `structures`, `drops`, `nodes`, `trees`, `creatures`,
-  `fish`, `birds`, `adopted`, and the full `ready` pack.
+  `fish`, `birds`, `wonders`, `adopted`, and the full `ready` pack.
 - Captures one single-asset alignment screenshot for every ready slug under
   `output/playwright/kiln-asset-viewer/assets/<slug>.png`.
 - Emits `output/playwright/kiln-asset-viewer/proof.json` with socket role, socket grid,
@@ -313,10 +313,11 @@ env or an authenticated AWS/Kiln session, and promote only after `proof:kiln-ass
 `proof:kiln-asset-viewer`.
 
 The backlog is now an executable pre-catalog request packet:
-`tools/kiln/requests/hearth-horizon-next-packs.json`. It currently contains API-valid packs
-for shared-scale house shells, aquatic life/fish, pickup/drop skins, ore/resource nodes,
-native-life expansion, wonder/cave dressing, and authored avatar/equipment. Validate it
-without spend from `tools/kiln`:
+`tools/kiln/requests/hearth-horizon-next-packs.json`. It includes both completed packs
+that were generated/promoted from this request backlog, such as K9 aquatic life, K11 sky
+life, and K1/K10 pickup/drop skins, and future packs for shared-scale house shells,
+ore/resource nodes, native-life expansion, wonder/cave dressing, and authored
+avatar/equipment. Validate it without spend from `tools/kiln`:
 
 ```bash
 node scripts/validate-request-packs.mjs
@@ -326,7 +327,7 @@ Generate one approved pack only after the runtime/socket owner is ready and the 
 intentional:
 
 ```bash
-KILN_CONFIRM_SPEND=1 node scripts/generate-request-pack.mjs k9-aquatic-life
+KILN_CONFIRM_SPEND=1 node scripts/generate-request-pack.mjs k3w-house-shell-shared-scale
 ```
 
 Generated candidates stay quarantined in `public/assets/kiln/generated/`. Accepted slugs

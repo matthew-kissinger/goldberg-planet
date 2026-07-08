@@ -12,7 +12,7 @@ import { buildLayers } from '../src/world/layers';
 import { Columns } from '../src/world/columns';
 import { Terrain } from '../src/world/terrain';
 
-function drop(id: number, item: ResourceDropSave['item'], tile: number): ResourceDropSave {
+function drop(id: number, item: ResourceDropSave['item'], tile: number, source: ResourceDropSave['source'] = item === 'wood' ? 'tree' : 'mine'): ResourceDropSave {
   return {
     id,
     item,
@@ -21,8 +21,23 @@ function drop(id: number, item: ResourceDropSave['item'], tile: number): Resourc
     offsetA: 0.12 * id,
     offsetB: -0.05 * id,
     age: 1.2,
-    source: item === 'wood' ? 'tree' : 'mine',
+    source,
   };
+}
+
+function itemForSlug(slug: KilnResourceDropSkinSlug): string {
+  if (slug === 'drop-wood-logs') return 'wood';
+  if (slug === 'drop-ore-chunk') return 'rock';
+  if (slug === 'drop-dirt-clod') return 'dirt';
+  if (slug === 'drop-sand-pile') return 'sand';
+  if (slug === 'drop-snow-clump') return 'snow';
+  if (slug === 'drop-glow-crystal') return 'glowCrystal';
+  if (slug === 'drop-raw-fish') return 'rawFish';
+  if (slug === 'drop-kelp-reeds') return 'kelp/reeds';
+  if (slug === 'drop-compost-pellet') return 'compost';
+  if (slug === 'drop-cave-mushroom') return 'caveMushroom';
+  if (slug === 'node-root-pod') return 'seeds';
+  return 'reeds';
 }
 
 function template(slug: KilnResourceDropSkinSlug): KilnResourceDropSkinTemplate {
@@ -43,11 +58,11 @@ function template(slug: KilnResourceDropSkinSlug): KilnResourceDropSkinTemplate 
       sourceMeshNames: [`${slug}-mesh`],
       sourceMeshCount: 1,
       geometry,
-      material: new THREE.MeshStandardMaterial({ color: slug === 'drop-wood-logs' ? 0xa56d3a : 0x8a8d91 }),
+      material: new THREE.MeshStandardMaterial({ color: slug === 'drop-wood-logs' ? 0xa56d3a : slug === 'drop-glow-crystal' ? 0x70d6d1 : 0x8a8d91 }),
     }],
     fit: {
       slug,
-      item: slug === 'drop-wood-logs' ? 'wood' : 'rock',
+      item: itemForSlug(slug),
       socketRole: 'ground-pickup',
       sourceBboxSize: [1, 1, 1],
       runtimeSourceBboxSize: [1, 1, 1],
@@ -94,11 +109,26 @@ function fixtureWorld() {
 }
 
 describe('resource drop renderer Kiln skin batching', () => {
-  it('batches approved wood and rock drop GLBs while keeping unmapped drops on fallback meshes', async () => {
+  it('batches approved pickup GLBs while keeping unmapped drops on fallback meshes', async () => {
     const scene = new THREE.Scene();
     const provider = new FakeDropSkins();
     const renderer = new ResourceDropRenderer(scene, provider);
-    const drops = [drop(1, 'wood', 3), drop(2, 'rock', 4), drop(3, 'sand', 5)];
+    const drops = [
+      drop(1, 'wood', 3),
+      drop(2, 'rock', 4),
+      drop(3, 'dirt', 5),
+      drop(4, 'sand', 6),
+      drop(5, 'snow', 7),
+      drop(6, 'glowCrystal', 8),
+      drop(7, 'rawFish', 9),
+      drop(8, 'kelp', 10),
+      drop(9, 'reeds', 11),
+      drop(10, 'reeds', 12, 'creature'),
+      drop(11, 'seeds', 13, 'creature'),
+      drop(12, 'compost', 14),
+      drop(13, 'caveMushroom', 15),
+      drop(14, 'bait', 16),
+    ];
     const { geo, layers, columns } = fixtureWorld();
 
     renderer.setDrops(drops);
@@ -106,16 +136,34 @@ describe('resource drop renderer Kiln skin batching', () => {
     renderer.update(drops, geo, layers, columns, { x: 0, y: 0, z: 0 }, 2.1);
     const stats = renderer.stats();
 
-    expect(provider.requested.sort()).toEqual(['drop-ore-chunk', 'drop-wood-logs']);
-    expect(stats.kilnSkinsLoaded).toBe(2);
+    expect(provider.requested.sort()).toEqual([
+      'drop-cave-mushroom',
+      'drop-compost-pellet',
+      'drop-creature-fiber',
+      'drop-dirt-clod',
+      'drop-glow-crystal',
+      'drop-kelp-reeds',
+      'drop-ore-chunk',
+      'drop-raw-fish',
+      'drop-sand-pile',
+      'drop-snow-clump',
+      'drop-wood-logs',
+      'node-root-pod',
+    ]);
+    expect(stats.kilnSkinsLoaded).toBe(13);
     expect(stats.kilnSkinsPending).toBe(0);
     expect(stats.kilnSkinFallbacks).toBe(0);
-    expect(stats.batchedInstances).toBe(2);
-    expect(stats.instancedMeshes).toBe(2);
-    expect(stats.instancedDrawCalls).toBe(2);
+    expect(stats.batchedInstances).toBe(13);
+    expect(stats.instancedMeshes).toBe(12);
+    expect(stats.instancedDrawCalls).toBe(12);
     expect(stats.fallbackGroups).toBe(1);
     expect(stats.kilnDropSkinsBySlug['drop-wood-logs']).toMatchObject({ loaded: 1, batchedInstances: 1, instancedMeshes: 1 });
     expect(stats.kilnDropSkinsBySlug['drop-ore-chunk']).toMatchObject({ loaded: 1, batchedInstances: 1, instancedMeshes: 1 });
+    expect(stats.kilnDropSkinsBySlug['drop-kelp-reeds']).toMatchObject({ loaded: 2, batchedInstances: 2, instancedMeshes: 1 });
+    expect(stats.kilnDropSkinsBySlug['drop-creature-fiber']).toMatchObject({ loaded: 1, batchedInstances: 1, instancedMeshes: 1 });
+    expect(stats.kilnDropSkinsBySlug['drop-raw-fish']).toMatchObject({ loaded: 1, batchedInstances: 1, instancedMeshes: 1 });
+    expect(stats.kilnDropSkinsBySlug['drop-cave-mushroom']).toMatchObject({ loaded: 1, batchedInstances: 1, instancedMeshes: 1 });
+    expect(stats.kilnDropSkinsBySlug['node-root-pod']).toMatchObject({ loaded: 1, batchedInstances: 1, instancedMeshes: 1 });
     expect(stats.kilnSkinFits['drop-wood-logs']).toMatchObject({
       sourceUrl: '/assets/kiln/models/drop-wood-logs.glb',
       batchingPolicy: 'instanced-merged-by-material',
@@ -126,7 +174,7 @@ describe('resource drop renderer Kiln skin batching', () => {
   it('leaves supported drops visible through procedural fallback if the GLB skin fails', async () => {
     const scene = new THREE.Scene();
     const renderer = new ResourceDropRenderer(scene, new FailingDropSkins());
-    const drops = [drop(1, 'wood', 3), drop(2, 'rock', 4)];
+    const drops = [drop(1, 'wood', 3), drop(2, 'rock', 4), drop(3, 'rawFish', 5), drop(4, 'reeds', 6, 'creature'), drop(5, 'seeds', 7, 'creature')];
     const { geo, layers, columns } = fixtureWorld();
 
     renderer.setDrops(drops);
@@ -137,9 +185,12 @@ describe('resource drop renderer Kiln skin batching', () => {
     expect(stats.kilnSkinsLoaded).toBe(0);
     expect(stats.batchedInstances).toBe(0);
     expect(stats.instancedDrawCalls).toBe(0);
-    expect(stats.fallbackGroups).toBe(2);
-    expect(stats.kilnSkinFallbacks).toBe(2);
+    expect(stats.fallbackGroups).toBe(5);
+    expect(stats.kilnSkinFallbacks).toBe(5);
     expect(stats.kilnDropSkinsBySlug['drop-wood-logs']).toMatchObject({ loaded: 0, fallback: 1 });
     expect(stats.kilnDropSkinsBySlug['drop-ore-chunk']).toMatchObject({ loaded: 0, fallback: 1 });
+    expect(stats.kilnDropSkinsBySlug['drop-raw-fish']).toMatchObject({ loaded: 0, fallback: 1 });
+    expect(stats.kilnDropSkinsBySlug['drop-creature-fiber']).toMatchObject({ loaded: 0, fallback: 1 });
+    expect(stats.kilnDropSkinsBySlug['node-root-pod']).toMatchObject({ loaded: 0, fallback: 1 });
   });
 });
