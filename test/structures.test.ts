@@ -10,11 +10,9 @@ import {
   normalizeStructureYaw,
   relocateStructure,
   rootCellarProvisionCapacity,
-  rootCellarProvisionCount,
   rotateStructure,
   shelterReport,
   spendPlacedItem,
-  spendRootCellarProvision,
   STRUCTURE_YAW_STEP,
   structureSocketCatalog,
   structureSocketOccupancy,
@@ -662,7 +660,7 @@ describe('Hearth and Horizon structures', () => {
     expect(normalized).toEqual([{ id: 6, item: 'rainCistern', tile: 26, layer: 3, yaw: 0.5, state: { water: 4, fills: 2 } }]);
   });
 
-  it('caches root-cellar provisions for home expedition prep and feeds hearth supper', () => {
+  it('caches root-cellar provisions for home expedition prep', () => {
     const structures: StructureSave[] = [
       { id: 1, item: 'bedroll', tile: 100, layer: 2, yaw: 0, state: { home: true } },
     ];
@@ -686,7 +684,6 @@ describe('Hearth and Horizon structures', () => {
       message: 'root cellar cached cave mushrooms · provisions 2/6',
     });
     expect(food).toEqual({});
-    expect(rootCellarProvisionCount(structures, hubTopology)).toBe(2);
     expect(homeScore(structures, hubTopology).shelter).toMatchObject({
       hasCellar: true,
       cellarProvisions: 2,
@@ -700,13 +697,7 @@ describe('Hearth and Horizon structures', () => {
       message: 'pulled trail ration from root cellar · provisions 1/6',
     });
     expect(food).toEqual({ trailRation: 1 });
-    expect(rootCellarProvisionCount(structures, hubTopology)).toBe(1);
-
-    const spent = spendRootCellarProvision(structures, hubTopology);
-    expect(spent).toMatchObject({ ok: true, cellarId: cellar.id, remaining: 0 });
-    expect(cellar.state?.provisions).toBeUndefined();
-    expect(rootCellarProvisionCount(structures, hubTopology)).toBe(0);
-    expect(spendRootCellarProvision(structures, hubTopology)).toMatchObject({ ok: false, remaining: 0 });
+    expect(homeScore(structures, hubTopology)).toMatchObject({ cellarProvisions: 1 });
 
     const normalized = normalizeStructureSaves([
       { id: 15, item: 'rootCellar', tile: 43, layer: 3, yaw: 0.5, state: { provisions: 99, caches: 2.8 } },

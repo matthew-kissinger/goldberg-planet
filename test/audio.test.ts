@@ -36,7 +36,7 @@ describe('Hearth and Horizon audio events', () => {
     expect(audioUrl('audio/music/test.mp3', '/goldberg-planet/')).toBe('/goldberg-planet/audio/music/test.mp3');
   });
 
-  it('routes survival verbs to readable feedback sounds', () => {
+  it('routes player action verbs to readable feedback sounds', () => {
     expect(audioEventForCraft(true)).toBe('craftConfirm');
     expect(audioEventForCraft(false)).toBe('uiDeny');
     expect(audioEventForPlacement(true)).toBe('structurePlace');
@@ -47,7 +47,7 @@ describe('Hearth and Horizon audio events', () => {
     expect(audioEventForStructure('campfire', 'inspect', false)).toBe('uiDeny');
     expect(audioEventForFoodAction('fish', true)).toBe('fishingCatch');
     expect(audioEventForFoodAction('forage', true)).toBe('gatherSoft');
-    expect(audioEventForFoodAction('eat', true)).toBe('hearthRest');
+    expect(audioEventForFoodAction('fish', false)).toBe('uiDeny');
   });
 
   it('records events even before browser audio unlocks', () => {

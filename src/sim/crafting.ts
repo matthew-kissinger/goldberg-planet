@@ -13,7 +13,6 @@ export type CraftedItemId =
   | 'echoPick'
   | 'echoShovel'
   | 'packFrame'
-  | 'stormCloak'
   | 'repairKit'
   | 'fishingRod'
   | 'bait'
@@ -107,7 +106,6 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
   echoPick: { id: 'echoPick', name: 'Echo Pick', kind: 'tool', css: '#6de2d8', description: 'A cave-crystal pick for longer rock, cave, and expedition work.' },
   echoShovel: { id: 'echoShovel', name: 'Echo Shovel', kind: 'tool', css: '#78cfc2', description: 'A tuned shovel that clears soil, sand, and snow with stronger reach and durability.' },
   packFrame: { id: 'packFrame', name: 'Pack Frame', kind: 'travel', css: '#b58b52', description: 'A reed-lashed frame that makes heavy expedition loads easier to carry without removing burden entirely.' },
-  stormCloak: { id: 'stormCloak', name: 'Storm Cloak', kind: 'travel', css: '#5f7f92', description: 'A reed-wrapped weather cloak that softens rain, cold, storm, and soaked exposure without replacing real shelter.' },
   repairKit: { id: 'repairKit', name: 'Field Repair Kit', kind: 'part', css: '#c9a56d', description: 'Reed lashings, wedges, and stone flakes that save a worn tool at the breaking point.' },
   fishingRod: { id: 'fishingRod', name: 'Fishing Rod', kind: 'tool', css: '#c8a36b', description: 'A first path into shore, dock, and cave fishing.' },
   bait: { id: 'bait', name: 'Bait', kind: 'food', css: '#c98b5a', description: 'Berry mash and scraps for pulling better fish schools toward shore.' },
@@ -115,14 +113,14 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
   compost: { id: 'compost', name: 'Compost', kind: 'part', css: '#6b5b32', description: 'Broken-down scraps that feed crop plots and speed a protected farm.' },
   berries: { id: 'berries', name: 'Berries', kind: 'food', css: '#b64d6b', description: 'A quick farm food and camp-meal ingredient.' },
   caveMushroom: { id: 'caveMushroom', name: 'Cave Mushroom', kind: 'food', css: '#8bd0b0', description: 'A dim cave forage food that helps stretch underground trips.' },
-  snowHerb: { id: 'snowHerb', name: 'Snow Herb', kind: 'food', css: '#c9eef2', description: 'A cold ridge herb that cuts exposure during harsh weather.' },
+  snowHerb: { id: 'snowHerb', name: 'Snow Herb', kind: 'food', css: '#c9eef2', description: 'A cold-ridge herb, good in camp meals.' },
   kelp: { id: 'kelp', name: 'Kelp', kind: 'food', css: '#4f9f74', description: 'Coastal and sea-cave forage for rough meals and bait experiments.' },
   reeds: { id: 'reeds', name: 'Reeds', kind: 'part', css: '#7da65f', description: 'Waterline stems for reed beds, trap lashings, roof mats, and food wraps.' },
   rawFish: { id: 'rawFish', name: 'Raw Fish', kind: 'food', css: '#8bb7c8', description: 'Caught from shores and docks, best cooked at a lit fire.' },
   cookedFish: { id: 'cookedFish', name: 'Cooked Fish', kind: 'food', css: '#d59a63', description: 'A reliable cooked food and camp-meal ingredient.' },
   campMeal: { id: 'campMeal', name: 'Camp Meal', kind: 'food', css: '#d9c16c', description: 'A warm fish-and-berry meal for longer trips.' },
   trailRation: { id: 'trailRation', name: 'Trail Ration', kind: 'food', css: '#b89458', description: 'Preserved fish, kelp, and herbs packed for caves, storms, and longer flights.' },
-  expeditionStew: { id: 'expeditionStew', name: 'Expedition Stew', kind: 'food', css: '#e8a65f', description: 'A packed hearth meal that steadies cave walks, bad weather, and long flights with trail focus.' },
+  expeditionStew: { id: 'expeditionStew', name: 'Expedition Stew', kind: 'food', css: '#e8a65f', description: 'A packed hearth meal for cave walks, bad weather, and long flights.' },
   glowCrystal: { id: 'glowCrystal', name: 'Glow Crystal', kind: 'part', css: '#70d6d1', description: 'A cave-grown crystal from dry and sea cave walls.' },
   campfire: { id: 'campfire', name: 'Campfire', kind: 'placeable', css: '#e07a3f', description: 'Warmth, cooking, light, and a visible home signal.' },
   chest: { id: 'chest', name: 'Chest', kind: 'placeable', css: '#a56d3a', description: 'Persistent storage for a functional house.' },
@@ -212,15 +210,6 @@ export const BASIC_RECIPES: RecipeDef[] = [
     description: 'Adds a reed-lashed carry frame: +28 pack capacity and a visible back-frame target for long routes.',
   },
   {
-    id: 'storm_cloak',
-    name: 'Storm Cloak',
-    result: 'stormCloak',
-    count: 1,
-    station: 'workbench',
-    requires: { snow: 4, reeds: 4, kelp: 1, snowHerb: 1 },
-    description: 'Fits a weather cloak: storm/cold/soaked exposure softens, and storm routes gain a wearable prep answer.',
-  },
-  {
     id: 'echo_axe',
     name: 'Echo Axe',
     result: 'echoAxe',
@@ -306,7 +295,7 @@ export const BASIC_RECIPES: RecipeDef[] = [
     count: 1,
     station: 'workbench',
     requires: { wood: 5, rock: 5, dirt: 3 },
-    description: 'Stores preserved food and forage as home provisions for hearth supper.',
+    description: 'Stores preserved food and forage as home provisions.',
   },
   {
     id: 'dock_segment',

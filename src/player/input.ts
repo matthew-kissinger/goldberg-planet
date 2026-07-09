@@ -122,10 +122,10 @@ export class Input {
       }
     });
     window.addEventListener('wheel', (e) => {
-      if (this.worldInputBlocked()) {
-        e.preventDefault();
-        return;
-      }
+      // While a panel (crafting, etc.) owns input, let the wheel event through untouched so
+      // the browser can natively scroll the open panel's own overflow — previously this
+      // preventDefault()'d unconditionally, which silently blocked scrolling inside it.
+      if (this.worldInputBlocked()) return;
       this.wheel += e.deltaY;
       this.wheelTouched = true;
       e.preventDefault();

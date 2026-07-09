@@ -148,13 +148,10 @@ export class Hud {
     });
   }
 
-  setVitals(text: string, alert: 'none' | 'warning' | 'critical' = 'none'): void {
-    const cacheKey = `${alert}|${text}`;
-    if (cacheKey !== this.vitalsCache) {
+  setVitals(text: string): void {
+    if (text !== this.vitalsCache) {
       this.vitals.textContent = text;
-      this.vitals.classList.toggle('warn', alert === 'warning');
-      this.vitals.classList.toggle('critical', alert === 'critical');
-      this.vitalsCache = cacheKey;
+      this.vitalsCache = text;
     }
   }
 

@@ -48,7 +48,7 @@ describe('Hearth and Horizon character equipment rules', () => {
   });
 
   it('shows owned tools on the backpack in stable priority order', () => {
-    expect(backPropsForInventory(owns('packFrame', 'stormCloak', 'fishingRod', 'reeds', 'stoneHatchet', 'stonePick', 'echoPick', 'repairKit', 'echoLantern'))).toEqual(['packFrame', 'stormCloak', 'echoPick', 'stoneHatchet', 'stonePick', 'repairKit', 'fishingRod', 'reeds', 'echoLantern']);
+    expect(backPropsForInventory(owns('packFrame', 'fishingRod', 'reeds', 'stoneHatchet', 'stonePick', 'echoPick', 'repairKit', 'echoLantern'))).toEqual(['packFrame', 'echoPick', 'stoneHatchet', 'stonePick', 'repairKit', 'fishingRod', 'reeds', 'echoLantern']);
     expect(backPropsForInventory(owns('expeditionStew'))).toEqual(['expeditionStew']);
   });
 

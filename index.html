@@ -26,13 +26,7 @@
     }
     #vitals {
       top: calc(8px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left));
-      font-size: 11px; color: #6d7d94; letter-spacing: 0.3px; transition: color 0.2s;
-    }
-    #vitals.warn { color: #ffe1a0; }
-    #vitals.critical { color: #f0b4a4; font-weight: 600; animation: vitals-pulse 1.1s ease-in-out infinite; }
-    @keyframes vitals-pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.55; }
+      font-size: 11px; color: #6d7d94; letter-spacing: 0.3px;
     }
     #diag {
       top: calc(28px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left));

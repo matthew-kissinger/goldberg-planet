@@ -3,7 +3,7 @@ import { buildInventoryLedger, mealUnitsForInventory, packBurdenForInventory, pa
 import type { InventoryItems } from '../src/sim/crafting';
 
 describe('Pack Ledger inventory view', () => {
-  it('groups hotbar materials and crafted survival items into loop-focused sections', () => {
+  it('groups hotbar materials and crafted items into loop-focused sections', () => {
     const materials = [3, 4, 0, 0, 6];
     const crafted: InventoryItems = {
       sticks: 2,
@@ -13,7 +13,7 @@ describe('Pack Ledger inventory view', () => {
       cookedFish: 1,
       campMeal: 1,
       chest: 1,
-      stormCloak: 1,
+      packFrame: 1,
     };
 
     const ledger = buildInventoryLedger(materials, crafted, { stonePick: 9 });
@@ -27,7 +27,7 @@ describe('Pack Ledger inventory view', () => {
     expect(section('tools')?.entries.map((entry) => entry.item)).toEqual(['stoneHatchet', 'stonePick', 'repairKit']);
     expect(section('food')?.entries.map((entry) => entry.item)).toEqual(['cookedFish', 'campMeal']);
     expect(section('build')?.entries.map((entry) => entry.item)).toEqual(['chest']);
-    expect(section('route')?.entries.map((entry) => entry.item)).toEqual(['stormCloak']);
+    expect(section('route')?.entries.map((entry) => entry.item)).toEqual(['packFrame']);
     expect(section('parts')?.entries.map((entry) => entry.item)).toEqual(['sticks']);
     expect(section('tools')?.entries.find((entry) => entry.item === 'stoneHatchet')?.detail).toBe('24/24 uses · wood');
     expect(section('tools')?.entries.find((entry) => entry.item === 'stonePick')?.detail).toBe('29/38 uses · rock');
@@ -55,7 +55,6 @@ describe('Pack Ledger inventory view', () => {
     const heavy = packBurdenForInventory([0, 360, 0, 0, 0], {});
     expect(heavy.status).toBe('heavy');
     expect(heavy.sprintBlocked).toBe(false);
-    expect(heavy.staminaDrain).toBeGreaterThan(0.5);
 
     const overloaded = packBurdenForInventory([0, 500, 0, 0, 0], {});
     expect(overloaded.status).toBe('overloaded');
@@ -64,7 +63,6 @@ describe('Pack Ledger inventory view', () => {
 
     const creative = packBurdenForInventory([999, 999, 999, 999, 999], {}, { creative: true });
     expect(creative.status).toBe('creative');
-    expect(creative.staminaDrain).toBe(0);
     expect(creative.sprintBlocked).toBe(false);
   });
 
@@ -81,15 +79,5 @@ describe('Pack Ledger inventory view', () => {
     expect(ledger.summary).toContain('field pack');
     expect(ledger.sections.find((section) => section.id === 'route')?.entries.map((entry) => entry.item)).toEqual(['packFrame']);
     expect(ledger.sections.find((section) => section.id === 'route')?.entries[0].detail).toContain('+28 capacity');
-  });
-
-  it('lists a storm cloak as lightweight route gear with weather protection detail', () => {
-    const crafted: InventoryItems = { stormCloak: 1, echoLantern: 1 };
-    const ledger = buildInventoryLedger([0, 0, 0, 0, 0], crafted, {});
-    const route = ledger.sections.find((section) => section.id === 'route');
-
-    expect(route?.entries.map((entry) => entry.item)).toEqual(['stormCloak', 'echoLantern']);
-    expect(route?.entries[0].detail).toContain('weather cloak');
-    expect(ledger.burden.load).toBe(2.1);
   });
 });

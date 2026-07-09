@@ -53,8 +53,6 @@ export interface InventoryBurden {
   load: number;
   capacity: number;
   ratio: number;
-  staminaDrain: number;
-  exposureRate: number;
   sprintBlocked: boolean;
 }
 
@@ -90,12 +88,10 @@ const ROUTE_GEAR = new Set<ItemId>([
   'echoLantern',
   'packFrame',
   'planeFrame',
-  'stormCloak',
 ]);
 
 const BASE_PACK_CAPACITY = 42;
 export const PACK_FRAME_CAPACITY_BONUS = 28;
-export const STORM_CLOAK_EXPOSURE_MULTIPLIER = 0.68;
 
 const ITEM_LOADS: Partial<Record<ItemId, number>> = {
   dirt: 0.07,
@@ -113,7 +109,6 @@ const ITEM_LOADS: Partial<Record<ItemId, number>> = {
   echoPick: 2.4,
   echoShovel: 2.2,
   packFrame: 1.4,
-  stormCloak: 0.9,
   repairKit: 0.45,
   fishingRod: 1,
   bait: 0.08,
@@ -164,7 +159,6 @@ function entryDetail(id: ItemId, def: ItemDef, count: number, wear: ToolWear): s
   }
   if (id === 'repairKit') return `${count} auto-repair ${count === 1 ? 'kit' : 'kits'}`;
   if (id === 'packFrame') return `carry frame · +${PACK_FRAME_CAPACITY_BONUS} capacity`;
-  if (id === 'stormCloak') return `weather cloak · storm exposure x${STORM_CLOAK_EXPOSURE_MULTIPLIER}`;
   if (id === 'echoLantern') return 'cave resonance light';
   if (id === 'fishingRod') return 'shore and dock casting';
   if (id === 'bait') return 'fishing bait';
@@ -244,8 +238,6 @@ export function packBurdenForInventory(
       load: roundedLoad,
       capacity,
       ratio,
-      staminaDrain: 0,
-      exposureRate: 0,
       sprintBlocked: false,
     };
   }
@@ -257,8 +249,6 @@ export function packBurdenForInventory(
       load: roundedLoad,
       capacity,
       ratio,
-      staminaDrain: 0,
-      exposureRate: 0,
       sprintBlocked: false,
     };
   }
@@ -270,8 +260,6 @@ export function packBurdenForInventory(
       load: roundedLoad,
       capacity,
       ratio,
-      staminaDrain: 0.18,
-      exposureRate: 0,
       sprintBlocked: false,
     };
   }
@@ -279,12 +267,10 @@ export function packBurdenForInventory(
     return {
       status: 'heavy',
       label: 'heavy pack',
-      detail: `${formatAmount(roundedLoad)}/${capacity} load · sprint drains faster`,
+      detail: `${formatAmount(roundedLoad)}/${capacity} load · carry gets awkward`,
       load: roundedLoad,
       capacity,
       ratio,
-      staminaDrain: 0.65,
-      exposureRate: 0.06,
       sprintBlocked: false,
     };
   }
@@ -295,8 +281,6 @@ export function packBurdenForInventory(
     load: roundedLoad,
     capacity,
     ratio,
-    staminaDrain: 1.35,
-    exposureRate: 0.14,
     sprintBlocked: true,
   };
 }

@@ -86,7 +86,6 @@ import {
   nearestStructureOnTiles,
   normalizeStructureSaves,
   placeableName,
-  spendRootCellarProvision,
   structureDismantleBlockers,
   structureSocketCatalog,
   structureSocketOccupancy,
@@ -132,21 +131,11 @@ import {
   type ToolWear,
 } from './sim/tools';
 import {
-  advanceTime as advanceSurvivalTime,
-  eatBestFood,
-  isExposureCritical,
-  isExposureWarning,
-  normalizeSurvivalState,
+  advanceTime,
   normalizeTimeState,
   normalizeWeatherState,
-  prepareHearthSupper,
-  recoverFromCollapse,
-  restAtShelter,
-  survivalReport,
-  updateSurvival,
-  weatherProtectionForInventory,
   weatherAt,
-} from './sim/survival';
+} from './sim/time';
 
 interface TileRingEntry {
   tile: number;
@@ -182,7 +171,7 @@ const WOOD_SLOT = 4;
 const STORAGE_FOCUS_ACTIONS: ChestTransferAction[] = ['depositOne', 'depositAll', 'withdrawOne', 'withdrawAll'];
 
 const KEYBOARD_HELP = `WASD move · space jump · shift sprint · wheel zoom
-LMB mine + chop trees · RMB build · Z/X rotate build/prop · 1-5 pick block · Q eat
+LMB mine + chop trees · RMB build · Z/X rotate build/prop · 1-5 pick block
 Plane: chop 2 trees for 12 wood · B craft · R use/open chest/farm/fish/forage · Shift+R pack prop · V/Shift+E move prop · E board/stow
 F free-flight · F3 stats · H help`;
 
@@ -599,14 +588,10 @@ async function boot(): Promise<void> {
   let lastLandmarkAction = '';
   let lastToolAction = '';
   let lastCaveAction = '';
-  let lastSurvivalAction = '';
-  let exposureWarningActive = false;
-  let exposureCriticalActive = false;
   let lastPickupAction = '';
   let toolWear: ToolWear = normalizeToolWear(loadedSave?.progression?.toolWear);
   const timeState = normalizeTimeState(loadedSave?.time);
   const weatherState = normalizeWeatherState(loadedSave?.weather);
-  const survivalState = normalizeSurvivalState(loadedSave?.survival);
   let characterAction: { action: CharacterAction; held: CharacterPropId; started: number; duration: number } = {
     action: 'idle',
     held: 'hands',
@@ -860,7 +845,6 @@ async function boot(): Promise<void> {
       progression: { pentagons: [...discoveredPentagons], toolWear },
       time: timeState,
       weather: weatherState,
-      survival: survivalState,
       hotbarSel,
       planeCrafted,
     }));
@@ -1099,7 +1083,7 @@ async function boot(): Promise<void> {
     syncHudUx(currentUxProfile);
   });
 
-  let fWas = false, gWas = false, oWas = false, eWas = false, vWas = false, bWas = false, rWas = false, qWas = false, nWas = false, zWas = false, xWas = false, escWas = false, f3Was = false, hWas = false;
+  let fWas = false, gWas = false, oWas = false, eWas = false, vWas = false, bWas = false, rWas = false, nWas = false, zWas = false, xWas = false, escWas = false, f3Was = false, hWas = false;
   let showDiag = params.get('debug') === '1';
   let prevSel = -1;
   let lockHinted = false;
@@ -1191,7 +1175,6 @@ async function boot(): Promise<void> {
       const recipe = status.recipe;
       const planeAlready = recipe.id === 'plane_frame' && planeCrafted;
       const packFrameAlready = recipe.id === 'pack_frame' && itemCount(counts, craftedItems, 'packFrame') > 0;
-      const stormCloakAlready = recipe.id === 'storm_cloak' && itemCount(counts, craftedItems, 'stormCloak') > 0;
       const placeable = isPlaceableItemId(recipe.result);
       return {
         id: recipe.id,
@@ -1199,11 +1182,10 @@ async function boot(): Promise<void> {
         name: recipe.name,
         description: planeAlready ? 'Plane built. Press E to board or stow it.'
           : packFrameAlready ? `Pack frame fitted. Capacity +${packCapacityBonus()} is active.`
-            : stormCloakAlready ? 'Storm cloak fitted. Bad-weather exposure is softened.'
             : recipe.description,
         count: recipe.count,
         owned: itemCount(counts, craftedItems, recipe.result),
-        canCraft: status.canCraft && !planeAlready && !packFrameAlready && !stormCloakAlready,
+        canCraft: status.canCraft && !planeAlready && !packFrameAlready,
         canPlace: placeable && itemCount(counts, craftedItems, recipe.result) > 0,
         selected: placeable && selectedStructureItem === recipe.result,
         focused: craftingOpen && index === craftingFocusIndex,
@@ -1227,11 +1209,6 @@ async function boot(): Promise<void> {
       hud.flash(`pack frame already fitted · capacity +${packCapacityBonus()}`, 2.5);
       return false;
     }
-    if (recipeId === 'storm_cloak' && itemCount(counts, craftedItems, 'stormCloak') > 0) {
-      playAudio('uiDeny');
-      hud.flash('storm cloak already fitted', 2.5);
-      return false;
-    }
     const result = craftRecipe(recipeId, counts, craftedItems, stationItems());
     if (!result.ok || !result.recipe) {
       playAudio(audioEventForCraft(false));
@@ -1249,8 +1226,6 @@ async function boot(): Promise<void> {
       hud.flash('plane frame crafted · press E to board', 4);
     } else if (recipeId === 'pack_frame') {
       hud.flash(`pack frame fitted · capacity ${packBurden().capacity}`, 3.5);
-    } else if (recipeId === 'storm_cloak') {
-      hud.flash('storm cloak fitted · bad weather softened', 3.5);
     } else {
       hud.flash(`crafted ${result.recipe.name}`, 2.5);
     }
@@ -1910,12 +1885,6 @@ async function boot(): Promise<void> {
 
   const currentWeather = () => weatherAt(timeState, weatherState, player.tile, player.radius() - PLANET_RADIUS, player.submerged);
 
-  const currentWeatherProtection = () => weatherProtectionForInventory(craftedItems, currentWeather());
-  const survivalSnapshot = () => ({
-    ...survivalReport(survivalState, currentWeather()),
-    weatherProtection: currentWeatherProtection(),
-  });
-
   const currentFishSchool = () => {
     return fishSchoolAt({
       tile: player.tile,
@@ -2167,35 +2136,9 @@ async function boot(): Promise<void> {
     caveKind: currentNaturalVoid()?.kind ?? null,
   });
 
-  const nearLitWarmth = (): boolean => {
-    const tiles = new Set(nearbyTiles(1));
-    return structures.some((s) => s.item === 'campfire' && s.state?.lit === true && tiles.has(s.tile));
-  };
-
   const shelterAtPlayer = () => {
     const home = homeScore(structures, geo);
-    const inside = home.shelter.tiles.includes(player.tile);
-    return {
-      home,
-      sheltered: inside && home.shelter.protected,
-      functionalShelter: inside && home.shelter.functional,
-    };
-  };
-
-  const tryEatPackedFood = (): boolean => {
-    const result = eatBestFood(craftedItems, survivalState);
-    lastSurvivalAction = result.message;
-    if (!result.ok) {
-      playAudio(audioEventForFoodAction('eat', false));
-      hud.flash(result.message, 2.2);
-      return false;
-    }
-    triggerCharacterAction('interact', result.item as CharacterPropId, 0.9);
-    playAudio(audioEventForFoodAction('eat', true));
-    markSaveDirty();
-    hud.flash(result.message, 2.8);
-    refreshCraftingHud();
-    return true;
+    return { home, inside: home.shelter.tiles.includes(player.tile) };
   };
 
   const tryForage = (): boolean => {
@@ -2510,9 +2453,6 @@ async function boot(): Promise<void> {
     return false;
   };
 
-  const homeBedrollStructure = (): StructureSave | null =>
-    structures.find((s) => s.item === 'bedroll' && s.state?.home === true) ?? null;
-
   const relocatePlayerToTile = (tile: number): void => {
     player.spawnAt(Math.max(0, Math.min(geo.count - 1, Math.trunc(tile))));
     player.vx = 0;
@@ -2559,30 +2499,6 @@ async function boot(): Promise<void> {
       blocked: false,
       collision: structureCollisionDiagnostics(start, target),
     };
-  };
-
-  // Debug/dev-only rescue: force-relocates the player home/to spawn. No longer called from the
-  // animate loop — normal exposure pressure is a HUD warning + ongoing stamina drain (see
-  // isExposureWarning/isExposureCritical below), never a silent automatic teleport. Reachable
-  // only via the explicit debug.collapse(force) console hook.
-  const triggerCollapseRecovery = (reason = 'exposure', force = false) => {
-    if (!force && (creativeActive || !isExposureCritical(survivalState))) return null;
-    const bedroll = homeBedrollStructure();
-    const home = homeScore(structures, geo);
-    const result = recoverFromCollapse(survivalState, timeState, weatherState, {
-      ...home.shelter,
-      hasHome: bedroll !== null,
-    });
-    relocatePlayerToTile(bedroll?.tile ?? spawnTile);
-    closeStorage();
-    craftingOpen = false;
-    refreshCraftingHud();
-    lastSurvivalAction = `${reason}:${result.message}`;
-    triggerCharacterAction('sleep', bedroll ? 'bedroll' : 'hands', 1.05);
-    playAudio(bedroll ? 'hearthRest' : 'uiDeny');
-    markSaveDirty();
-    hud.flash(result.message, 5);
-    return result;
   };
 
   const useEchoLantern = (): boolean => {
@@ -2809,41 +2725,16 @@ async function boot(): Promise<void> {
       fishTrapContext: target.item === 'fishTrap' || target.item === 'shoreNet' ? fishTrapContextFor(target) : undefined,
     });
     const result = command.interaction!;
-    let feedbackMessage = result.message;
-    let hearthSupperPrepared = false;
+    const feedbackMessage = result.message;
     lastStructureAction = command.action;
     recordBuildCommand(source, 'use', 'structure', command, target);
     if (command.foodAction) lastFoodAction = command.foodAction;
     if (result.ok) {
-      if (result.mode === 'home') {
-        const homeBeforeRest = homeScore(structures, geo);
-        const rest = restAtShelter(survivalState, timeState, weatherState, homeBeforeRest.shelter);
-        feedbackMessage = rest.message;
-        lastSurvivalAction = rest.message;
-        lastStructureAction = `${target.item}:home:${result.message}:${rest.message}`;
-        if (homeBeforeRest.shelter.functional && homeBeforeRest.shelter.cellarProvisions > 0) {
-          const spend = spendRootCellarProvision(structures, geo);
-          if (spend.ok) {
-            const supper = prepareHearthSupper(survivalState, {
-              ...homeBeforeRest.shelter,
-              cellarProvisions: homeBeforeRest.shelter.cellarProvisions,
-            });
-            if (supper.ok) {
-              hearthSupperPrepared = true;
-              feedbackMessage = `${rest.message} · ${supper.message}`;
-              lastSurvivalAction = `${rest.message} · ${supper.message}`;
-              lastStructureAction = `${target.item}:home:${result.message}:${rest.message}:${supper.message}:cellar ${spend.remaining}`;
-            }
-          }
-        }
-      }
       const action: CharacterAction = result.mode === 'setTrap' || result.mode === 'checkTrap' || result.mode === 'collectTrap' || result.mode === 'setNet' || result.mode === 'checkNet' || result.mode === 'collectNet'
         ? 'fish'
         : result.mode === 'collectWater'
         ? 'farm'
         : result.mode === 'cook' || result.mode === 'preserve' || result.mode === 'cache' || result.mode === 'withdrawProvision'
-        ? 'cook'
-        : hearthSupperPrepared
         ? 'cook'
         : result.mode === 'home'
         ? 'sleep'
@@ -2853,7 +2744,7 @@ async function boot(): Promise<void> {
       const movedProp = result.moved
         ? Object.keys(result.moved).find((id) => Object.prototype.hasOwnProperty.call(ITEM_DEFS, id)) as CharacterPropId | undefined
         : undefined;
-      triggerCharacterAction(action, movedProp ?? (hearthSupperPrepared ? 'trailRation' : propForStructureInteraction(target.item, result.mode)), action === 'sleep' ? 0.85 : hearthSupperPrepared ? 0.95 : result.mode === 'forecast' ? 0.72 : 0.55);
+      triggerCharacterAction(action, movedProp ?? propForStructureInteraction(target.item, result.mode), action === 'sleep' ? 0.85 : result.mode === 'forecast' ? 0.72 : 0.55);
       playAudio(audioEventForStructure(target.item, result.mode, true));
       markSaveDirty();
       structureRenderer.setStructures(structures);
@@ -2902,7 +2793,7 @@ async function boot(): Promise<void> {
       controls: { ux: uxManager.snapshot(), gamepad: gamepad.snapshot(), touch: touch.enabled, inputActive: input.active(), aimActive: input.active() || gamepad.active(), panels: currentPanelOwnership() },
       relocation: relocationDiagnostics(),
       structureCollision: structureCollisionDiagnostics(),
-      survival: { ...survivalSnapshot(), time: { ...timeState }, state: { ...survivalState }, pack: packBurden(), lastAction: lastSurvivalAction },
+      time: { ...timeState, weather: currentWeather() },
       caves: { current: currentNaturalVoid(), signal: nearbyCaveSignal(), lastAction: lastCaveAction, echoLantern: itemCount(counts, craftedItems, 'echoLantern') },
       storage: { open: openChestId !== null, chestId: openChestId, state: currentChestStorage() },
       character: character.state(),
@@ -2971,7 +2862,6 @@ async function boot(): Promise<void> {
       const layer = columns.groundLayerBelow(target, layers.bounds[0]);
       const mat = columns.materialAt(target, layer);
       const materialItem = materialItemForMaterial(mat);
-      const before = { stamina: survivalState.stamina, exposure: survivalState.exposure };
       const ok = columns.mine(target, layer);
       if (ok) {
         mining.clear(target, layer);
@@ -2986,8 +2876,6 @@ async function boot(): Promise<void> {
         tile: target,
         layer,
         materialItem,
-        before,
-        after: { stamina: survivalState.stamina, exposure: survivalState.exposure },
         resourceDrops: resourceDropDiagnostics(),
         mineProgress: mineProgressDiagnostics(),
       };
@@ -3047,13 +2935,7 @@ async function boot(): Promise<void> {
       markSaveDirty();
       return { ...toolWear };
     },
-    survival: () => ({ ...survivalSnapshot(), time: { ...timeState }, state: { ...survivalState }, pack: packBurden(), lastAction: lastSurvivalAction, shelter: shelterAtPlayer() }),
-    setSurvival: (state: unknown) => {
-      Object.assign(survivalState, normalizeSurvivalState(state));
-      markSaveDirty();
-      return { ...survivalState };
-    },
-    collapse: (force = true) => triggerCollapseRecovery('debug', force),
+    time: () => ({ ...timeState, weather: currentWeather(), shelter: shelterAtPlayer() }),
     setWeather: (state: unknown) => {
       Object.assign(weatherState, normalizeWeatherState(state));
       markSaveDirty();
@@ -3065,7 +2947,6 @@ async function boot(): Promise<void> {
       return { ...timeState };
     },
     debugSetItem: setDebugItemCount,
-    eat: () => tryEatPackedFood(),
     fish: (force = false) => tryFish(force),
     fishSchool: () => currentFishSchool(),
     fishingCue: () => currentFishingCue(),
@@ -3140,7 +3021,6 @@ async function boot(): Promise<void> {
         progression: { pentagons: [...discoveredPentagons], toolWear },
         time: timeState,
         weather: weatherState,
-        survival: survivalState,
         hotbarSel,
         planeCrafted,
       })),
@@ -3164,7 +3044,6 @@ async function boot(): Promise<void> {
         toolWear = normalizeToolWear(save.progression?.toolWear);
         Object.assign(timeState, normalizeTimeState(save.time));
         Object.assign(weatherState, normalizeWeatherState(save.weather));
-        Object.assign(survivalState, normalizeSurvivalState(save.survival));
         refreshUseButton();
         hotbarSel = Math.max(0, Math.min(SLOTS.length - 1, save.hotbarSel));
         planeCrafted = save.planeCrafted;
@@ -3403,7 +3282,7 @@ async function boot(): Promise<void> {
         mineProgress: mineProgressDiagnostics(),
         treeAssets: treeAssetDiagnostics(),
         fishVisuals: fishSchoolRenderer.stats(),
-        survival: { ...survivalSnapshot(), time: { ...timeState }, pack: packBurden() },
+        time: { ...timeState, weather: currentWeather() },
         structures: { relocation: relocationDiagnostics(), snapPreview: currentStructureSnapPreview(), commands: buildCommandDiagnostics() },
       };
     },
@@ -3433,7 +3312,7 @@ async function boot(): Promise<void> {
       ledger: packLedger(),
       tools: { ...toolSummary(craftedItems, toolWear), wear: { ...toolWear }, lastAction: lastToolAction, reach: playerReach() },
       food: { ...foodCounts(), lastAction: lastFoodAction, nearWater: nearFishingWater(), nearDock: nearDock(), school: currentFishSchool(), fishingCue: currentFishingCue(), fishVisuals: fishSchoolRenderer.stats(), forage: currentForage() },
-      survival: { ...survivalSnapshot(), time: { ...timeState }, pack: packBurden(), lastAction: lastSurvivalAction },
+      time: { ...timeState, weather: currentWeather() },
       audio: audio.state(),
       controls: { ux: uxManager.snapshot(), gamepad: gamepad.snapshot(), touch: touch.enabled, panels: currentPanelOwnership() },
       caves: { current: currentNaturalVoid(), signal: nearbyCaveSignal(), lastAction: lastCaveAction },
@@ -3520,7 +3399,7 @@ async function boot(): Promise<void> {
     if (gamepadNotice) hud.flash(gamepadNotice === 'gamepad disconnected' ? gamepadNotice : 'gamepad ready', 2.4);
 
     // key edges
-    const fDown = input.down('KeyF'), gDown = input.down('KeyG'), oDown = input.down('KeyO'), eDown = input.down('KeyE'), vDown = input.down('KeyV'), bDown = input.down('KeyB'), rDown = input.down('KeyR'), qDown = input.down('KeyQ'), nDown = input.down('KeyN'), zDown = input.down('KeyZ'), xDown = input.down('KeyX'), escDown = input.down('Escape');
+    const fDown = input.down('KeyF'), gDown = input.down('KeyG'), oDown = input.down('KeyO'), eDown = input.down('KeyE'), vDown = input.down('KeyV'), bDown = input.down('KeyB'), rDown = input.down('KeyR'), nDown = input.down('KeyN'), zDown = input.down('KeyZ'), xDown = input.down('KeyX'), escDown = input.down('Escape');
     const f3Down = input.down('F3'), hDown = input.down('KeyH');
     const fPressed = input.pressed('KeyF') || (fDown && !fWas);
     const gPressed = input.pressed('KeyG') || (gDown && !gWas);
@@ -3529,7 +3408,6 @@ async function boot(): Promise<void> {
     const vPressed = input.pressed('KeyV') || (vDown && !vWas);
     const bPressed = input.pressed('KeyB') || (bDown && !bWas);
     const rPressed = input.pressed('KeyR') || (rDown && !rWas);
-    const qPressed = input.pressed('KeyQ') || (qDown && !qWas);
     const nPressed = input.pressed('KeyN') || (nDown && !nWas);
     const zPressed = input.pressed('KeyZ') || (zDown && !zWas);
     const xPressed = input.pressed('KeyX') || (xDown && !xWas);
@@ -3588,7 +3466,6 @@ async function boot(): Promise<void> {
     } else if ((rPressed || (tf.use && !worldBlocked()) || (gp.use && !worldBlocked() && !gamepadUseConsumed)) && !worldBlocked() && !autopilot.active) {
       useStructure(undefined, gp.use ? 'gamepad' : tf.use ? 'touch' : 'keyboard');
     }
-    if ((qPressed || (gp.eat && !worldBlocked())) && !worldBlocked() && !autopilot.active) tryEatPackedFood();
     const gamepadBuildRotate = (selectedStructureItem !== null || relocationCursor !== null) && !worldBlocked() && (gp.pin || gp.clearPin);
     if ((zPressed || xPressed || gamepadBuildRotate) && !worldBlocked() && !autopilot.active) {
       rotateBuildFacing((zPressed || gp.clearPin) && !xPressed ? -1 : 1, undefined, gamepadBuildRotate ? 'gamepad' : 'keyboard');
@@ -3599,7 +3476,7 @@ async function boot(): Promise<void> {
     }
     if (f3Pressed || (gp.diag && !gpPanelConsumed)) showDiag = !showDiag;
     if (hPressed || (gp.help && !gpPanelConsumed)) hud.toggleHelp();
-    fWas = fDown; gWas = gDown; oWas = oDown; eWas = eDown; vWas = vDown; bWas = bDown; rWas = rDown; qWas = qDown; nWas = nDown; zWas = zDown; xWas = xDown; escWas = escDown; f3Was = f3Down; hWas = hDown;
+    fWas = fDown; gWas = gDown; oWas = oDown; eWas = eDown; vWas = vDown; bWas = bDown; rWas = rDown; nWas = nDown; zWas = zDown; xWas = xDown; escWas = escDown; f3Was = f3Down; hWas = hDown;
     worldInputBlocked = worldBlocked();
     if (worldInputBlocked) {
       input.cancelWorldInput();
@@ -3660,7 +3537,7 @@ async function boot(): Promise<void> {
       const upDown = (jumpIntent ? 1 : 0) + (downIntent ? -1 : 0);
       const sprintIntent = !motionBlocked && (input.down('ShiftLeft') || tf.sprint || gp.sprint);
       const burden = packBurden();
-      const sprintAllowed = creativeActive || (survivalState.stamina > 8 && !burden.sprintBlocked);
+      const sprintAllowed = creativeActive || !burden.sprintBlocked;
       player.update(dt, {
         forward: fwd, strafe,
         upDown: player.mode !== 'walk' ? upDown : 0,
@@ -3668,40 +3545,7 @@ async function boot(): Promise<void> {
         jump: jumpIntent,
         swimUp: jumpIntent,
       });
-      const shelter = shelterAtPlayer();
-      advanceSurvivalTime(timeState, weatherState, dt, player.mode === 'plane' ? 13 : 8);
-      updateSurvival(survivalState, {
-        dt,
-        moving: Math.hypot(player.vx, player.vy, player.vz) > 0.5,
-        sprinting: sprintIntent && sprintAllowed && player.mode === 'walk',
-        swimming: player.submerged > 0.4,
-        flying: player.mode === 'plane',
-        minutesElapsed: dt * (player.mode === 'plane' ? 13 : 8),
-        packBurden: creativeActive ? null : burden,
-        sheltered: shelter.sheltered,
-        functionalShelter: shelter.functionalShelter,
-        nearWarmth: nearLitWarmth(),
-        weather: currentWeather(),
-        weatherProtection: currentWeatherProtection(),
-        thresholdEffect: null,
-      });
-      // Soft exposure pressure: warn as exposure enters the 'worn' band, then keep the ongoing
-      // stamina-drain penalty (applied inside updateSurvival) visible while exposure is maxed.
-      // No relocation happens here — the player only moves via the bedroll "use" action above
-      // (player choice) or the explicit debug.collapse() console hook.
-      const exposureCriticalNow = isExposureCritical(survivalState);
-      const exposureWarningNow = isExposureWarning(survivalState);
-      if (exposureCriticalNow && !exposureCriticalActive) {
-        hud.flash('exposure maxed — cold is winning, stamina draining fast until you find shelter or warmth', 5);
-      } else if (exposureWarningNow && !exposureWarningActive) {
-        hud.flash('exposure rising — seek shelter or warmth soon', 4);
-      }
-      exposureWarningActive = exposureWarningNow;
-      exposureCriticalActive = exposureCriticalNow;
-      if (sprintIntent && !sprintAllowed && player.mode === 'walk') {
-        const reason = burden.sprintBlocked ? `${burden.label}: stash materials or build a chest` : 'too winded to sprint';
-        if (lastSurvivalAction !== reason) lastSurvivalAction = reason;
-      }
+      advanceTime(timeState, weatherState, dt, player.mode === 'plane' ? 13 : 8);
       if (player.planeStowed) hud.flash(player.submerged > 0.2 ? 'splashdown' : 'touched down', 2);
     }
 
@@ -3922,15 +3766,13 @@ async function boot(): Promise<void> {
       const home = homeScore(structures, geo);
       const food = foodCounts();
       const foodTotal = food.berries + food.caveMushroom + food.snowHerb + food.kelp + food.rawFish + food.cookedFish + food.campMeal + food.trailRation + food.expeditionStew;
-      const survival = survivalSnapshot();
       const burden = packBurden();
       const natural = currentNaturalVoid();
       const caveSignal = nearbyCaveSignal();
       const landmarkProgress = progressionState();
       const landmarkNearby = nearbyLandmarkTile() !== null;
       const fishingCueNow = currentFishingCue();
-      const vitalsAlert = isExposureCritical(survivalState) ? 'critical' : isExposureWarning(survivalState) ? 'warning' : 'none';
-      hud.setVitals(`${metrics.fpsEma.toFixed(0)} fps${metrics.active() ? ` · ● ${metrics.active()}` : ''} · ${survival.status} ${survival.stamina}/${survival.exposure}${!creativeActive && burden.status !== 'light' ? ` · ${burden.label}` : ''}${structures.length > 0 ? ` · ${home.label}` : ''}${foodTotal > 0 ? ` · food ${foodTotal}` : ''}${landmarkProgress.count > 0 || landmarkNearby ? ` · ${landmarkProgress.label}` : ''}${fishingCueNow.showInVitals ? ` · ${fishingCueNow.hud}` : ''}`, vitalsAlert);
+      hud.setVitals(`${metrics.fpsEma.toFixed(0)} fps${metrics.active() ? ` · ● ${metrics.active()}` : ''}${!creativeActive && burden.status !== 'light' ? ` · ${burden.label}` : ''}${structures.length > 0 ? ` · ${home.label}` : ''}${foodTotal > 0 ? ` · food ${foodTotal}` : ''}${landmarkProgress.count > 0 || landmarkNearby ? ` · ${landmarkProgress.label}` : ''}${fishingCueNow.showInVitals ? ` · ${fishingCueNow.hud}` : ''}`);
       if (showDiag) {
         const s = streamer.stats();
         const propStats = structureRenderer.stats();
@@ -3955,7 +3797,7 @@ async function boot(): Promise<void> {
           `tile ${player.tile}${geo.degreeOf(player.tile) === 5 ? ' *pentagon*' : ''} · GP(${M},0)`,
           `chunks ${s.resident} res / ${s.queued} q · ${(s.triangles / 1000).toFixed(0)}k tris`,
           `columns ${columns.generatedCount.toLocaleString()} / ${geo.count.toLocaleString()} · edits ${edits}`,
-          `pack ${burden.label} · ${burden.detail}${burden.staminaDrain > 0 ? ` · drain ${burden.staminaDrain.toFixed(2)}` : ''}${burden.sprintBlocked ? ' · sprint blocked' : ''}`,
+          `pack ${burden.label} · ${burden.detail}${burden.sprintBlocked ? ' · sprint blocked' : ''}`,
           `tools ${tools.owned.map((tool) => tool.label).join(' · ') || 'hands'}${tools.repairKits > 0 ? ` · repair kits ${tools.repairKits}` : ''} · reach ${playerReach().toFixed(1)}`,
           `character ${characterState.action} · held ${characterState.held} · back ${characterState.backProps.join(',') || 'none'} · silhouette ${characterStats.silhouetteParts} · sockets ${characterStats.propSockets.length}`,
           `audio ${audioState.muted ? 'muted' : audioState.unlocked ? 'on' : 'locked'} · loaded ${audioState.loaded.length} · music ${audioState.musicStarted ? audioState.musicPlaying ? 'playing' : audioState.musicQueued ? 'waiting' : 'paused' : 'idle'}${audioState.musicTrack ? ` ${audioState.musicTrack}` : ''} · last ${audioState.lastEvent ?? 'none'}${audioState.errors.length ? ` · errors ${audioState.errors.length}` : ''}`,
@@ -3963,14 +3805,13 @@ async function boot(): Promise<void> {
           `food bait ${food.bait} · seeds ${food.seeds} · compost ${food.compost} · berries ${food.berries} · mushroom/herb/kelp/reeds ${food.caveMushroom}/${food.snowHerb}/${food.kelp}/${food.reeds} · raw/cooked fish ${food.rawFish}/${food.cookedFish} · meals/rations/stews ${food.campMeal}/${food.trailRation}/${food.expeditionStew}`,
           `fish ${fishSchoolStats.label} · strength ${fishSchoolStats.strength.toFixed(2)} · catch ${fishSchoolStats.catchCount} · cue ${fishingCueNow.hud} · visual ${fishVisualStats.slug ?? 'none'} pts ${fishVisualStats.pointSchoolSprites} path ${fishVisualStats.swimPathBeads}`,
           `forage ${currentForage().label} · strength ${currentForage().strength.toFixed(2)}`,
-          `survival ${survival.label} · day ${timeState.day + 1} ${(Math.floor(timeState.minute / 60)).toString().padStart(2, '0')}:${(Math.floor(timeState.minute % 60)).toString().padStart(2, '0')}`,
+          `${currentWeather().label} · day ${timeState.day + 1} ${(Math.floor(timeState.minute / 60)).toString().padStart(2, '0')}:${(Math.floor(timeState.minute % 60)).toString().padStart(2, '0')}`,
           `landmarks ${landmarkProgress.count}/${landmarkProgress.total} · meshes ${landmarkStats.meshes} · lit ${landmarkStats.lit}`,
           natural ? `natural void ${natural.kind} · depth ${natural.depth.toFixed(1)} m` : '',
           caveSignal && !natural ? `cave signal ${caveSignal.label ?? caveKindLabel(caveSignal.kind)} · ${caveSignal.distance} ring${caveSignal.distance === 1 ? '' : 's'} · depth ${caveSignal.depth.toFixed(1)} m${caveSignal.clearance !== undefined ? ` · clearance ${caveSignal.clearance}` : ''}` : '',
           lastFoodAction ? `last food ${lastFoodAction}` : '',
           lastToolAction ? `last tool ${lastToolAction}` : '',
           lastCaveAction ? `last cave ${lastCaveAction}` : '',
-          lastSurvivalAction ? `last survival ${lastSurvivalAction}` : '',
           lastLandmarkAction ? `last landmark ${lastLandmarkAction}` : '',
           lastEditMs > 0 ? `last edit rebuild ${lastEditMs.toFixed(1)} ms` : '',
         ].filter((l) => l !== ''));

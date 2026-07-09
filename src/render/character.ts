@@ -28,7 +28,6 @@ const PROP_COLORS: Record<CharacterPropId, number> = {
   echoPick: 0x6de2d8,
   echoShovel: 0x78cfc2,
   packFrame: 0xb58b52,
-  stormCloak: 0x6fa6b4,
   repairKit: 0xc9a56d,
   fishingRod: 0xc8a36b,
   bait: 0xc98b5a,
@@ -339,26 +338,6 @@ export class Character {
         g.add(mesh(box, strapMat, [0, 0.32, -0.08], [0.44, 0.055, 0.04], 'packFrameReedLash'));
         g.add(mesh(torus, mat(0xc9a56d), [0, 0.5, -0.05], [0.9, 0.55, 0.9], 'packFrameShoulderLoop'));
         g.add(mesh(box, mat(0x6b4a2f), [0, 0.23, -0.03], [0.26, 0.22, 0.12], 'packFramePouch'));
-        return g;
-      }
-      if (id === 'stormCloak') {
-        const cloakMat = mat(0x6fa6b4, 0.78, 0.01, 0x1d4d5c);
-        const wetEdgeMat = mat(0xb8dce4, 0.38, 0.03, 0x5f9eb0);
-        g.add(mesh(box, cloakMat, [0, 0.36, -0.02], [0.56, 0.66, 0.06], 'stormCloakBody'));
-        g.add(mesh(box, cloakMat, [0, 0.66, 0], [0.66, 0.17, 0.09], 'stormCloakShoulders'));
-        const leftFlap = mesh(box, cloakMat, [-0.34, 0.33, -0.01], [0.13, 0.52, 0.05], 'stormCloakSideFlapL');
-        leftFlap.rotation.z = -0.12;
-        const rightFlap = mesh(box, cloakMat, [0.34, 0.33, -0.01], [0.13, 0.52, 0.05], 'stormCloakSideFlapR');
-        rightFlap.rotation.z = 0.12;
-        g.add(leftFlap, rightFlap);
-        g.add(mesh(cyl8, cloakMat, [0, 0.78, -0.02], [0.22, 0.18, 0.18], 'stormCloakHood'));
-        g.add(mesh(box, wetEdgeMat, [0, 0.1, -0.04], [0.62, 0.06, 0.04], 'stormCloakWetHem'));
-        g.add(mesh(box, mat(0xc9a56d), [0, 0.62, -0.08], [0.44, 0.04, 0.035], 'stormCloakReedTie'));
-        for (let i = -1; i <= 1; i++) {
-          const stripe = mesh(box, wetEdgeMat, [i * 0.18, 0.36, -0.065], [0.028, 0.44, 0.022], 'stormCloakRainStripe');
-          stripe.rotation.z = i * 0.05;
-          g.add(stripe);
-        }
         return g;
       }
       if (id === 'fishingRod') {
@@ -952,12 +931,6 @@ export class Character {
         obj.scale.setScalar(0.95);
         continue;
       }
-      if (id === 'stormCloak') {
-        obj.position.set(0, -0.16, 0.1);
-        obj.rotation.set(0.1, 0, 0);
-        obj.scale.setScalar(1.14);
-        continue;
-      }
       obj.scale.setScalar(0.72);
       obj.position.set(-0.26 + visibleIndex * 0.17, -0.12 + visibleIndex * 0.02, 0.02);
       obj.rotation.set(0.85, 0.08 * visibleIndex, -0.55 + visibleIndex * 0.22);
@@ -1052,10 +1025,12 @@ export class Character {
     switch (state.action) {
       case 'mine':
       case 'chop':
-        this.rightArm.rotation.x = -0.45 - swing * 1.35;
+        // rotation.x > 0 swings a hanging arm toward -Z (the character's front, where the
+        // target sits) — this was negative, swinging the tool backward instead of striking forward.
+        this.rightArm.rotation.x = 0.45 + swing * 1.35;
         this.rightArm.rotation.z = -0.32;
         this.rightSocket.rotation.z = 0.55 * swing;
-        this.leftArm.rotation.x = -0.25;
+        this.leftArm.rotation.x = 0.25;
         this.pilotBody.rotation.x = -0.06 * swing;
         this.rightLeg.rotation.x = -0.08;
         this.leftLeg.rotation.x = 0.12;

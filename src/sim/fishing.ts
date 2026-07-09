@@ -1,5 +1,5 @@
 import type { InventoryItems, ItemId } from './crafting';
-import type { WeatherReport } from './survival';
+import type { WeatherReport } from './time';
 import type { NaturalVoidKind } from '../world/caves';
 
 export type FishSchoolKind = 'none' | 'shore' | 'dock' | 'run' | 'storm' | 'cave';

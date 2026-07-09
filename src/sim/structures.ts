@@ -207,12 +207,6 @@ export interface StructureSocketSpec {
   glbPolicy: 'decorative-skin-after-normalization' | 'procedural-only';
 }
 
-export interface RootCellarSpendResult {
-  ok: boolean;
-  cellarId?: number;
-  remaining: number;
-}
-
 export type ChestTransferAction = 'depositOne' | 'depositAll' | 'withdrawOne' | 'withdrawAll';
 
 export interface ChestStorageRow {
@@ -1166,40 +1160,6 @@ export function rainCisternWaterCapacity(): number {
 
 export function rootCellarProvisionCapacity(): number {
   return ROOT_CELLAR_CAPACITY;
-}
-
-export function rootCellarProvisionCount(structures: readonly StructureSave[], topology?: StructureTopology): number {
-  return shelterReport(structures, topology).cellarProvisions;
-}
-
-export function spendRootCellarProvision(structures: StructureSave[], topology?: StructureTopology): RootCellarSpendResult {
-  const shelter = shelterReport(structures, topology);
-  const localTiles = new Set(shelter.tiles);
-  let best: StructureSave | null = null;
-  let bestProvisions = 0;
-  for (const s of structures) {
-    if (s.item !== 'rootCellar') continue;
-    if (localTiles.size > 0 && !localTiles.has(s.tile)) continue;
-    const provisions = rootCellarProvisions(s);
-    if (provisions <= bestProvisions) continue;
-    best = s;
-    bestProvisions = provisions;
-  }
-  if (!best) {
-    return { ok: false, remaining: shelter.cellarProvisions };
-  }
-  const next = bestProvisions - 1;
-  best.state = {
-    ...best.state,
-    provisions: next > 0 ? next : undefined,
-  };
-  if (best.state.provisions === undefined) delete best.state.provisions;
-  if (Object.keys(best.state).length === 0) delete best.state;
-  return {
-    ok: true,
-    cellarId: best.id,
-    remaining: rootCellarProvisionCount(structures, topology),
-  };
 }
 
 function useRainCistern(cistern: StructureSave, ctx?: RainCisternContext): StructureInteractionResult {

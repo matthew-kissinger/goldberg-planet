@@ -54,8 +54,8 @@ describe('Hearth and Horizon crafting rules', () => {
   });
 
   it('reports recipe readiness and drops unknown or empty saved items', () => {
-    const crafted = normalizeInventory({ workbench: 1, sticks: 0, stoneHatchet: 1, stonePick: 2, echoPick: 1, packFrame: 1, stormCloak: 1, repairKit: 1, bait: 2, compost: 2, berries: 3, caveMushroom: 1, snowHerb: 1, kelp: 2, reeds: 3, rawFish: 1, trailRation: 2, expeditionStew: 1, glowCrystal: 2, echoLantern: 1, nope: 5 } as InventoryItems);
-    expect(crafted).toEqual({ workbench: 1, stoneHatchet: 1, stonePick: 2, echoPick: 1, packFrame: 1, stormCloak: 1, repairKit: 1, bait: 2, compost: 2, berries: 3, caveMushroom: 1, snowHerb: 1, kelp: 2, reeds: 3, rawFish: 1, trailRation: 2, expeditionStew: 1, glowCrystal: 2, echoLantern: 1 });
+    const crafted = normalizeInventory({ workbench: 1, sticks: 0, stoneHatchet: 1, stonePick: 2, echoPick: 1, packFrame: 1, repairKit: 1, bait: 2, compost: 2, berries: 3, caveMushroom: 1, snowHerb: 1, kelp: 2, reeds: 3, rawFish: 1, trailRation: 2, expeditionStew: 1, glowCrystal: 2, echoLantern: 1, nope: 5 } as InventoryItems);
+    expect(crafted).toEqual({ workbench: 1, stoneHatchet: 1, stonePick: 2, echoPick: 1, packFrame: 1, repairKit: 1, bait: 2, compost: 2, berries: 3, caveMushroom: 1, snowHerb: 1, kelp: 2, reeds: 3, rawFish: 1, trailRation: 2, expeditionStew: 1, glowCrystal: 2, echoLantern: 1 });
 
     const statuses = allRecipeStatuses([0, 8, 0, 0, 4], { workbench: 1, sticks: 4 });
     const pick = statuses.find((status) => status.recipe.id === 'stone_pick');
@@ -119,19 +119,6 @@ describe('Hearth and Horizon crafting rules', () => {
     expect(result.ok).toBe(true);
     expect(result.result).toBe('packFrame');
     expect(crafted).toEqual({ packFrame: 1 });
-    expect(materials).toEqual([0, 0, 0, 0, 0]);
-  });
-
-  it('crafts a storm cloak as a wearable weather-prep upgrade', () => {
-    const materials = [0, 0, 0, 4, 0];
-    const crafted: InventoryItems = { reeds: 4, kelp: 1, snowHerb: 1 };
-
-    expect(craftRecipe('storm_cloak', materials, crafted).stationMissing?.item).toBe('workbench');
-
-    const result = craftRecipe('storm_cloak', materials, crafted, { workbench: 1 });
-    expect(result.ok).toBe(true);
-    expect(result.result).toBe('stormCloak');
-    expect(crafted).toEqual({ stormCloak: 1 });
     expect(materials).toEqual([0, 0, 0, 0, 0]);
   });
 

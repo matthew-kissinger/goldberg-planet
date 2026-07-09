@@ -139,6 +139,20 @@ describe('character renderer Soft-Facet Wayfarer readability', () => {
     expect(leftLeg.rotation.x).toBeLessThan(0);
   });
 
+  it('swings the tool arm forward when chopping or mining, not the reverse', () => {
+    // Same -Z-is-forward convention as the jump pose above: rotation.x > 0 on a hanging arm
+    // swings its hand toward -Z (the target in front of the character). The chop/mine swing
+    // had this backwards, so the tool appeared to strike behind the character instead of ahead.
+    const scene = new THREE.Scene();
+    const character = new Character(scene);
+
+    for (const action of ['chop', 'mine'] as const) {
+      character.update(fakePlayer(), { x: 0, y: 0, z: 0 }, 5, 1 / 60, visualState(action, 'stoneHatchet'));
+      const rightArm = findPart(character, 'rightSdfBlendArm').parent!;
+      expect(rightArm.rotation.x).toBeGreaterThan(0);
+    }
+  });
+
   it('keeps held props in hand and separates stowed route gear on the back', () => {
     const scene = new THREE.Scene();
     const character = new Character(scene);
@@ -148,7 +162,7 @@ describe('character renderer Soft-Facet Wayfarer readability', () => {
       { x: 0, y: 0, z: 0 },
       3.5,
       1 / 60,
-      visualState('discover', 'waystone', ['waystone', 'packFrame', 'stormCloak', 'echoLantern']),
+      visualState('discover', 'waystone', ['waystone', 'packFrame', 'echoLantern']),
     );
 
     const stats = character.stats();
@@ -156,12 +170,12 @@ describe('character renderer Soft-Facet Wayfarer readability', () => {
     expect(stats.visible).toBe(true);
     expect(stats.heldProp).toBe('waystone');
     expect(stats.heldPropMeshes).toBeGreaterThanOrEqual(3);
-    expect(stats.backPropsVisible).toEqual(expect.arrayContaining(['packFrame', 'stormCloak', 'echoLantern']));
+    expect(stats.backPropsVisible).toEqual(expect.arrayContaining(['packFrame', 'echoLantern']));
     expect(stats.backPropsVisible).not.toContain('waystone');
     expect(stats.backPropMeshes).toBeGreaterThan(10);
   });
 
-  it('covers survival, travel, pickup, and rest action poses through renderer state', () => {
+  it('covers combat, travel, pickup, and rest action poses through renderer state', () => {
     const scene = new THREE.Scene();
     const character = new Character(scene);
     const scenarios: [CharacterVisualState['action'], CharacterPropId][] = [
@@ -172,12 +186,12 @@ describe('character renderer Soft-Facet Wayfarer readability', () => {
       ['pickup', 'glowCrystal'],
       ['ward', 'hands'],
       ['shoot', 'hands'],
-      ['brace', 'stormCloak'],
+      ['brace', 'echoLantern'],
       ['stagger', 'hands'],
     ];
 
     for (const [action, held] of scenarios) {
-      character.update(fakePlayer(), { x: 0, y: 0, z: 0 }, 3.5, 1 / 60, visualState(action, held, ['packFrame', 'stormCloak']));
+      character.update(fakePlayer(), { x: 0, y: 0, z: 0 }, 3.5, 1 / 60, visualState(action, held, ['packFrame', 'echoLantern']));
       const stats = character.stats();
       expect(character.state().action).toBe(action);
       expect(stats.heldProp).toBe(held);

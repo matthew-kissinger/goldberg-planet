@@ -99,11 +99,9 @@ export function audioEventForStructure(item: string, mode?: string, ok = true): 
   return 'uiConfirm';
 }
 
-export function audioEventForFoodAction(action: 'eat' | 'fish' | 'forage', ok = true): AudioEventId {
+export function audioEventForFoodAction(action: 'fish' | 'forage', ok = true): AudioEventId {
   if (!ok) return 'uiDeny';
-  if (action === 'fish') return 'fishingCatch';
-  if (action === 'forage') return 'gatherSoft';
-  return 'hearthRest';
+  return action === 'fish' ? 'fishingCatch' : 'gatherSoft';
 }
 
 /**

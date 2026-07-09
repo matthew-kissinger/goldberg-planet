@@ -74,7 +74,7 @@ describe('Hearth and Horizon save boundary', () => {
       trees: a.trees,
       mining,
       inventory: [2, 4, 6, 8, 10],
-      craftedItems: { sticks: 4, workbench: 1, stoneHatchet: 1, stoneAxe: 1, packFrame: 1, stormCloak: 1, compost: 2, berries: 3, reeds: 4, rawFish: 1, campMeal: 1, expeditionStew: 1 },
+      craftedItems: { sticks: 4, workbench: 1, stoneHatchet: 1, stoneAxe: 1, packFrame: 1, compost: 2, berries: 3, reeds: 4, rawFish: 1, campMeal: 1, expeditionStew: 1 },
       drops: [{ id: 7, item: 'wood', count: 2, tile: partialTreeTile, offsetA: 0.1, offsetB: -0.2, groundRadius: 903.75, age: 0.5, source: 'tree' }],
       structures: [
         { id: 1, item: 'campfire', tile: editTile, layer: top - 1, yaw: 0.25, state: { lit: true } },
@@ -98,7 +98,6 @@ describe('Hearth and Horizon save boundary', () => {
       },
       time: { day: 3, minute: 735 },
       weather: { phase: 0.42 },
-      survival: { stamina: 68, exposure: 31, mealsEaten: 2, trailFocus: 45 },
       hotbarSel: 4,
       planeCrafted: true,
       savedAt: 123,
@@ -123,7 +122,7 @@ describe('Hearth and Horizon save boundary', () => {
     expect(parsed!.mineProgress).toEqual([{ tile: crackedTile, layer: crackedLayer, progress: 1.25, needed: 4 }]);
     expect(parsed!.drops).toEqual([{ id: 7, item: 'wood', count: 2, tile: partialTreeTile, offsetA: 0.1, offsetB: -0.2, groundRadius: 903.75, age: 0.5, source: 'tree' }]);
     expect(parsed!.inventory).toEqual([2, 4, 6, 8, 10]);
-    expect(parsed!.craftedItems).toEqual({ sticks: 4, workbench: 1, stoneHatchet: 1, stoneAxe: 1, packFrame: 1, stormCloak: 1, compost: 2, berries: 3, reeds: 4, rawFish: 1, campMeal: 1, expeditionStew: 1 });
+    expect(parsed!.craftedItems).toEqual({ sticks: 4, workbench: 1, stoneHatchet: 1, stoneAxe: 1, packFrame: 1, compost: 2, berries: 3, reeds: 4, rawFish: 1, campMeal: 1, expeditionStew: 1 });
     expect(parsed!.structures).toEqual([
       { id: 1, item: 'campfire', tile: editTile, layer: top - 1, yaw: 0.25, state: { lit: true } },
       { id: 2, item: 'chest', tile: editTile + 1, layer: top - 1, yaw: 0, state: { storage: { wood: 5, rock: 2 } } },
@@ -144,7 +143,6 @@ describe('Hearth and Horizon save boundary', () => {
     expect(parsed!.progression.toolWear).toEqual({ stoneHatchet: 5, stoneAxe: 3, stonePick: 37 });
     expect(parsed!.time).toEqual({ day: 3, minute: 735 });
     expect(parsed!.weather).toEqual({ phase: 0.42 });
-    expect(parsed!.survival).toEqual({ stamina: 68, exposure: 31, mealsEaten: 2, collapseCount: 0, trailFocus: 45 });
     expect(parsed!.hotbarSel).toBe(4);
     expect(parsed!.planeCrafted).toBe(true);
     expect(b.player.mode).toBe('plane');

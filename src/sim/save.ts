@@ -7,11 +7,11 @@ import { normalizeResourceDrops, type ResourceDropSave } from './resourceDrops';
 import { normalizeStructureSaves, type StructureSave } from './structures';
 import { normalizePentagonList } from './landmarks';
 import { normalizeToolWear, type ToolWear } from './tools';
-import { normalizeSurvivalState, normalizeTimeState, normalizeWeatherState, type SurvivalState, type TimeState, type WeatherState } from './survival';
+import { normalizeTimeState, normalizeWeatherState, type TimeState, type WeatherState } from './time';
 
-// Bumped for the controlled-burn cut (2026-07-08): save shape changed across ~20 systems,
-// old saves are incompatible and intentionally not migrated — this forces a clean reset.
-export const SAVE_VERSION = 2;
+// Bumped again (2026-07-08): the stamina/exposure/collapse survival system and its `survival`
+// save field were cut entirely — old saves are incompatible and intentionally not migrated.
+export const SAVE_VERSION = 3;
 
 export interface ColumnEditSave {
   tile: number;
@@ -56,7 +56,6 @@ export interface WorldSave {
   crops: unknown[];
   time: TimeState;
   weather: WeatherState;
-  survival: SurvivalState;
   progression: { pentagons: number[]; toolWear: ToolWear };
 }
 
@@ -74,7 +73,6 @@ export interface CaptureWorldSaveInput {
   progression?: { pentagons?: readonly number[]; toolWear?: ToolWear };
   time?: TimeState;
   weather?: WeatherState;
-  survival?: SurvivalState;
   hotbarSel: number;
   planeCrafted: boolean;
   savedAt?: number;
@@ -242,7 +240,6 @@ export function captureWorldSave(input: CaptureWorldSaveInput): WorldSave {
     crops: [],
     time: normalizeTimeState(input.time),
     weather: normalizeWeatherState(input.weather),
-    survival: normalizeSurvivalState(input.survival),
     progression: {
       pentagons: normalizePentagonList(input.progression?.pentagons),
       toolWear: normalizeToolWear(input.progression?.toolWear),
@@ -308,7 +305,6 @@ export function parseWorldSaveJson(json: string): WorldSave | null {
       crops: Array.isArray(v.crops) ? v.crops : [],
       time: normalizeTimeState(v.time),
       weather: normalizeWeatherState(v.weather),
-      survival: normalizeSurvivalState(v.survival),
       progression: v.progression && Array.isArray(v.progression.pentagons)
         ? {
           pentagons: normalizePentagonList(intArray(v.progression.pentagons) ?? []),

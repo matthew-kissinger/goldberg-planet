@@ -45,7 +45,6 @@ export const CHARACTER_PROP_IDS: readonly CharacterPropId[] = [
   'echoPick',
   'echoShovel',
   'packFrame',
-  'stormCloak',
   'repairKit',
   'fishingRod',
   'bait',
@@ -143,7 +142,7 @@ export function pickupPropForItem(item: ItemId): CharacterPropId {
 
 export function backPropsForInventory(hasItem: (id: ItemId) => boolean): CharacterPropId[] {
   const props: CharacterPropId[] = [];
-  for (const id of ['packFrame', 'stormCloak', 'echoAxe', 'echoPick', 'echoShovel', 'stoneAxe', 'stoneHatchet', 'stonePick', 'stoneShovel', 'repairKit', 'fishingRod', 'fishTrap', 'shoreNet', 'reeds', 'lantern', 'echoLantern', 'waystone', 'weatherVane', 'rootCellar', 'expeditionStew'] as const) {
+  for (const id of ['packFrame', 'echoAxe', 'echoPick', 'echoShovel', 'stoneAxe', 'stoneHatchet', 'stonePick', 'stoneShovel', 'repairKit', 'fishingRod', 'fishTrap', 'shoreNet', 'reeds', 'lantern', 'echoLantern', 'waystone', 'weatherVane', 'rootCellar', 'expeditionStew'] as const) {
     if (hasItem(id)) props.push(id);
   }
   return props;
