@@ -1010,12 +1010,14 @@ export class Character {
         return;
       }
       if (state.action === 'jump') {
-        this.rightArm.rotation.x = -0.62;
-        this.leftArm.rotation.x = -0.5;
+        // Arms reach forward/up, legs tuck back — rotation.x > 0 swings a hanging limb
+        // toward -Z (the character's front); this pose had both pairs backwards.
+        this.rightArm.rotation.x = 0.62;
+        this.leftArm.rotation.x = 0.5;
         this.rightArm.rotation.z = -0.36;
         this.leftArm.rotation.z = 0.36;
-        this.rightLeg.rotation.x = 0.48;
-        this.leftLeg.rotation.x = 0.32;
+        this.rightLeg.rotation.x = -0.48;
+        this.leftLeg.rotation.x = -0.32;
         this.rightLeg.rotation.z = -0.18;
         this.leftLeg.rotation.z = 0.18;
         this.pilotBody.rotation.x = -0.08;

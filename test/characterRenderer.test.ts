@@ -21,6 +21,15 @@ function readabilityRoles(character: Character): Set<string> {
   return roles;
 }
 
+function findPart(character: Character, name: string): THREE.Object3D {
+  let found: THREE.Object3D | null = null;
+  character.group.traverse((part) => {
+    if (part.name === name) found = part;
+  });
+  if (!found) throw new Error(`part not found: ${name}`);
+  return found;
+}
+
 function fakePlayer(overrides: Partial<Player> = {}): Player {
   return {
     px: 100,
@@ -99,6 +108,35 @@ describe('character renderer Soft-Facet Wayfarer readability', () => {
     expect(stats.silhouetteParts).toBeGreaterThanOrEqual(28);
     expect(stats.actionPoseCoverage).toBeGreaterThanOrEqual(18);
     expect(stats.normalDistanceReady).toBe(true);
+  });
+
+  it('swings arms forward and legs backward on jump, not the reverse', () => {
+    // Local -Z is the character's front (face plate, eyes, and belt buckle all sit at
+    // negative Z in the rig), and character.update() maps that local -Z axis to the
+    // player's actual facing direction in world space. A positive rotation.x on a
+    // hanging limb group swings its lower end toward -Z (forward); negative swings it
+    // toward +Z (backward). The jump pose had this backwards for both arms and legs.
+    const scene = new THREE.Scene();
+    const character = new Character(scene);
+    // jump is a continuous state (like move/sprint/swim/plane), not a timed one-shot
+    // action, so it only applies when actionDuration is 0 (see applyPose's `active` gate).
+    character.update(fakePlayer(), { x: 0, y: 0, z: 0 }, 5, 1 / 60, {
+      action: 'jump',
+      held: 'hands',
+      backProps: [],
+      actionT: 0,
+      actionDuration: 0,
+    });
+
+    const rightArm = findPart(character, 'rightSdfBlendArm').parent!;
+    const leftArm = findPart(character, 'leftSdfBlendArm').parent!;
+    const rightLeg = findPart(character, 'rightSdfBlendLeg').parent!;
+    const leftLeg = findPart(character, 'leftSdfBlendLeg').parent!;
+
+    expect(rightArm.rotation.x).toBeGreaterThan(0);
+    expect(leftArm.rotation.x).toBeGreaterThan(0);
+    expect(rightLeg.rotation.x).toBeLessThan(0);
+    expect(leftLeg.rotation.x).toBeLessThan(0);
   });
 
   it('keeps held props in hand and separates stowed route gear on the back', () => {
