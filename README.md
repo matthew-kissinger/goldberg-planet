@@ -3,14 +3,14 @@
 **Play it: <https://matthew-kissinger.github.io/goldberg-planet/>**
 
 A browser prototype of a walkable, swimmable, flyable, mineable, buildable spherical planet
-whose surface is a true Goldberg polyhedron — hexagons plus exactly twelve pentagons —
+whose surface is a true Goldberg polyhedron (hexagons plus exactly twelve pentagons),
 continuous from a footstep on a beach to the whole planet hanging in space. The topology is
-derived from scratch — combinatorial tile ids stitched across 20 icosahedral charts, no
+derived from scratch: combinatorial tile ids stitched across 20 icosahedral charts, no
 geometry library ([Shape and identity](#shape-and-identity)).
 
 Best in a WebGPU browser (Chrome/Edge); it falls back to WebGL2 automatically everywhere else.
 Works on phones too — touch controls appear automatically — and standard gamepads can drive
-the full survival loop. The game is a sandbox: walk, swim, mine, build, chop two trees for
+the full survival loop. It's a demo concept rather than a full game - a sandbox where you walk, swim, mine, build, chop two trees for
 plane wood, then press `E`, tap the plane button, or press gamepad Start to fly around the
 world, under, over, and through the voxel clouds.
 
