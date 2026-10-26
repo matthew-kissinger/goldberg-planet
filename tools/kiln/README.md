@@ -1,7 +1,13 @@
 # Kiln Drop-in — 3D assets for sphere-planet
 
+> **Retired (2026-10-26).** The hosted Kiln Studio product and its `app.kilnstudio.tools/v1` developer
+> API no longer exist, so the scripts in this kit cannot run as written. Use local Kiln instead
+> ([instruktlabs/kiln](https://github.com/instruktlabs/kiln): MCP server, CLI and SDK, no account), or the
+> invite-only hosted Kiln MCP at `https://kiln.instruktlabs.com/mcp` (OAuth sign-in with Google or GitHub).
+> This folder is kept as a record of how the game's existing Kiln assets were generated.
+
 A **self-contained, portable kit** for generating consistent 3D game assets from
-[Kiln Studio](https://app.kilnstudio.tools)'s production `/v1` developer API — with no dependency on
+Kiln Studio's `/v1` developer API (retired) — with no dependency on
 the Kiln monorepo, no SDK, and no `@kiln/engine`. Drop this folder into the sphere-planet
 (goldberg-planet) game repo and any coding agent (or you) can generate props, creatures, and POIs
 that share the game's palette.
@@ -36,7 +42,7 @@ kiln-dropin/
 1. **Node 20+** (uses built-in global `fetch`). No `npm install` needed for this kit.
 2. **A Kiln developer API key** (`ks_live_...`). This is owner-gated and must be provisioned against
    production by the admin — see `knowledge/01-auth-and-keys.md`. Until you have one, the scripts
-   can't run. (The owner mints it via https://app.kilnstudio.tools/admin → developers, or the Kiln
+   can't run. (The owner used to mint it via the Kiln Studio admin UI → developers, or the Kiln
    repo's `provision-starter-developer-client.ts`, after `aws sso login --profile mkclouds`.)
 
 ## Setup

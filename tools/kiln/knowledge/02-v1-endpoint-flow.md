@@ -1,6 +1,8 @@
 # /v1 Endpoint Flow (single asset, end to end)
 
-Base URL: `https://app.kilnstudio.tools/v1`  ·  Auth: `Authorization: Bearer ks_live_...`
+> **Retired.** This endpoint no longer exists; see the note at the top of `../README.md`.
+
+Former base URL: `https://app.kilnstudio.tools/v1` (retired)  ·  Auth: `Authorization: Bearer ks_live_...`
 Contract: **async 202 + poll**. (Source: `kiln-studio/server/src/routes/v1.ts`.)
 
 ## 0. No-spend capability check (do this first)

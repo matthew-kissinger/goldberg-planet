@@ -28,7 +28,14 @@ function loadLocalEnv() {
 }
 loadLocalEnv();
 
-export const apiUrl = (process.env.KILN_API_URL ?? 'https://app.kilnstudio.tools/v1').replace(/\/+$/, '');
+// The Kiln Studio /v1 API (formerly https://app.kilnstudio.tools/v1) is retired, so there is no default.
+export const apiUrl = (process.env.KILN_API_URL ?? '').replace(/\/+$/, '');
+function requiredApiUrl() {
+  if (!apiUrl) {
+    throw new Error('KILN_API_URL is not set. The Kiln Studio /v1 API is retired; see tools/kiln/README.md for current Kiln options.');
+  }
+  return apiUrl;
+}
 
 export function requiredApiKey() {
   const key = process.env.KILN_API_KEY;
@@ -45,7 +52,7 @@ const EDGE_RETRY_MS = numEnv('KILN_EDGE_RETRY_MS', 15000);
 // JSON request against /v1 with Bearer auth + CloudFront edge-block retry.
 export async function kilnJson(path, options = {}) {
   for (let attempt = 0; attempt <= EDGE_RETRIES; attempt += 1) {
-    const res = await fetch(`${apiUrl}${path}`, {
+    const res = await fetch(`${requiredApiUrl()}${path}`, {
       method: options.method ?? 'GET',
       headers: {
         authorization: `Bearer ${requiredApiKey()}`,
@@ -70,7 +77,7 @@ export async function kilnJson(path, options = {}) {
 
 // Download raw bytes from a presigned URL (or a /v1-relative path).
 export async function downloadBytes(url) {
-  const resolved = url.startsWith('/') ? new URL(url, new URL(apiUrl).origin) : new URL(url);
+  const resolved = url.startsWith('/') ? new URL(url, new URL(requiredApiUrl()).origin) : new URL(url);
   if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') {
     throw new Error(`unsupported URL protocol ${resolved.protocol}`);
   }
