@@ -587,3 +587,7 @@ contracts.
   creates the first derived season-chain payoff; completing the full chord now leaves a
   readable afterglow at the fall crater. Meteor showers, stronger visual tells, and later
   window-changing seasonal consequences are still future work.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
