@@ -1,5 +1,8 @@
 # Auth & Key Handling
 
+> **Retired.** Kiln Studio and its `/v1` API were shut down; `ks_live_` keys can no longer be issued.
+> See the note at the top of `../README.md` for current Kiln options.
+
 ## The key
 - Kiln `/v1` uses an admin-issued **DeveloperClient PAT** shaped `ks_live_<43 base64url chars>`.
   (Source: `kiln-studio/server/src/developer/clients.ts` — `TOKEN_PREFIX = 'ks_live'`.)
@@ -18,7 +21,7 @@
 
 ## Getting a key provisioned (owner action — not automatable by the agent)
 The owner (admin) mints it against production. Simplest paths:
-1. **Admin UI:** https://app.kilnstudio.tools/admin -> "developers" tab -> "issue private developer
+1. **Admin UI (retired):** the Kiln Studio admin -> "developers" tab -> "issue private developer
    client" -> pick the owner's user, set $/day + rpm + scopes -> Create -> copy the one-time secret.
 2. **Repo script (in the Kiln monorepo, not here):**
    `AWS_PROFILE=mkclouds bun scripts/provision-starter-developer-client.ts`

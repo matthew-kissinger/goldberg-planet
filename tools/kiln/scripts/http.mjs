@@ -28,7 +28,11 @@ function loadLocalEnv() {
 }
 loadLocalEnv();
 
-export const apiUrl = (process.env.KILN_API_URL ?? 'https://app.kilnstudio.tools/v1').replace(/\/+$/, '');
+// The Kiln Studio /v1 API (formerly https://app.kilnstudio.tools/v1) is retired, so there is no default.
+export const apiUrl = (process.env.KILN_API_URL ?? '').replace(/\/+$/, '');
+if (!apiUrl) {
+  throw new Error('KILN_API_URL is not set. The Kiln Studio /v1 API is retired; see tools/kiln/README.md for current Kiln options.');
+}
 
 export function requiredApiKey() {
   const key = process.env.KILN_API_KEY;
