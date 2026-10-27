@@ -1,76 +1,23 @@
 /**
  * HUD: a single dim vitals line (F3 expands full diagnostics), transient toasts above
- * the hotbar, a flight strip while airborne, and a tap/click-selectable hotbar.
+ * the inventory strip, a flight strip while airborne, and the crafting panel.
  * The help block fades itself out after a few seconds of play; H brings it back.
  */
 
-export interface HotbarSlot {
+export interface InventorySlotView {
   name: string;
   css: string;
   count: number;
-}
-
-export interface InventoryLedgerEntryView {
-  item: string;
-  name: string;
-  css: string;
-  count: number;
-  detail: string;
-}
-
-export interface InventoryLedgerSectionView {
-  id: string;
-  title: string;
-  total: number;
-  emptyLabel: string;
-  entries: InventoryLedgerEntryView[];
-}
-
-export interface InventoryLedgerView {
-  title: string;
-  summary: string;
-  burden?: { status: string; label: string; detail: string };
-  sections: InventoryLedgerSectionView[];
-}
-
-export interface HudControlLabels {
-  craft: string;
-  hotbar: string[];
+  /** optional progress label, e.g. "7/12" toward the plane */
+  goal?: string;
 }
 
 export interface CraftingRecipeView {
   id: string;
-  result: string;
   name: string;
   description: string;
-  count: number;
-  owned: number;
   canCraft: boolean;
-  canPlace: boolean;
-  selected: boolean;
-  focused?: boolean;
-  focusAction?: 'craft' | 'place';
-  station?: string;
   requirements: { name: string; need: number; have: number }[];
-}
-
-export type ChestStorageAction = 'depositOne' | 'depositAll' | 'withdrawOne' | 'withdrawAll';
-
-export interface ChestStoragePanelView {
-  id: number;
-  title: string;
-  summary: string;
-  rows: {
-    item: string;
-    name: string;
-    css: string;
-    pack: number;
-    stored: number;
-    canDeposit: boolean;
-    canWithdraw: boolean;
-    focused?: boolean;
-    focusAction?: ChestStorageAction;
-  }[];
 }
 
 function escapeHtml(text: string): string {
@@ -82,69 +29,31 @@ function escapeHtml(text: string): string {
 }
 
 export class Hud {
-  onSlotSelect: ((i: number) => void) | null = null;
   onCraftSelect: ((id: string) => void) | null = null;
-  onPlaceSelect: ((id: string) => void) | null = null;
-  onStorageTransfer: ((chestId: number, item: string, action: ChestStorageAction) => void) | null = null;
-  onStorageClose: (() => void) | null = null;
   private vitals = document.getElementById('vitals')!;
   private diag = document.getElementById('diag')!;
   private msg = document.getElementById('msg')!;
   private flight = document.getElementById('flight')!;
-  private slot = document.getElementById('slotname')!;
   private help = document.getElementById('help')!;
-  private hotbar = document.getElementById('hotbar')!;
+  private inventory = document.getElementById('hotbar')!;
   private crafting = document.getElementById('crafting')!;
-  private storage = document.getElementById('storage')!;
   private craftButton = document.getElementById('btn-craft')!;
-  private hotbarCache = '';
+  private inventoryCache = '';
   private craftingCache = '';
-  private storageCache = '';
   private vitalsCache = '';
   private helpCache = '';
-  private controls: HudControlLabels = {
-    craft: 'B',
-    hotbar: ['1', '2', '3', '4', '5'],
-  };
-  private ledger: InventoryLedgerView | null = null;
+  private craftKey = 'B';
   private msgTimer = 0;
-  private slotTimer = 0;
   private helpTimer = 25;
   private helpShown = true;
 
   constructor() {
-    this.hotbar.addEventListener('pointerdown', (e) => {
-      const el = (e.target as HTMLElement).closest('.slot') as HTMLElement | null;
-      if (el?.dataset.i !== undefined) {
-        e.stopPropagation();
-        this.onSlotSelect?.(Number(el.dataset.i));
-      }
-    });
     this.crafting.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       const button = (e.target as HTMLElement).closest('button[data-recipe]') as HTMLButtonElement | null;
-      const place = (e.target as HTMLElement).closest('button[data-place]') as HTMLButtonElement | null;
-      if ((!button || button.disabled) && (!place || place.disabled)) return;
+      if (!button || button.disabled) return;
       e.preventDefault();
-      if (place && !place.disabled) this.onPlaceSelect?.(place.dataset.place ?? '');
-      else if (button && !button.disabled) this.onCraftSelect?.(button.dataset.recipe ?? '');
-    });
-    this.storage.addEventListener('pointerdown', (e) => {
-      e.stopPropagation();
-      const close = (e.target as HTMLElement).closest('button[data-storage-close]') as HTMLButtonElement | null;
-      if (close) {
-        e.preventDefault();
-        this.onStorageClose?.();
-        return;
-      }
-      const action = (e.target as HTMLElement).closest('button[data-storage-action]') as HTMLButtonElement | null;
-      if (!action || action.disabled) return;
-      e.preventDefault();
-      const chestId = Number(action.dataset.chest);
-      const item = action.dataset.item ?? '';
-      const transfer = action.dataset.storageAction as ChestStorageAction | undefined;
-      if (!Number.isFinite(chestId) || !transfer) return;
-      this.onStorageTransfer?.(chestId, item, transfer);
+      this.onCraftSelect?.(button.dataset.recipe ?? '');
     });
   }
 
@@ -173,65 +82,31 @@ export class Hud {
     if (this.flight.textContent !== text) this.flight.textContent = text;
   }
 
-  setHotbar(slots: HotbarSlot[], sel: number): void {
-    const html = slots.map((s, i) =>
-      `<div class="slot${i === sel ? ' sel' : ''}" data-i="${i}"><div class="swatch" style="background:${s.css}"></div>` +
-      `<span class="key">${escapeHtml(this.controls.hotbar[i] ?? String(i + 1))}</span><span class="count">${s.count}</span></div>`,
+  setInventory(slots: InventorySlotView[]): void {
+    const html = slots.map((s) =>
+      `<div class="slot"><div class="swatch" style="background:${s.css}"></div>` +
+      `<span class="key">${escapeHtml(s.name)}</span><span class="count">${s.goal ?? s.count}</span></div>`,
     ).join('');
-    if (html !== this.hotbarCache) {
-      this.hotbar.innerHTML = html;
-      this.hotbarCache = html;
+    if (html !== this.inventoryCache) {
+      this.inventory.innerHTML = html;
+      this.inventoryCache = html;
     }
   }
 
-  private renderLedger(ledger: InventoryLedgerView): string {
-    const visibleSections = ledger.sections.filter((section) => section.entries.length > 0);
-    const sections = visibleSections.length > 0
-      ? visibleSections.map((section) => {
-        const entries = section.entries.slice(0, 8).map((entry) =>
-          `<div class="ledger-entry">` +
-          `<span class="ledger-swatch" style="background:${escapeHtml(entry.css)}"></span>` +
-          `<span class="ledger-name">${escapeHtml(entry.name)}</span>` +
-          `<span class="ledger-count">${entry.count}</span>` +
-          `<span class="ledger-detail">${escapeHtml(entry.detail)}</span></div>`,
-        ).join('');
-        const hidden = section.entries.length > 8
-          ? `<div class="ledger-more">+${section.entries.length - 8} more</div>`
-          : '';
-        return `<section class="ledger-section ${escapeHtml(section.id)}">` +
-          `<div class="ledger-section-head"><span>${escapeHtml(section.title)}</span><b>${section.total}</b></div>` +
-          `<div class="ledger-items">${entries}${hidden}</div></section>`;
-      }).join('')
-      : '<div class="ledger-empty">pack empty · gather, craft, and place to fill it</div>';
-    return `<div class="pack-ledger">` +
-      `<div class="ledger-head"><strong>${escapeHtml(ledger.title)}</strong><span>${escapeHtml(ledger.summary)}</span></div>` +
-      (ledger.burden ? `<div class="ledger-burden ${escapeHtml(ledger.burden.status)}"><span>${escapeHtml(ledger.burden.label)}</span><p>${escapeHtml(ledger.burden.detail)}</p></div>` : '') +
-      `<div class="ledger-grid">${sections}</div></div>`;
-  }
-
-  setCrafting(recipes: CraftingRecipeView[], open: boolean, ledger?: InventoryLedgerView | null): void {
-    if (ledger !== undefined) this.ledger = ledger;
+  setCrafting(recipes: CraftingRecipeView[], open: boolean): void {
     document.body.classList.toggle('crafting-open', open);
     this.craftButton.classList.toggle('active', open);
     this.crafting.classList.toggle('hide', !open);
     if (!open) return;
     const html = [
-      `<div class="craft-head"><span>Crafting</span><span>${escapeHtml(this.controls.craft)}</span></div>`,
-      this.ledger ? this.renderLedger(this.ledger) : '',
+      `<div class="craft-head"><span>Crafting</span><span>${escapeHtml(this.craftKey)}</span></div>`,
       ...recipes.map((r) => {
         const req = r.requirements.map((m) =>
           `<span class="${m.have >= m.need ? 'ok' : 'miss'}">${m.name} ${m.have}/${m.need}</span>`).join('');
-        const station = r.station ? `<span class="miss">${r.station}</span>` : '';
-        const needs = `${station}${req}`;
-        const owned = r.owned > 0 ? `<span class="owned">x${r.owned}</span>` : '';
-        const rowFocus = r.focused ? ' focused' : '';
-        const craftFocus = r.focused && r.focusAction !== 'place' ? ' focus' : '';
-        const placeFocus = r.focused && r.focusAction === 'place' ? ' focus' : '';
-        return `<div class="craft-row${r.canCraft ? ' ready' : ''}${r.selected ? ' selected' : ''}${rowFocus}">` +
-          `<button class="${craftFocus}" data-recipe="${r.id}" aria-label="Craft ${r.name}" title="Craft ${r.name}" ${r.canCraft ? '' : 'disabled'}>+</button>` +
-          `<button class="${placeFocus}" data-place="${escapeHtml(r.result)}" aria-label="Place ${r.name}" title="Place ${r.name}" ${r.canPlace ? '' : 'disabled'}>set</button>` +
-          `<div class="craft-copy"><div><strong>${r.name}</strong>${owned}<em>+${r.count}</em></div>` +
-          `<p>${r.description}</p><div class="craft-req">${needs}</div></div></div>`;
+        return `<div class="craft-row${r.canCraft ? ' ready' : ''}">` +
+          `<button data-recipe="${r.id}" aria-label="Craft ${r.name}" title="Craft ${r.name}" ${r.canCraft ? '' : 'disabled'}>+</button>` +
+          `<div class="craft-copy"><div><strong>${r.name}</strong></div>` +
+          `<p>${r.description}</p><div class="craft-req">${req}</div></div></div>`;
       }),
     ].join('');
     if (html !== this.craftingCache) {
@@ -240,51 +115,11 @@ export class Hud {
     }
   }
 
-  setStorage(view: ChestStoragePanelView | null, open: boolean): void {
-    if (!open || !view) {
-      this.storage.classList.add('hide');
-      return;
-    }
-    const rows = view.rows.map((row) => {
-      const swatch = `<span class="storage-swatch" style="background:${escapeHtml(row.css)}"></span>`;
-      const carried = row.pack > 0 ? ' ready' : '';
-      const stored = row.stored > 0 ? ' ready' : '';
-      const rowFocus = row.focused ? ' focused' : '';
-      const focusClass = (action: ChestStorageAction): string => row.focused && row.focusAction === action ? ' class="focus"' : '';
-      return `<div class="storage-row${rowFocus}">` +
-        `<div class="storage-item">${swatch}<span>${escapeHtml(row.name)}</span></div>` +
-        `<div class="storage-count${carried}">${row.pack}</div>` +
-        `<div class="storage-count${stored}">${row.stored}</div>` +
-        `<div class="storage-actions">` +
-        `<button${focusClass('depositOne')} data-storage-action="depositOne" data-chest="${view.id}" data-item="${escapeHtml(row.item)}" aria-label="Stash one ${escapeHtml(row.name)}" title="Stash one" ${row.canDeposit ? '' : 'disabled'}>&gt;</button>` +
-        `<button${focusClass('depositAll')} data-storage-action="depositAll" data-chest="${view.id}" data-item="${escapeHtml(row.item)}" aria-label="Stash all ${escapeHtml(row.name)}" title="Stash all" ${row.canDeposit ? '' : 'disabled'}>&gt;&gt;</button>` +
-        `<button${focusClass('withdrawOne')} data-storage-action="withdrawOne" data-chest="${view.id}" data-item="${escapeHtml(row.item)}" aria-label="Take one ${escapeHtml(row.name)}" title="Take one" ${row.canWithdraw ? '' : 'disabled'}>&lt;</button>` +
-        `<button${focusClass('withdrawAll')} data-storage-action="withdrawAll" data-chest="${view.id}" data-item="${escapeHtml(row.item)}" aria-label="Take all ${escapeHtml(row.name)}" title="Take all" ${row.canWithdraw ? '' : 'disabled'}>&lt;&lt;</button>` +
-        `</div></div>`;
-    }).join('');
-    const html = `<div class="storage-head"><div><strong>${escapeHtml(view.title)}</strong><p>${escapeHtml(view.summary)}</p></div>` +
-      '<button data-storage-close="1" aria-label="Close storage" title="Close storage">×</button></div>' +
-      '<div class="storage-labels"><span>material</span><span>pack</span><span>chest</span><span>move</span></div>' +
-      `<div class="storage-rows">${rows}</div>`;
-    if (html !== this.storageCache) {
-      this.storage.innerHTML = html;
-      this.storageCache = html;
-    }
-    this.storage.classList.remove('hide');
-  }
-
-  /** transient toast above the hotbar */
+  /** transient toast above the inventory strip */
   flash(text: string, seconds = 4): void {
     this.msg.textContent = text;
     this.msg.classList.add('on');
     this.msgTimer = seconds;
-  }
-
-  /** brief label under the toast line when the selected block changes */
-  slotName(text: string): void {
-    this.slot.textContent = text;
-    this.slot.classList.add('on');
-    this.slotTimer = 1.3;
   }
 
   toggleHelp(): void {
@@ -293,13 +128,9 @@ export class Hud {
     this.helpTimer = this.helpShown ? 30 : 0;
   }
 
-  setControlLabels(labels: HudControlLabels): void {
-    if (
-      labels.craft === this.controls.craft &&
-      labels.hotbar.join('|') === this.controls.hotbar.join('|')
-    ) return;
-    this.controls = { craft: labels.craft, hotbar: labels.hotbar.slice() };
-    this.hotbarCache = '';
+  setCraftKey(label: string): void {
+    if (label === this.craftKey) return;
+    this.craftKey = label;
     this.craftingCache = '';
   }
 
@@ -313,10 +144,6 @@ export class Hud {
     if (this.msgTimer > 0) {
       this.msgTimer -= dt;
       if (this.msgTimer <= 0) this.msg.classList.remove('on');
-    }
-    if (this.slotTimer > 0) {
-      this.slotTimer -= dt;
-      if (this.slotTimer <= 0) this.slot.classList.remove('on');
     }
     if (this.helpShown && this.helpTimer > 0) {
       this.helpTimer -= dt;

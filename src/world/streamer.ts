@@ -14,8 +14,7 @@ import type { Goldberg } from '../geo/goldberg';
 import type { Layers } from './layers';
 import type { Columns } from './columns';
 import type { Trees } from './trees';
-import type { CellDamageProvider } from '../sim/mining';
-import { enumerateChunks, type ChunkInfo } from './chunks';
+import { chunkKeyOfTile, enumerateChunks, type ChunkInfo } from './chunks';
 import { buildChunkMesh } from '../render/mesher';
 import { PLANET_RADIUS } from './layers';
 import { HEIGHT_MAX } from './terrain';
@@ -42,15 +41,13 @@ export class Streamer {
   readonly resident = new Map<number, Resident>();
   private queue: ChunkInfo[] = [];
   private queued = new Set<number>();
-  private frame = 0;
   // last-known camera position (floating origin). Meshes are positioned from this at
-  // CREATION, so a chunk built at any point in the frame — in particular an edit rebuild
+  // CREATION, so a chunk built at any point in the frame — in particular a tree rebuild
   // that runs after the per-frame transform pass — is never rendered untransformed.
   private eyeX = 0;
   private eyeY = 0;
   private eyeZ = 0;
   residencyDirty = true;
-  private proceduralTreesEnabled = true;
 
   // metrics
   loads = 0;
@@ -65,7 +62,6 @@ export class Streamer {
     private readonly scene: THREE.Scene,
     private readonly material: THREE.Material,
     private readonly trees?: Trees,
-    private readonly cellDamage?: CellDamageProvider,
   ) {
     this.all = enumerateChunks(geo);
     this.list = [...this.all.values()];
@@ -134,7 +130,7 @@ export class Streamer {
 
   buildChunk(info: ChunkInfo): void {
     const t0 = performance.now();
-    const data = buildChunkMesh(info, this.geo, this.layers, this.columns, this.proceduralTreesEnabled ? this.trees : undefined, this.cellDamage);
+    const data = buildChunkMesh(info, this.geo, this.layers, this.columns, this.trees);
     let mesh: THREE.Mesh | null = null;
     if (data) {
       const geom = new THREE.BufferGeometry();
@@ -155,9 +151,9 @@ export class Streamer {
   }
 
   /**
-   * Rebuild one chunk immediately (edits). The resident SET is unchanged by a rebuild,
+   * Rebuild one chunk immediately. The resident SET is unchanged by a rebuild,
    * so this must NOT dirty the far-sphere filter — that refilter is a 184k-tri scan plus
-   * a full index re-upload, and letting edits trigger it was a per-edit frame spike.
+   * a full index re-upload, and letting rebuilds trigger it was a per-chop frame spike.
    */
   rebuildNow(key: number): void {
     const res = this.resident.get(key);
@@ -169,6 +165,12 @@ export class Streamer {
     this.loads--; // rebuilds aren't loads
     this.releases--;
     this.residencyDirty = wasDirty;
+  }
+
+  /** Rebuild the chunk holding a tile (a tree changed there), if it is resident. */
+  rebuildTile(tile: number): void {
+    const key = chunkKeyOfTile(this.geo, tile);
+    if (this.resident.has(key)) this.rebuildNow(key);
   }
 
   /** Per-frame: update camera-relative transforms (floating origin). */
@@ -185,29 +187,6 @@ export class Streamer {
 
   residentKeys(): Set<number> {
     return new Set(this.resident.keys());
-  }
-
-  residentChunks(): ChunkInfo[] {
-    return [...this.resident.values()].map((res) => res.info);
-  }
-
-  proceduralTreesActive(): boolean {
-    return this.proceduralTreesEnabled;
-  }
-
-  setProceduralTreesEnabled(enabled: boolean): boolean {
-    if (this.proceduralTreesEnabled === enabled) return false;
-    this.proceduralTreesEnabled = enabled;
-    this.releaseAll();
-    this.residencyDirty = true;
-    return true;
-  }
-
-  /** Release every resident chunk mesh (edit-persistence proof / memory reset). Columns and edits are untouched. */
-  releaseAll(): void {
-    for (const [key, res] of [...this.resident]) {
-      this.disposeResident(key, res);
-    }
   }
 
   stats(): { resident: number; queued: number; triangles: number } {

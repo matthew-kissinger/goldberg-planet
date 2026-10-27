@@ -1,6 +1,0 @@
-# Never commit secrets or generated artifacts.
-.env
-.env.local
-*.tgz
-dogfood-output/
-generated/

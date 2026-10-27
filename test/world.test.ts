@@ -4,7 +4,6 @@ import { buildLayers, PLANET_RADIUS, BUILD_CEILING, CELL_H, WATER_SURFACE } from
 import { Terrain, MAT } from '../src/world/terrain';
 import { Columns } from '../src/world/columns';
 import { Trees } from '../src/world/trees';
-import { MineProgress } from '../src/sim/mining';
 import { enumerateChunks } from '../src/world/chunks';
 import { buildChunkMesh } from '../src/render/mesher';
 
@@ -344,20 +343,15 @@ describe('chunks + mesher', () => {
     }
   });
 
-  it('mining a tile changes only geometry near that tile', () => {
+  it('editing a tile changes only geometry near that tile', () => {
     const chunks = enumerateChunks(g);
     const cols = new Columns(g, layers, new Terrain('edit'));
     const chunk = [...chunks.values()][3];
     const before = buildChunkMesh(chunk, g, layers, cols)!;
     const victim = chunk.tiles[Math.floor(chunk.tiles.length / 2)];
     const top = cols.topLayerOf(victim);
-    const mining = new MineProgress();
-    mining.strike(victim, top, 1, 4);
-    const cracked = buildChunkMesh(chunk, g, layers, cols, undefined, mining)!;
-    expect(cracked.triangles).toBe(before.triangles);
-    expect(cracked.colors).not.toEqual(before.colors);
     expect(cols.solidAt(victim, top)).toBe(true);
-    cols.mine(victim, cols.topLayerOf(victim));
+    cols.mine(victim, top);
     const after = buildChunkMesh(chunk, g, layers, cols)!;
     // mesh changed
     expect(after.positions.length === before.positions.length &&
