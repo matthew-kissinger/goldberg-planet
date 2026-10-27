@@ -91,9 +91,9 @@ else: a released region regrows the same woods, minus what you chopped (the chop
 sparse state, independent of mesh residency, exactly like column edits). Trees now take
 staged hits: each chop cracks and shakes the tree, the final hit fells it, and six wood
 lands as short-lived grounded pickups before it enters your pack. Two felled trees still
-craft your plane. The approved Kiln pine, broadleaf, dead-snag, and shrub skins now render
-as resident-chunk instanced vegetation while the code-owned tree simulation still controls
-chopping, drops, and fallback. Mining now follows that same staged reward rule: dirt, sand,
+craft your plane. Trees render as plain three.js geometry from the code-owned tree simulation,
+which controls chopping and drops (the Kiln GLB skins were removed in the 2026-07-08
+burndown). Mining now follows that same staged reward rule: dirt, sand,
 snow, wood, and rock cells darken with cracked facets over repeated hits, matching shovels/picks/echo
 tools shorten the sequence, and only the final pop spawns a bouncing chip. Cave-adjacent
 rock can loosen glow-crystal chips the same way. Ready pickups now also trigger a short
@@ -123,8 +123,8 @@ hex face at a time, gamepad `LB+D-pad` rotates selected build pieces, and inacti
 props can now be moved through the relocation cursor with `V`/`Shift+E`, the touch move
 button, or gamepad `LB+RT`. The C1 and C2/C3 browser proofs verify rotated placement, safe
 pack-back, lit-prop pack refusal, snap-preview and blocked-preview diagnostics/screenshots,
-door/window/roof guide silhouettes, snap-grid relocation blockers, promoted Kiln door/window/roof skin requests and fitted
-decorative bounds over code-owned sockets, and state-preserving snap-back across desktop,
+door/window/roof guide silhouettes, snap-grid relocation blockers, fitted decorative bounds
+over code-owned sockets, and state-preserving snap-back across desktop,
 laptop, tablet, phone, and injected synthetic gamepad profiles. Real hardware gamepad
 validation is still not claimed by this automated proof. Stone axe, pick,
 shovel, and hatchet now matter in play: matching tools reach a little farther, repeat
@@ -254,9 +254,9 @@ work instead of hiding it in diagnostics. Native encounters can also own the rou
 an unresolved nearby hazard can pull the guide off a distant seasonal route, and `P` can pin
 that single creature stop as a saved native route plan. The Reed Bow and
 whistling arrows add the first ranged version of that same idea: scare a visible brambleback
-off before it crowds the player, spend ammo, and keep rewards grounded in the world. The
-approved Kiln native-creature GLBs are now wired as distance-gated idle/walk skins for these
-tile-anchored encounters. Creature-first click targeting and occupied-tile placement
+off before it crowds the player, spend ammo, and keep rewards grounded in the world. These
+tile-anchored encounters use plain three.js bodies (the Kiln creature GLBs were removed in the
+2026-07-08 burndown). Creature-first click targeting and occupied-tile placement
 blockers are now wired; full roaming AI remains the next creature-depth slice. Dormant reeds, shells, pods, crystals, blooms,
 amber, and horizon shards become harvestable after the matching shrine awakens, grant
 practical survival/building items once, save with the world, and appear as Route Slate
