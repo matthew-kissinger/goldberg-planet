@@ -378,8 +378,7 @@ pentagon discovery. Workbench, campfire, chest, bedroll, waystone, and plane-fra
 have specific silhouettes instead of the generic pack fallback, and plane mode includes a
 named seated pilot/yoke silhouette. `Character.stats()`, F3, browser diagnostics, and
 `render_game_to_text` expose the avatar's named readability parts, prop sockets, held/stowed
-props, and action coverage; `npm run proof:character` captures desktop, laptop, tablet,
-phone, gamepad, and WebGL fallback screenshots. This is the runtime contract for the future
+props, and action coverage. This is the runtime contract for the future
 authored player model and prop set. Root-cellar kits and provision crates now join the visible
 cache/withdraw poses. Cave-anchor kits, rope coils, and the cave-reading pose now join the
 expedition prop set. Drying-rack kits, trail ration bundles, and expedition stew bowls or
