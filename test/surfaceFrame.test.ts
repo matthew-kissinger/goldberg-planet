@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three/webgpu';
 import { Goldberg } from '../src/geo/goldberg';
-import { pentagonTileIds } from '../src/sim/landmarks';
 import { makeSurfaceBasisFromYaw } from '../src/render/surfaceFrame';
 
 function determinant(x: THREE.Vector3, y: THREE.Vector3, z: THREE.Vector3): number {
@@ -19,7 +18,7 @@ describe('surface frame basis', () => {
     const by = new THREE.Vector3();
     const bz = new THREE.Vector3();
 
-    for (const [i, tile] of pentagonTileIds(geo).entries()) {
+    for (const [i, tile] of [...Array(geo.count).keys()].filter((t) => geo.degreeOf(t) === 5).entries()) {
       const frame = geo.frameOf(tile);
       makeSurfaceBasisFromYaw(frame, i * 0.31, matrix, x, y, z);
       bx.setFromMatrixColumn(matrix, 0);

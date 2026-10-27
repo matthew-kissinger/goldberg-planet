@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GamepadControls, applyAxisDeadzone, applyRadialDeadzone, gamepadFrameFromState, type GamepadButtonLike, type GamepadLike } from '../src/player/gamepad';
+import { applyAxisDeadzone, applyRadialDeadzone, gamepadFrameFromState, type GamepadButtonLike, type GamepadLike } from '../src/player/gamepad';
 
 function buttons(down: number[] = [], values: Record<number, number> = {}): GamepadButtonLike[] {
   return Array.from({ length: 16 }, (_, i) => ({
@@ -32,89 +32,42 @@ describe('gamepad controls', () => {
     expect(frame.lookY).toBeGreaterThan(0);
   });
 
-  it('emits edges only once for mine, place, and craft actions', () => {
-    const first = gamepadFrameFromState(pad([0, 0, 0, 0], [2, 3], { 7: 1 }), [], 1 / 60);
-    expect(first.mine).toBe(true);
-    expect(first.minePressed).toBe(true);
-    expect(first.place).toBe(true);
-    expect(first.placePressed).toBe(true);
+  it('emits chop and craft edges once while held chop keeps repeating', () => {
+    const first = gamepadFrameFromState(pad([0, 0, 0, 0], [2, 3]), [], 1 / 60);
+    expect(first.chop).toBe(true);
+    expect(first.chopPressed).toBe(true);
     expect(first.craft).toBe(true);
-    const held = gamepadFrameFromState(pad([0, 0, 0, 0], [2, 3], { 7: 1 }), buttons([2, 3], { 7: 1 }).map((b) => !!b.pressed || (b.value ?? 0) > 0.55), 1 / 60);
-    expect(held.mine).toBe(true);
-    expect(held.minePressed).toBe(false);
-    expect(held.place).toBe(true);
-    expect(held.placePressed).toBe(false);
+    const previous = buttons([2, 3]).map((b) => !!b.pressed || (b.value ?? 0) > 0.55);
+    const held = gamepadFrameFromState(pad([0, 0, 0, 0], [2, 3]), previous, 1 / 60);
+    expect(held.chop).toBe(true);
+    expect(held.chopPressed).toBe(false);
     expect(held.craft).toBe(false);
   });
 
-  it('uses LB as a route and pack modifier instead of hotbar cycling', () => {
-    const lbRight = gamepadFrameFromState(pad([0, 0, 0, 0], [4, 15]), [], 1 / 60);
-    expect(lbRight.pin).toBe(true);
-    expect(lbRight.slotDelta).toBe(0);
-    const lbLeft = gamepadFrameFromState(pad([0, 0, 0, 0], [4, 14]), [], 1 / 60);
-    expect(lbLeft.clearPin).toBe(true);
-    expect(lbLeft.slotDelta).toBe(0);
-    const pack = gamepadFrameFromState(pad([0, 0, 0, 0], [1, 4]), [], 1 / 60);
-    expect(pack.pack).toBe(true);
-    expect(pack.use).toBe(false);
+  it('treats the right trigger as chop', () => {
+    const frame = gamepadFrameFromState(pad([0, 0, 0, 0], [], { 7: 1 }), [], 1 / 60);
+    expect(frame.chop).toBe(true);
+    expect(frame.chopPressed).toBe(true);
   });
 
-  it('uses LB plus RT as a relocation edge instead of normal placement', () => {
-    const relocate = gamepadFrameFromState(pad([0, 0, 0, 0], [4], { 7: 1 }), [], 1 / 60);
-    expect(relocate.relocate).toBe(true);
-    expect(relocate.place).toBe(false);
-    expect(relocate.placePressed).toBe(false);
-  });
-
-  it('emits menu focus edges for panel-owned gamepad navigation', () => {
-    const first = gamepadFrameFromState(pad([0, 0, 0, 0], [0, 1, 12, 15]), [], 1 / 60);
+  it('maps Start to the plane and A/B to panel confirm/cancel edges', () => {
+    const first = gamepadFrameFromState(pad([0, 0, 0, 0], [0, 1, 9]), [], 1 / 60);
+    expect(first.plane).toBe(true);
     expect(first.confirm).toBe(true);
     expect(first.cancel).toBe(true);
-    expect(first.menuUp).toBe(true);
-    expect(first.menuRight).toBe(true);
     expect(first.jump).toBe(true);
-    expect(first.use).toBe(true);
-
-    const heldPrevious = buttons([0, 1, 12, 15]).map((b) => !!b.pressed || (b.value ?? 0) > 0.55);
-    const held = gamepadFrameFromState(pad([0, 0, 0, 0], [0, 1, 12, 15]), heldPrevious, 1 / 60);
+    const previous = buttons([0, 1, 9]).map((b) => !!b.pressed || (b.value ?? 0) > 0.55);
+    const held = gamepadFrameFromState(pad([0, 0, 0, 0], [0, 1, 9]), previous, 1 / 60);
+    expect(held.plane).toBe(false);
     expect(held.confirm).toBe(false);
-    expect(held.cancel).toBe(false);
-    expect(held.menuUp).toBe(false);
-    expect(held.menuRight).toBe(false);
     expect(held.jump).toBe(true);
-    expect(held.use).toBe(false);
   });
 
-  it('cycles hotbar on unmodified D-pad left and right', () => {
-    expect(gamepadFrameFromState(pad([0, 0, 0, 0], [15]), [], 1 / 60).slotDelta).toBe(1);
-    expect(gamepadFrameFromState(pad([0, 0, 0, 0], [14]), [], 1 / 60).slotDelta).toBe(-1);
-  });
-
-  it('keeps injected edge actions one-shot while continuous input persists', () => {
-    const controls = new GamepadControls();
-    controls.inject({ moveX: 0.75, craft: true, slotDelta: 1, mine: true, minePressed: true, menuDown: true, confirm: true }, 3);
-    const first = controls.frame(1 / 60);
-    const second = controls.frame(1 / 60);
-    const third = controls.frame(1 / 60);
-
-    expect(first.moveX).toBeCloseTo(0.75);
-    expect(first.craft).toBe(true);
-    expect(first.slotDelta).toBe(1);
-    expect(first.mine).toBe(true);
-    expect(first.minePressed).toBe(true);
-    expect(first.menuDown).toBe(true);
-    expect(first.confirm).toBe(true);
-
-    expect(second.moveX).toBeCloseTo(0.75);
-    expect(second.craft).toBe(false);
-    expect(second.slotDelta).toBe(0);
-    expect(second.mine).toBe(true);
-    expect(second.minePressed).toBe(false);
-    expect(second.menuDown).toBe(false);
-    expect(second.confirm).toBe(false);
-
-    expect(third.moveX).toBeCloseTo(0.75);
-    expect(third.craft).toBe(false);
-    expect(third.mine).toBe(true);
+  it('uses LB as the zoom and diagnostics modifier', () => {
+    const zoom = gamepadFrameFromState(pad([0, 0, 0, 0.8], [4]), [], 1 / 60);
+    expect(zoom.zoom).toBeGreaterThan(0.5);
+    expect(zoom.lookY).toBe(0);
+    expect(gamepadFrameFromState(pad([0, 0, 0, 0], [4, 11]), [], 1 / 60).diag).toBe(true);
+    expect(gamepadFrameFromState(pad([0, 0, 0, 0], [11]), [], 1 / 60).help).toBe(true);
   });
 });

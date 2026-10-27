@@ -6,16 +6,12 @@ import {
   AUDIO_EVENT_CUES,
   MUSIC_TRACKS,
   audioUrl,
-  audioEventForCraft,
-  audioEventForFoodAction,
-  audioEventForPlacement,
-  audioEventForStructure,
   type AudioAssetDef,
   type AudioAssetId,
 } from '../src/audio/events';
 import { GameAudio } from '../src/audio/gameAudio';
 
-describe('Hearth and Horizon audio events', () => {
+describe('audio events', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -36,31 +32,17 @@ describe('Hearth and Horizon audio events', () => {
     expect(audioUrl('audio/music/test.mp3', '/goldberg-planet/')).toBe('/goldberg-planet/audio/music/test.mp3');
   });
 
-  it('routes player action verbs to readable feedback sounds', () => {
-    expect(audioEventForCraft(true)).toBe('craftConfirm');
-    expect(audioEventForCraft(false)).toBe('uiDeny');
-    expect(audioEventForPlacement(true)).toBe('structurePlace');
-    expect(audioEventForStructure('campfire', 'lit', true)).toBe('hearthRest');
-    expect(audioEventForStructure('bedroll', 'home', true)).toBe('hearthRest');
-    expect(audioEventForStructure('chest', 'deposit', true)).toBe('structurePlace');
-    expect(audioEventForStructure('chest', 'withdraw', true)).toBe('structurePlace');
-    expect(audioEventForStructure('campfire', 'inspect', false)).toBe('uiDeny');
-    expect(audioEventForFoodAction('fish', true)).toBe('fishingCatch');
-    expect(audioEventForFoodAction('forage', true)).toBe('gatherSoft');
-    expect(audioEventForFoodAction('fish', false)).toBe('uiDeny');
-  });
-
   it('records events even before browser audio unlocks', () => {
     const audio = new GameAudio();
     expect(audio.state().unlocked).toBe(false);
-    expect(audio.playEvent('fishingCatch')).toBe(false);
-    expect(audio.playEvent('routeSlate')).toBe(false);
+    expect(audio.playEvent('craftConfirm')).toBe(false);
+    expect(audio.playEvent('gatherSoft')).toBe(false);
     const state = audio.state();
-    expect(state.lastEvent).toBe('routeSlate');
-    expect(state.lastAsset).toBe('routeSlate');
+    expect(state.lastEvent).toBe('gatherSoft');
+    expect(state.lastAsset).toBe('gatherSoft');
     expect(state.pendingEvents).toBeGreaterThanOrEqual(2);
-    expect(state.playCounts.fishingCatch).toBe(1);
-    expect(state.assetPlayCounts.fishingCatch).toBe(1);
+    expect(state.playCounts.craftConfirm).toBe(1);
+    expect(state.assetPlayCounts.craftConfirm).toBe(1);
   });
 
   it('keeps mute state and group volumes in diagnostics', () => {

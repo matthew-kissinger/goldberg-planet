@@ -58,18 +58,17 @@ function fakePlayer(overrides: Partial<Player> = {}): Player {
   } as unknown as Player;
 }
 
-function visualState(action: CharacterVisualState['action'], held: CharacterPropId, backProps: CharacterPropId[] = []): CharacterVisualState {
+function visualState(action: CharacterVisualState['action'], held: CharacterPropId): CharacterVisualState {
   return {
     action,
     held,
-    backProps,
     actionT: action === 'idle' ? 0 : 0.25,
     actionDuration: action === 'idle' ? 0 : 0.8,
   };
 }
 
-describe('character renderer Soft-Facet Wayfarer readability', () => {
-  it('exposes named silhouette parts and prop sockets for the fallback avatar', () => {
+describe('character renderer', () => {
+  it('exposes named silhouette parts for the procedural avatar', () => {
     const scene = new THREE.Scene();
     const character = new Character(scene);
     const names = meshNames(character);
@@ -104,10 +103,7 @@ describe('character renderer Soft-Facet Wayfarer readability', () => {
       'right bright boot toe',
       'left bright boot toe',
     ]));
-    expect(stats.propSockets).toEqual(['back pack', 'left hand', 'right hand']);
     expect(stats.silhouetteParts).toBeGreaterThanOrEqual(28);
-    expect(stats.actionPoseCoverage).toBeGreaterThanOrEqual(18);
-    expect(stats.normalDistanceReady).toBe(true);
   });
 
   it('swings arms forward and legs backward on jump, not the reverse', () => {
@@ -123,7 +119,6 @@ describe('character renderer Soft-Facet Wayfarer readability', () => {
     character.update(fakePlayer(), { x: 0, y: 0, z: 0 }, 5, 1 / 60, {
       action: 'jump',
       held: 'hands',
-      backProps: [],
       actionT: 0,
       actionDuration: 0,
     });
@@ -139,72 +134,61 @@ describe('character renderer Soft-Facet Wayfarer readability', () => {
     expect(leftLeg.rotation.x).toBeLessThan(0);
   });
 
-  it('swings the tool arm forward when chopping or mining, not the reverse', () => {
+  it('swings the chopping arm forward, not the reverse', () => {
     // Same -Z-is-forward convention as the jump pose above: rotation.x > 0 on a hanging arm
-    // swings its hand toward -Z (the target in front of the character). The chop/mine swing
-    // had this backwards, so the tool appeared to strike behind the character instead of ahead.
+    // swings its hand toward -Z (the tree in front of the character).
     const scene = new THREE.Scene();
     const character = new Character(scene);
-
-    for (const action of ['chop', 'mine'] as const) {
-      character.update(fakePlayer(), { x: 0, y: 0, z: 0 }, 5, 1 / 60, visualState(action, 'stoneHatchet'));
-      const rightArm = findPart(character, 'rightSdfBlendArm').parent!;
-      expect(rightArm.rotation.x).toBeGreaterThan(0);
-    }
+    character.update(fakePlayer(), { x: 0, y: 0, z: 0 }, 5, 1 / 60, visualState('chop', 'hands'));
+    const rightArm = findPart(character, 'rightSdfBlendArm').parent!;
+    expect(rightArm.rotation.x).toBeGreaterThan(0);
   });
 
-  it('keeps held props in hand and separates stowed route gear on the back', () => {
+  it('shows the held item in the right hand and nothing for bare hands', () => {
     const scene = new THREE.Scene();
     const character = new Character(scene);
 
-    character.update(
-      fakePlayer(),
-      { x: 0, y: 0, z: 0 },
-      3.5,
-      1 / 60,
-      visualState('discover', 'waystone', ['waystone', 'packFrame', 'echoLantern']),
-    );
-
-    const stats = character.stats();
-    expect(character.state().action).toBe('discover');
+    character.update(fakePlayer(), { x: 0, y: 0, z: 0 }, 3.5, 1 / 60, visualState('pickup', 'wood'));
+    let stats = character.stats();
+    expect(character.state().action).toBe('pickup');
     expect(stats.visible).toBe(true);
-    expect(stats.heldProp).toBe('waystone');
-    expect(stats.heldPropMeshes).toBeGreaterThanOrEqual(3);
-    expect(stats.backPropsVisible).toEqual(expect.arrayContaining(['packFrame', 'echoLantern']));
-    expect(stats.backPropsVisible).not.toContain('waystone');
-    expect(stats.backPropMeshes).toBeGreaterThan(10);
+    expect(stats.heldProp).toBe('wood');
+    expect(stats.heldPropMeshes).toBe(1);
+
+    character.update(fakePlayer(), { x: 0, y: 0, z: 0 }, 3.5, 1 / 60, visualState('idle', 'hands'));
+    stats = character.stats();
+    expect(stats.heldProp).toBe('hands');
+    expect(stats.heldPropMeshes).toBe(0);
   });
 
-  it('covers combat, travel, pickup, and rest action poses through renderer state', () => {
+  it('covers every core-loop action pose through renderer state', () => {
     const scene = new THREE.Scene();
     const character = new Character(scene);
     const scenarios: [CharacterVisualState['action'], CharacterPropId][] = [
-      ['chop', 'stoneHatchet'],
-      ['mine', 'echoPick'],
-      ['build', 'chest'],
-      ['fish', 'fishingRod'],
-      ['pickup', 'glowCrystal'],
-      ['ward', 'hands'],
-      ['shoot', 'hands'],
-      ['brace', 'echoLantern'],
-      ['stagger', 'hands'],
+      ['chop', 'hands'],
+      ['pickup', 'wood'],
+      ['craft', 'planeFrame'],
     ];
 
     for (const [action, held] of scenarios) {
-      character.update(fakePlayer(), { x: 0, y: 0, z: 0 }, 3.5, 1 / 60, visualState(action, held, ['packFrame', 'echoLantern']));
+      character.update(fakePlayer(), { x: 0, y: 0, z: 0 }, 3.5, 1 / 60, visualState(action, held));
       const stats = character.stats();
       expect(character.state().action).toBe(action);
       expect(stats.heldProp).toBe(held);
       expect(stats.supportedActions).toContain(action);
-      expect(stats.normalDistanceReady).toBe(true);
     }
   });
 
-  it('interns materials by color so unrelated props with matching accent colors share one instance', () => {
+  it('hides the walking body and shows the plane in plane mode', () => {
     const scene = new THREE.Scene();
     const character = new Character(scene);
+    character.update(fakePlayer({ mode: 'plane' }), { x: 0, y: 0, z: 0 }, 15, 1 / 60, visualState('plane', 'hands'));
+    expect(findPart(character, 'wayfarerSdfBlendShell').parent!.visible).toBe(false);
+  });
 
-    const meshesByName = new Map<string, THREE.Mesh[]>();
+  it('interns materials by color so matching parts share one instance', () => {
+    const scene = new THREE.Scene();
+    const character = new Character(scene);
     let totalMeshCount = 0;
     const uniqueMaterials = new Set<THREE.Material>();
     character.group.traverse((part) => {
@@ -212,24 +196,8 @@ describe('character renderer Soft-Facet Wayfarer readability', () => {
       if (!mesh.isMesh) return;
       totalMeshCount++;
       if (mesh.material && !Array.isArray(mesh.material)) uniqueMaterials.add(mesh.material as THREE.Material);
-      const list = meshesByName.get(mesh.name) ?? [];
-      list.push(mesh);
-      meshesByName.set(mesh.name, list);
     });
-
-    // hatchetWrap (stoneHatchet), repairKitLashing (repairKit), and packFrameShoulderLoop (packFrame)
-    // are unrelated prop items that all use the same reed-lashing accent color and material params.
-    // They must reuse a single interned THREE.MeshStandardMaterial instance rather than each
-    // allocating their own, even though they belong to entirely different held/back prop groups.
-    const reedLashingNames = ['hatchetWrap', 'repairKitLashing', 'packFrameShoulderLoop'];
-    const reedLashingMaterials = reedLashingNames.flatMap((name) => meshesByName.get(name) ?? []).map((mesh) => mesh.material);
-    expect(reedLashingMaterials.length).toBeGreaterThanOrEqual(reedLashingNames.length * 2); // held + back copy of each
-    const first = reedLashingMaterials[0];
-    for (const material of reedLashingMaterials) expect(material).toBe(first);
-
-    // Sanity check that interning is working broadly, not just for the color above: with ~50 prop
-    // ids each built twice (held + back), a naive per-mesh material allocator would produce close to
-    // one material per mesh. Interning should collapse that down to a small fraction of the mesh count.
+    // a naive per-mesh allocator would produce close to one material per mesh
     expect(uniqueMaterials.size).toBeLessThan(totalMeshCount / 3);
   });
 });

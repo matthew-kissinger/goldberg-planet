@@ -1,7 +1,6 @@
 /**
- * The player's body: a procedural survival-builder avatar with visible equip sockets,
- * readable action poses, and the existing bush plane in plane mode. The model is still a
- * fallback asset, but it now communicates selected tools, carried props, and recent verbs.
+ * The player's body: a procedural avatar with a right-hand prop socket, readable action
+ * poses for the core loop (walk, chop, pick up, craft), and the bush plane in plane mode.
  */
 
 import * as THREE from 'three/webgpu';
@@ -9,97 +8,19 @@ import { attribute, color, float, positionLocal, time, vec3 } from 'three/tsl';
 import type { Player } from '../player/player';
 import { CHARACTER_PROP_IDS, type CharacterAction, type CharacterPropId, type CharacterVisualState } from '../sim/equipment';
 
-const PROP_COLORS: Record<CharacterPropId, number> = {
-  hands: 0xd8dee8,
-  map: 0xd7c58f,
-  torch: 0xffa349,
-  dirt: 0x8a6242,
-  rock: 0x8d9095,
-  sand: 0xd8c48a,
-  snow: 0xeef2f5,
-  wood: 0xa8763f,
-  sticks: 0xc69254,
-  workbench: 0x8d6948,
-  stoneHatchet: 0xb6aaa0,
-  stoneAxe: 0xa5a7ac,
-  stonePick: 0x8f939b,
-  stoneShovel: 0x9b8974,
-  echoAxe: 0x62d4c7,
-  echoPick: 0x6de2d8,
-  echoShovel: 0x78cfc2,
-  packFrame: 0xb58b52,
-  repairKit: 0xc9a56d,
-  fishingRod: 0xc8a36b,
-  bait: 0xc98b5a,
-  seeds: 0x9abf5a,
-  compost: 0x6b5b32,
-  berries: 0xb64d6b,
-  caveMushroom: 0x8bd0b0,
-  snowHerb: 0xc9eef2,
-  kelp: 0x4f9f74,
-  reeds: 0x7da65f,
-  rawFish: 0x8bb7c8,
-  cookedFish: 0xd59a63,
-  campMeal: 0xd9c16c,
-  trailRation: 0xb89458,
-  expeditionStew: 0xe8a65f,
-  glowCrystal: 0x70d6d1,
-  campfire: 0xe07a3f,
-  chest: 0xa56d3a,
-  bedroll: 0x8fb0d0,
-  rainCistern: 0x5faed2,
-  rootCellar: 0x7b6a8f,
-  waterJar: 0x7dc6e8,
-  dockSegment: 0x7b6a4a,
-  fishTrap: 0x8bb7c8,
-  shoreNet: 0x7da65f,
-  dryingRack: 0xb89458,
-  weatherVane: 0x9fb8c2,
-  lantern: 0xffd06f,
-  waystone: 0x87a9d6,
-  echoLantern: 0x6de2d8,
-  planeFrame: 0xd6a86a,
-};
-
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
 
-const CHARACTER_ACTION_POSE_COVERAGE: readonly CharacterAction[] = [
-  'idle',
-  'move',
-  'sprint',
-  'jump',
-  'swim',
-  'plane',
-  'mine',
-  'chop',
-  'build',
-  'craft',
-  'fish',
-  'farm',
-  'cook',
-  'pickup',
-  'ward',
-  'shoot',
-  'brace',
-  'stagger',
-  'sleep',
-  'discover',
-  'interact',
+const CHARACTER_ACTIONS: readonly CharacterAction[] = [
+  'idle', 'move', 'sprint', 'jump', 'swim', 'plane', 'chop', 'craft', 'pickup',
 ] as const;
 
 export interface CharacterRendererStats {
   visible: boolean;
   meshes: number;
   silhouetteParts: number;
-  propSockets: string[];
-  readabilityRoles: string[];
   supportedActions: CharacterAction[];
-  actionPoseCoverage: number;
   heldProp: CharacterPropId;
   heldPropMeshes: number;
-  backPropsVisible: CharacterPropId[];
-  backPropMeshes: number;
-  normalDistanceReady: boolean;
 }
 
 type SdfVolume = {
@@ -180,9 +101,7 @@ export class Character {
   private readonly leftLeg = new THREE.Group();
   private readonly rightSocket = new THREE.Group();
   private readonly leftSocket = new THREE.Group();
-  private readonly backSocket = new THREE.Group();
   private readonly heldProps = new Map<CharacterPropId, THREE.Group>();
-  private readonly backProps = new Map<CharacterPropId, THREE.Group>();
   private readonly fadeMats: THREE.Material[] = [];
   private readonly m = new THREE.Matrix4();
   private readonly right = new THREE.Vector3();
@@ -194,7 +113,6 @@ export class Character {
   private lastState: CharacterVisualState = {
     action: 'idle',
     held: 'hands',
-    backProps: [],
     actionT: 0,
     actionDuration: 0,
   };
@@ -259,7 +177,6 @@ export class Character {
       return object;
     };
 
-    const colorMat = (id: CharacterPropId): THREE.MeshStandardMaterial => mat(PROP_COLORS[id] ?? 0xffffff, 0.72, 0.03);
 
     const makeShellMaterial = (baseColor: number, roughness = 0.84, metalness = 0.02): THREE.MeshStandardNodeMaterial => {
       const material = new THREE.MeshStandardNodeMaterial();
@@ -280,274 +197,8 @@ export class Character {
       const g = new THREE.Group();
       g.name = `character-prop-${id}`;
       if (id === 'hands') return g;
-      if (id === 'stoneHatchet' || id === 'stoneAxe' || id === 'echoAxe') {
-        const hatchet = id === 'stoneHatchet';
-        g.add(mesh(cyl6, woodMat, [0, hatchet ? 0.22 : 0.28, 0], [hatchet ? 0.038 : 0.045, hatchet ? 0.54 : 0.78, hatchet ? 0.038 : 0.045], hatchet ? 'hatchetHandle' : 'axeHandle'));
-        g.add(mesh(box, metalMat, [hatchet ? 0.105 : 0.13, hatchet ? 0.49 : 0.68, -0.02], [hatchet ? 0.2 : 0.28, hatchet ? 0.15 : 0.2, 0.06], hatchet ? 'hatchetBlade' : 'axeBlade'));
-        g.add(mesh(box, metalMat, [-0.02, hatchet ? 0.47 : 0.64, -0.02], [hatchet ? 0.09 : 0.13, hatchet ? 0.12 : 0.16, 0.05], hatchet ? 'hatchetPoll' : 'axePoll'));
-        if (hatchet) {
-          g.add(mesh(torus, mat(0xc9a56d), [0.01, 0.42, -0.01], [0.38, 0.34, 0.38], 'hatchetWrap'));
-        }
-        if (id === 'echoAxe') {
-          g.add(mesh(sphere8, mat(0x6de2d8, 0.28, 0.02, 0x3bd6cf), [0.23, 0.76, -0.02], [0.055, 0.055, 0.055], 'echoAxeCrystal'));
-          g.add(mesh(box, mat(0x62d4c7, 0.34, 0.02, 0x2bcac3), [-0.01, 0.47, -0.03], [0.035, 0.46, 0.035], 'echoAxeBinding'));
-        }
-        return g;
-      }
-      if (id === 'stonePick' || id === 'echoPick') {
-        g.add(mesh(cyl6, woodMat, [0, 0.28, 0], [0.04, 0.82, 0.04], 'pickHandle'));
-        const head = mesh(box, metalMat, [0, 0.72, 0], [0.64, 0.08, 0.07], 'pickHead');
-        head.rotation.z = 0.12;
-        g.add(head);
-        if (id === 'echoPick') {
-          g.add(mesh(cone8, mat(0x6de2d8, 0.26, 0.03, 0x3bd6cf), [0.36, 0.73, 0], [0.07, 0.18, 0.07], 'echoPickTipR'));
-          g.add(mesh(cone8, mat(0x6de2d8, 0.26, 0.03, 0x3bd6cf), [-0.36, 0.73, 0], [0.07, 0.18, 0.07], 'echoPickTipL'));
-          g.add(mesh(sphere8, mat(0x9efff7, 0.22, 0.02, 0x44efe2), [0, 0.78, 0], [0.055, 0.055, 0.055], 'echoPickCore'));
-        }
-        return g;
-      }
-      if (id === 'stoneShovel' || id === 'echoShovel') {
-        g.add(mesh(cyl6, woodMat, [0, 0.3, 0], [0.04, 0.86, 0.04], 'shovelHandle'));
-        const blade = mesh(cone8, metalMat, [0, 0.02, -0.02], [0.17, 0.26, 0.17], 'shovelBlade');
-        blade.rotation.x = Math.PI;
-        g.add(blade);
-        if (id === 'echoShovel') {
-          g.add(mesh(cone8, mat(0x78cfc2, 0.28, 0.03, 0x3bd6cf), [0, 0.12, -0.03], [0.09, 0.2, 0.09], 'echoShovelEdge'));
-          g.add(mesh(box, mat(0x62d4c7, 0.34, 0.02, 0x2bcac3), [0, 0.45, -0.03], [0.035, 0.42, 0.035], 'echoShovelBinding'));
-        }
-        return g;
-      }
-      if (id === 'repairKit') {
-        g.add(mesh(box, mat(0x6c4d2d), [0, 0.18, 0], [0.36, 0.2, 0.22], 'repairKitWrap'));
-        g.add(mesh(torus, mat(0xc9a56d), [-0.1, 0.32, 0.01], [0.55, 0.55, 0.55], 'repairKitLashing'));
-        g.add(mesh(box, metalMat, [0.12, 0.34, -0.02], [0.16, 0.06, 0.08], 'repairKitStoneWedge'));
-        const handle = mesh(cyl6, woodMat, [-0.02, 0.42, 0.04], [0.025, 0.38, 0.025], 'repairKitPeg');
-        handle.rotation.z = Math.PI / 2;
-        g.add(handle);
-        return g;
-      }
-      if (id === 'packFrame') {
-        const spine = mesh(cyl6, woodMat, [0, 0.38, -0.02], [0.035, 0.86, 0.035], 'packFrameSpine');
-        const left = mesh(cyl6, woodMat, [-0.18, 0.34, -0.02], [0.03, 0.72, 0.03], 'packFrameSideL');
-        const right = mesh(cyl6, woodMat, [0.18, 0.34, -0.02], [0.03, 0.72, 0.03], 'packFrameSideR');
-        const top = mesh(cyl6, woodMat, [0, 0.7, -0.02], [0.028, 0.46, 0.028], 'packFrameTopRail');
-        const bottom = mesh(cyl6, woodMat, [0, 0.05, -0.02], [0.028, 0.42, 0.028], 'packFrameBottomRail');
-        top.rotation.z = Math.PI / 2;
-        bottom.rotation.z = Math.PI / 2;
-        g.add(spine, left, right, top, bottom);
-        g.add(mesh(box, strapMat, [0, 0.32, -0.08], [0.44, 0.055, 0.04], 'packFrameReedLash'));
-        g.add(mesh(torus, mat(0xc9a56d), [0, 0.5, -0.05], [0.9, 0.55, 0.9], 'packFrameShoulderLoop'));
-        g.add(mesh(box, mat(0x6b4a2f), [0, 0.23, -0.03], [0.26, 0.22, 0.12], 'packFramePouch'));
-        return g;
-      }
-      if (id === 'fishingRod') {
-        const rod = mesh(cyl6, woodMat, [0, 0.66, -0.08], [0.025, 1.38, 0.025], 'fishingRod');
-        rod.rotation.z = -0.22;
-        g.add(rod);
-        g.add(mesh(box, metalMat, [0.12, 0.3, -0.08], [0.13, 0.13, 0.04], 'reel'));
-        const line = mesh(box, mat(0xd9edf7, 0.35, 0), [-0.24, 1.1, -0.22], [0.012, 0.82, 0.012], 'lineHint');
-        line.rotation.z = -0.18;
-        g.add(line);
-        return g;
-      }
-      if (id === 'map') {
-        const chart = mesh(box, colorMat(id), [0, 0.25, -0.03], [0.42, 0.05, 0.32], 'mapChart');
-        chart.rotation.x = -0.5;
-        g.add(chart);
-        g.add(mesh(box, mat(0x6d4b2d), [-0.23, 0.25, -0.03], [0.035, 0.07, 0.35], 'mapRoll'));
-        return g;
-      }
-      if (id === 'torch' || id === 'lantern' || id === 'echoLantern') {
-        g.add(mesh(cyl6, woodMat, [0, 0.3, 0], [0.04, 0.66, 0.04], 'torchHandle'));
-        const glow = mesh(sphere8, id === 'echoLantern' ? mat(0x6de2d8, 0.22, 0.03, 0x44efe2) : glowMat, [0, 0.68, 0], [0.13, 0.13, 0.13], 'torchGlow');
-        g.add(glow);
-        if (id === 'echoLantern') {
-          g.add(mesh(cone8, mat(0x70d6d1, 0.35, 0.02, 0x2bcac3), [0, 0.86, 0], [0.08, 0.18, 0.08], 'echoCrystal'));
-        }
-        return g;
-      }
-      if (id === 'waterJar') {
-        g.add(mesh(cyl8, mat(0x6f8790, 0.5, 0.06), [0, 0.22, 0], [0.16, 0.3, 0.16], 'waterJarBody'));
-        g.add(mesh(cyl8, mat(0x7dc6e8, 0.22, 0.02, 0x3a9ed0), [0, 0.4, 0], [0.13, 0.035, 0.13], 'waterJarSurface'));
-        g.add(mesh(cyl6, metalMat, [0, 0.5, 0], [0.12, 0.08, 0.12], 'waterJarRim'));
-        return g;
-      }
-      if (id === 'glowCrystal') {
-        const crystal = mesh(cone8, mat(0x70d6d1, 0.28, 0.04, 0x2bcac3), [0, 0.28, 0], [0.14, 0.38, 0.14], 'glowCrystal');
-        crystal.rotation.z = 0.18;
-        g.add(crystal);
-        g.add(mesh(sphere8, mat(0xa9fff8, 0.32, 0.02, 0x49e3dd), [0, 0.14, 0], [0.09, 0.07, 0.09], 'crystalCore'));
-        return g;
-      }
-      if (id === 'workbench') {
-        g.add(mesh(box, woodMat, [0, 0.28, 0], [0.48, 0.18, 0.32], 'workbenchCarryTop'));
-        g.add(mesh(box, mat(0x5b3a22), [-0.18, 0.08, -0.1], [0.055, 0.28, 0.055], 'workbenchCarryLeg'));
-        g.add(mesh(box, mat(0x5b3a22), [0.18, 0.08, 0.1], [0.055, 0.28, 0.055], 'workbenchCarryLeg'));
-        g.add(mesh(box, metalMat, [0.12, 0.41, -0.05], [0.18, 0.05, 0.06], 'workbenchCarryTool'));
-        g.add(mesh(box, strapMat, [0, 0.22, -0.2], [0.52, 0.045, 0.035], 'workbenchCarryStrap'));
-        return g;
-      }
-      if (id === 'campfire') {
-        for (let i = 0; i < 3; i++) {
-          const log = mesh(cyl6, woodMat, [(i - 1) * 0.08, 0.18, 0], [0.04, 0.42, 0.04], 'campfireCarryLog');
-          log.rotation.z = Math.PI / 2 + (i - 1) * 0.34;
-          g.add(log);
-        }
-        g.add(mesh(cone8, glowMat, [0, 0.36, -0.02], [0.12, 0.28, 0.12], 'campfireCarryFlame'));
-        g.add(mesh(box, strapMat, [0, 0.12, -0.18], [0.34, 0.045, 0.035], 'campfireCarryTie'));
-        return g;
-      }
-      if (id === 'chest') {
-        g.add(mesh(box, mat(0x8a5a33), [0, 0.22, 0], [0.46, 0.3, 0.32], 'chestCarryBox'));
-        g.add(mesh(cyl8, mat(0xa56d3a), [0, 0.39, 0], [0.24, 0.28, 0.24], 'chestCarryRoundedLid'));
-        g.add(mesh(box, metalMat, [0, 0.28, -0.19], [0.14, 0.12, 0.035], 'chestCarryLatch'));
-        g.add(mesh(box, strapMat, [0, 0.23, -0.22], [0.5, 0.045, 0.035], 'chestCarryStrap'));
-        return g;
-      }
-      if (id === 'bedroll') {
-        const roll = mesh(cyl8, mat(0x8fb0d0), [0, 0.28, 0], [0.24, 0.54, 0.24], 'bedrollCarryRoll');
-        roll.rotation.z = Math.PI / 2;
-        g.add(roll);
-        g.add(mesh(box, creamMat, [0, 0.28, -0.2], [0.44, 0.07, 0.05], 'bedrollCarryBlanketEdge'));
-        g.add(mesh(box, strapMat, [-0.16, 0.28, -0.25], [0.035, 0.32, 0.035], 'bedrollCarryLeftTie'));
-        g.add(mesh(box, strapMat, [0.16, 0.28, -0.25], [0.035, 0.32, 0.035], 'bedrollCarryRightTie'));
-        return g;
-      }
-      if (id === 'rainCistern') {
-        g.add(mesh(cyl8, woodMat, [0, 0.22, 0], [0.28, 0.32, 0.28], 'rainCisternCarryBarrel'));
-        g.add(mesh(cyl8, mat(0x7dc6e8, 0.25, 0.02, 0x3a9ed0), [0, 0.42, 0], [0.24, 0.035, 0.24], 'rainCisternCarryWater'));
-        g.add(mesh(box, strapMat, [0, 0.22, -0.3], [0.46, 0.05, 0.035], 'rainCisternCarryStrap'));
-        g.add(mesh(box, metalMat, [0, 0.52, 0], [0.4, 0.04, 0.08], 'rainCisternCarryLip'));
-        return g;
-      }
-      if (id === 'rootCellar') {
-        g.add(mesh(box, mat(0x5b3a22), [0, 0.18, 0], [0.42, 0.18, 0.34], 'rootCellarCarryCrate'));
-        g.add(mesh(box, mat(0x7b6a8f, 0.58, 0.04, 0x3a3354), [0, 0.34, -0.02], [0.34, 0.08, 0.26], 'rootCellarCarryCoolStone'));
-        g.add(mesh(box, strapMat, [0, 0.22, -0.22], [0.46, 0.045, 0.035], 'rootCellarCarryStrap'));
-        g.add(mesh(cyl6, mat(0x8bd0b0, 0.44, 0.02, 0x4fcfa4), [0.12, 0.46, 0], [0.055, 0.14, 0.055], 'rootCellarCarryMushroom'));
-        return g;
-      }
-      if (id === 'dockSegment') {
-        for (let i = 0; i < 3; i++) {
-          const plank = mesh(box, woodMat, [(i - 1) * 0.12, 0.22, 0], [0.09, 0.52, 0.08], 'dockPlankBundle');
-          plank.rotation.z = (i - 1) * 0.08;
-          g.add(plank);
-        }
-        g.add(mesh(box, mat(0x5b3a22), [0, 0.47, 0], [0.4, 0.05, 0.08], 'dockBundleStrap'));
-        return g;
-      }
-      if (id === 'fishTrap') {
-        g.add(mesh(box, mat(0x5b3a22), [0, 0.16, 0], [0.42, 0.08, 0.28], 'fishTrapCarrySkid'));
-        for (const x of [-0.18, 0.18]) {
-          const hoop = mesh(torus, mat(0xc9a56d), [x, 0.3, 0], [0.75, 0.75, 0.75], 'fishTrapCarryHoop');
-          hoop.rotation.y = Math.PI / 2;
-          g.add(hoop);
-        }
-        for (const z of [-0.12, 0, 0.12]) {
-          const slat = mesh(cyl6, mat(0xc9a56d), [0, 0.3, z], [0.018, 0.48, 0.018], 'fishTrapCarrySlat');
-          slat.rotation.z = Math.PI / 2;
-          g.add(slat);
-        }
-        g.add(mesh(sphere8, mat(0xc98b5a), [0.02, 0.31, 0], [0.055, 0.055, 0.055], 'fishTrapCarryBait'));
-        g.add(mesh(box, mat(0x8bb7c8), [-0.07, 0.34, 0.04], [0.12, 0.04, 0.03], 'fishTrapCarryFishHint'));
-        return g;
-      }
-      if (id === 'shoreNet') {
-        const frame = mesh(torus, mat(0xc9a56d), [0, 0.28, 0], [1.15, 0.78, 1], 'shoreNetCarryHoop');
-        frame.rotation.x = Math.PI / 2;
-        g.add(frame);
-        for (let i = -2; i <= 2; i++) {
-          const strand = mesh(box, mat(i % 2 === 0 ? 0x7da65f : 0xb7c66e), [i * 0.045, 0.28, 0], [0.012, 0.42, 0.012], 'shoreNetCarryStrand');
-          strand.rotation.z = i * 0.04;
-          g.add(strand);
-          const cross = mesh(box, mat(0xc9a56d), [0, 0.28 + i * 0.04, 0], [0.34, 0.012, 0.012], 'shoreNetCarryCross');
-          g.add(cross);
-        }
-        g.add(mesh(sphere8, mat(0x5faed2, 0.3, 0.03, 0x287aa6), [0.19, 0.5, 0.02], [0.055, 0.055, 0.055], 'shoreNetCarryFloat'));
-        g.add(mesh(box, strapMat, [0, 0.13, -0.05], [0.42, 0.04, 0.045], 'shoreNetCarryTie'));
-        return g;
-      }
-      if (id === 'dryingRack') {
-        const left = mesh(cyl6, woodMat, [-0.14, 0.32, 0], [0.025, 0.7, 0.025], 'rackCarryPost');
-        left.rotation.z = -0.28;
-        const right = mesh(cyl6, woodMat, [0.14, 0.32, 0], [0.025, 0.7, 0.025], 'rackCarryPost');
-        right.rotation.z = 0.28;
-        g.add(left, right);
-        const rail = mesh(cyl6, woodMat, [0, 0.64, 0], [0.025, 0.46, 0.025], 'rackCarryRail');
-        rail.rotation.z = Math.PI / 2;
-        g.add(rail);
-        g.add(mesh(box, mat(0x6c4d2d), [0, 0.22, 0], [0.34, 0.08, 0.16], 'rackFoodBundle'));
-        return g;
-      }
-      if (id === 'weatherVane') {
-        g.add(mesh(cyl6, woodMat, [0, 0.32, 0], [0.025, 0.78, 0.025], 'weatherVaneCarryPost'));
-        const cross = mesh(cyl6, metalMat, [0, 0.72, 0], [0.025, 0.48, 0.025], 'weatherVaneCarryNeedle');
-        cross.rotation.z = Math.PI / 2;
-        g.add(cross);
-        const head = mesh(cone8, metalMat, [0.28, 0.72, 0], [0.08, 0.16, 0.08], 'weatherVaneCarryArrow');
-        head.rotation.z = -Math.PI / 2;
-        g.add(head);
-        const tail = mesh(box, mat(0x6c7880), [-0.23, 0.72, 0], [0.12, 0.12, 0.035], 'weatherVaneCarryTail');
-        tail.rotation.z = 0.35;
-        g.add(tail);
-        const ribbon = mesh(box, mat(0x87a9d6), [-0.04, 0.56, 0.02], [0.035, 0.2, 0.018], 'weatherVaneCarryRibbon');
-        ribbon.rotation.z = -0.28;
-        g.add(ribbon);
-        return g;
-      }
-      if (id === 'waystone') {
-        g.add(mesh(dodeca, mat(0x5f6e7f), [0, 0.24, 0], [0.2, 0.34, 0.16], 'waystoneCarryBody'));
-        g.add(mesh(sphere8, mat(0x87a9d6, 0.28, 0.04, 0x447fb8), [0, 0.48, -0.02], [0.11, 0.11, 0.09], 'waystoneCarryCore'));
-        g.add(mesh(box, mat(0xd7c58f, 0.5, 0.02, 0x9d7f2a), [0, 0.25, -0.14], [0.3, 0.04, 0.03], 'waystoneCarryGlyphBar'));
-        g.add(mesh(box, strapMat, [0, 0.15, -0.2], [0.38, 0.045, 0.035], 'waystoneCarryStrap'));
-        return g;
-      }
-      if (id === 'bait' || id === 'seeds' || id === 'compost' || id === 'berries' || id === 'caveMushroom' || id === 'snowHerb' || id === 'kelp' || id === 'rawFish' || id === 'cookedFish' || id === 'campMeal' || id === 'trailRation' || id === 'expeditionStew') {
-        g.add(mesh(sphere8, colorMat(id), [0, 0.2, 0], [0.18, 0.16, 0.18], 'foodBundle'));
-        if (id === 'seeds' || id === 'bait') g.add(mesh(box, mat(0x6c4d2d), [0, 0.12, 0], [0.32, 0.2, 0.12], id === 'bait' ? 'baitPouch' : 'seedPouch'));
-        if (id === 'compost') {
-          g.add(mesh(box, mat(0x4b3a20), [0, 0.14, 0], [0.34, 0.18, 0.18], 'compostWrap'));
-          g.add(mesh(sphere8, mat(0x76a45e), [0.08, 0.33, 0], [0.055, 0.035, 0.055], 'compostSprout'));
-        }
-        if (id === 'snowHerb') g.add(mesh(cone8, mat(0xe8fbff, 0.45, 0.02, 0xbceff5), [0.02, 0.42, 0], [0.07, 0.2, 0.07], 'snowHerbSprig'));
-        if (id === 'kelp') {
-          const strand = mesh(box, mat(0x2d7959), [0.04, 0.32, 0], [0.05, 0.34, 0.025], 'kelpStrand');
-          strand.rotation.z = 0.25;
-          g.add(strand);
-        }
-        if (id === 'trailRation') {
-          g.add(mesh(box, mat(0x6c4d2d), [0, 0.2, -0.02], [0.36, 0.13, 0.16], 'rationWrap'));
-          g.add(mesh(box, mat(0xe2c47a), [0, 0.32, -0.02], [0.3, 0.035, 0.18], 'rationTie'));
-        }
-        if (id === 'expeditionStew') {
-          g.add(mesh(cyl8, mat(0x72503a), [0, 0.17, -0.01], [0.22, 0.16, 0.22], 'stewBowl'));
-          g.add(mesh(cyl8, mat(0xe8a65f, 0.42, 0.02, 0x7b3f1e), [0, 0.3, -0.01], [0.18, 0.035, 0.18], 'stewSurface'));
-          const spoon = mesh(box, metalMat, [0.2, 0.34, -0.02], [0.035, 0.34, 0.025], 'stewSpoon');
-          spoon.rotation.z = -0.55;
-          g.add(spoon);
-          g.add(mesh(box, mat(0xf0d7a2, 0.36, 0.02, 0x9c5c2c), [-0.08, 0.45, -0.02], [0.025, 0.18, 0.025], 'stewSteam'));
-        }
-        return g;
-      }
-      if (id === 'dirt' || id === 'rock' || id === 'sand' || id === 'snow' || id === 'wood') {
-        g.add(mesh(box, colorMat(id), [0, 0.2, 0], [0.28, 0.28, 0.28], 'heldBlock'));
-        return g;
-      }
-      if (id === 'sticks') {
-        for (let i = 0; i < 3; i++) {
-          const stick = mesh(cyl6, woodMat, [(i - 1) * 0.05, 0.28, 0], [0.025, 0.62, 0.025], 'stickBundle');
-          stick.rotation.z = (i - 1) * 0.15;
-          g.add(stick);
-        }
-        return g;
-      }
-      if (id === 'reeds') {
-        for (let i = 0; i < 5; i++) {
-          const reed = mesh(cyl6, mat(i % 2 === 0 ? 0x7da65f : 0xb7c66e), [(i - 2) * 0.035, 0.34, 0], [0.018, 0.7 + i * 0.03, 0.018], 'reedBundleStem');
-          reed.rotation.z = (i - 2) * 0.08;
-          g.add(reed);
-        }
-        g.add(mesh(box, strapMat, [0, 0.24, -0.04], [0.28, 0.04, 0.05], 'reedBundleTie'));
+      if (id === 'wood') {
+        g.add(mesh(box, mat(0xa8763f, 0.72, 0.03), [0, 0.2, 0], [0.28, 0.28, 0.28], 'heldBlock'));
         return g;
       }
       if (id === 'planeFrame') {
@@ -558,12 +209,7 @@ export class Character {
         cowlHint.rotation.x = Math.PI / 2;
         g.add(rib, wing, cowlHint);
         g.add(mesh(box, strapMat, [0, 0.18, -0.18], [0.52, 0.045, 0.035], 'planeFrameCarryStrap'));
-        return g;
       }
-      const pack = mesh(box, colorMat(id), [0, 0.2, 0], [0.38, 0.26, 0.28], 'propPack');
-      pack.rotation.y = 0.18;
-      g.add(pack);
-      g.add(mesh(box, strapMat, [0, 0.34, -0.15], [0.42, 0.045, 0.04], 'propStrap'));
       return g;
     };
 
@@ -626,12 +272,6 @@ export class Character {
     bedroll.rotation.z = Math.PI / 2;
     const bedrollTie = markRole(mesh(box, strapMat, [0, 1.42, 0.66], [0.36, 0.045, 0.035], 'wayfarerBedrollTie'), 'bedroll tie');
     this.pilotBody.add(backpack, backPatch, backStrap, bedroll, bedrollTie);
-    this.backSocket.position.set(0, 1.08, 0.48);
-    this.backSocket.rotation.x = 0.18;
-    this.rightSocket.userData.characterPropSocket = 'right hand';
-    this.leftSocket.userData.characterPropSocket = 'left hand';
-    this.backSocket.userData.characterPropSocket = 'back pack';
-    this.pilotBody.add(this.backSocket);
 
     const makeArm = (sign: 1 | -1, socket: THREE.Group): THREE.Group => {
       const arm = new THREE.Group();
@@ -685,22 +325,11 @@ export class Character {
     this.pilotBody.add(this.rightArm, this.leftArm, this.rightLeg, this.leftLeg);
 
     for (const id of CHARACTER_PROP_IDS) {
-      if (id !== 'hands') {
-        const held = makeProp(id);
-        held.visible = false;
-        held.userData.characterPropKind = id;
-        held.userData.characterPropMount = 'right hand';
-        this.rightSocket.add(held);
-        this.heldProps.set(id, held);
-
-        const back = makeProp(id);
-        back.visible = false;
-        back.userData.characterPropKind = id;
-        back.userData.characterPropMount = 'back pack';
-        back.scale.setScalar(0.72);
-        this.backSocket.add(back);
-        this.backProps.set(id, back);
-      }
+      if (id === 'hands') continue;
+      const held = makeProp(id);
+      held.visible = false;
+      this.rightSocket.add(held);
+      this.heldProps.set(id, held);
     }
 
     this.body.add(this.pilotBody);
@@ -808,50 +437,29 @@ export class Character {
   }
 
   state(): CharacterVisualState {
-    return {
-      ...this.lastState,
-      backProps: [...this.lastState.backProps],
-    };
+    return { ...this.lastState };
   }
 
   stats(): CharacterRendererStats {
-    const readabilityRoles = new Set<string>();
-    const propSockets = new Set<string>();
+    const roles = new Set<string>();
     let meshes = 0;
     this.group.traverse((part) => {
       if ((part as THREE.Mesh).isMesh) meshes++;
       const role = part.userData.characterReadabilityRole;
-      if (typeof role === 'string') readabilityRoles.add(role);
-      const socket = part.userData.characterPropSocket;
-      if (typeof socket === 'string') propSockets.add(socket);
+      if (typeof role === 'string') roles.add(role);
     });
-    const countMeshes = (root: THREE.Object3D | undefined): number => {
-      if (!root) return 0;
-      let count = 0;
-      root.traverse((part) => {
-        if ((part as THREE.Mesh).isMesh) count++;
-      });
-      return count;
-    };
     const heldProp = [...this.heldProps.entries()].find(([, obj]) => obj.visible)?.[0] ?? 'hands';
-    const backPropsVisible = [...this.backProps.entries()].filter(([, obj]) => obj.visible).map(([id]) => id);
-    const heldPropMeshes = heldProp === 'hands' ? 0 : countMeshes(this.heldProps.get(heldProp));
-    const backPropMeshes = backPropsVisible.reduce((sum, id) => sum + countMeshes(this.backProps.get(id)), 0);
+    let heldPropMeshes = 0;
+    this.heldProps.get(heldProp)?.traverse((part) => {
+      if ((part as THREE.Mesh).isMesh) heldPropMeshes++;
+    });
     return {
       visible: this.group.visible,
       meshes,
-      silhouetteParts: readabilityRoles.size,
-      propSockets: [...propSockets].sort(),
-      readabilityRoles: [...readabilityRoles].sort(),
-      supportedActions: [...CHARACTER_ACTION_POSE_COVERAGE],
-      actionPoseCoverage: CHARACTER_ACTION_POSE_COVERAGE.length,
+      silhouetteParts: roles.size,
+      supportedActions: [...CHARACTER_ACTIONS],
       heldProp,
       heldPropMeshes,
-      backPropsVisible,
-      backPropMeshes,
-      normalDistanceReady: readabilityRoles.size >= 28
-        && propSockets.size >= 3
-        && CHARACTER_ACTION_POSE_COVERAGE.length >= 18,
     };
   }
 
@@ -875,11 +483,10 @@ export class Character {
     const state: CharacterVisualState = visual ?? {
       action: moving ? 'move' : 'idle',
       held: 'hands',
-      backProps: [],
       actionT: 0,
       actionDuration: 0,
     };
-    this.lastState = { ...state, backProps: [...state.backProps] };
+    this.lastState = { ...state };
 
     this.plane.visible = player.mode === 'plane';
     this.pilotBody.visible = player.mode !== 'plane';
@@ -917,25 +524,7 @@ export class Character {
   }
 
   private applyEquipment(state: CharacterVisualState): void {
-    const held = this.heldProps.has(state.held) ? state.held : 'hands';
-    for (const [id, obj] of this.heldProps) obj.visible = id === held;
-    const activeBack = new Set(state.backProps.filter((id) => id !== held));
-    let visibleIndex = 0;
-    for (const [id, obj] of this.backProps) {
-      const visible = activeBack.has(id);
-      obj.visible = visible;
-      if (!visible) continue;
-      if (id === 'packFrame') {
-        obj.position.set(0, -0.1, 0.04);
-        obj.rotation.set(0.18, 0, 0);
-        obj.scale.setScalar(0.95);
-        continue;
-      }
-      obj.scale.setScalar(0.72);
-      obj.position.set(-0.26 + visibleIndex * 0.17, -0.12 + visibleIndex * 0.02, 0.02);
-      obj.rotation.set(0.85, 0.08 * visibleIndex, -0.55 + visibleIndex * 0.22);
-      visibleIndex++;
-    }
+    for (const [id, obj] of this.heldProps) obj.visible = id === state.held;
   }
 
   private applyPose(state: CharacterVisualState, moving: boolean): void {
@@ -1023,7 +612,6 @@ export class Character {
     }
 
     switch (state.action) {
-      case 'mine':
       case 'chop':
         // rotation.x > 0 swings a hanging arm toward -Z (the character's front, where the
         // target sits) — this was negative, swinging the tool backward instead of striking forward.
@@ -1036,15 +624,6 @@ export class Character {
         this.leftLeg.rotation.x = 0.12;
         setSquash(swing * 0.026);
         break;
-      case 'build':
-        this.rightArm.rotation.x = -0.62 - swing * 0.55;
-        this.leftArm.rotation.x = -0.48 - swing * 0.2;
-        this.rightArm.rotation.z = -0.34;
-        this.leftArm.rotation.z = 0.32;
-        this.rightLeg.rotation.x = -0.06;
-        this.leftLeg.rotation.x = 0.1;
-        setSquash(swing * 0.018);
-        break;
       case 'craft':
         this.rightArm.rotation.x = -0.85 + Math.sin(p * Math.PI * 4) * 0.12;
         this.leftArm.rotation.x = -0.75 - Math.sin(p * Math.PI * 4) * 0.12;
@@ -1053,36 +632,6 @@ export class Character {
         this.rightLeg.rotation.x = 0.06;
         this.leftLeg.rotation.x = 0.06;
         setSquash(Math.abs(Math.sin(p * Math.PI * 4)) * 0.012);
-        break;
-      case 'fish':
-        this.rightArm.rotation.x = -1.25 + swing * 0.45;
-        this.rightArm.rotation.z = -0.52;
-        this.leftArm.rotation.x = -0.5;
-        this.leftArm.rotation.z = 0.34;
-        this.pilotBody.rotation.x = -0.04;
-        this.rightLeg.rotation.x = -0.08;
-        this.leftLeg.rotation.x = 0.14;
-        setSquash(swing * 0.02);
-        break;
-      case 'farm':
-        this.rightArm.rotation.x = -0.95 - swing * 0.28;
-        this.leftArm.rotation.x = -0.85 - swing * 0.2;
-        this.rightArm.rotation.z = -0.18;
-        this.leftArm.rotation.z = 0.18;
-        this.pilotBody.rotation.x = -0.12 * swing;
-        this.rightLeg.rotation.x = 0.18;
-        this.leftLeg.rotation.x = -0.08;
-        setSquash(swing * 0.024);
-        break;
-      case 'cook':
-      case 'interact':
-        this.rightArm.rotation.x = -0.78 - swing * 0.25;
-        this.leftArm.rotation.x = -0.45;
-        this.rightArm.rotation.z = -0.45;
-        this.leftArm.rotation.z = 0.36;
-        this.rightLeg.rotation.x = 0.04;
-        this.leftLeg.rotation.x = 0.04;
-        setSquash(swing * 0.014);
         break;
       case 'pickup': {
         const reach = Math.sin(Math.min(1, p * 1.25) * Math.PI);
@@ -1103,96 +652,6 @@ export class Character {
         setSquash(0.04 * reach - 0.018 * lift);
         break;
       }
-      case 'ward': {
-        const guard = Math.sin(Math.min(1, p * 1.2) * Math.PI);
-        const slash = Math.sin(clamp01((p - 0.18) / 0.62) * Math.PI);
-        this.pilotBody.rotation.x = -0.07 - guard * 0.05;
-        this.pilotBody.rotation.z = -0.05 - slash * 0.04;
-        this.rightArm.rotation.x = -0.78 - slash * 0.72;
-        this.rightArm.rotation.z = -0.52 - guard * 0.18;
-        this.leftArm.rotation.x = -0.72 + guard * 0.12;
-        this.leftArm.rotation.z = 0.58 + guard * 0.18;
-        this.rightSocket.rotation.z = 0.28 + slash * 0.64;
-        this.rightSocket.rotation.y = -0.12 * guard;
-        this.rightLeg.rotation.x = -0.14;
-        this.leftLeg.rotation.x = 0.22;
-        this.rightLeg.rotation.z = -0.18;
-        this.leftLeg.rotation.z = 0.16;
-        setSquash(0.02 + guard * 0.018);
-        break;
-      }
-      case 'shoot': {
-        const draw = clamp01(p / 0.42);
-        const release = clamp01((p - 0.58) / 0.42);
-        const settle = 1 - release;
-        this.pilotBody.rotation.x = -0.05;
-        this.pilotBody.rotation.z = -0.07 * settle;
-        this.rightArm.rotation.x = -0.82 - draw * 0.16 + release * 0.2;
-        this.rightArm.rotation.z = -0.52 - draw * 0.34 + release * 0.3;
-        this.leftArm.rotation.x = -1.08 + release * 0.38;
-        this.leftArm.rotation.z = 0.48 + draw * 0.24 - release * 0.2;
-        this.rightSocket.rotation.y = -0.34 * draw + 0.18 * release;
-        this.rightSocket.rotation.z = -0.18 * draw;
-        this.rightLeg.rotation.x = -0.1;
-        this.leftLeg.rotation.x = 0.16;
-        this.rightLeg.rotation.z = -0.14;
-        this.leftLeg.rotation.z = 0.14;
-        setSquash(0.012 + draw * 0.012 - release * 0.012);
-        break;
-      }
-      case 'brace': {
-        const brace = Math.sin(Math.min(1, p * 1.15) * Math.PI);
-        const recoil = Math.sin(clamp01((p - 0.28) / 0.72) * Math.PI);
-        this.pilotBody.rotation.x = -0.22 * brace + 0.08 * recoil;
-        this.pilotBody.rotation.z = -0.06 * brace;
-        this.pilotBody.position.y -= 0.025 * brace;
-        this.rightArm.rotation.x = -1.0 - brace * 0.25;
-        this.leftArm.rotation.x = -0.95 - brace * 0.18;
-        this.rightArm.rotation.z = -0.42 - brace * 0.2;
-        this.leftArm.rotation.z = 0.54 + brace * 0.18;
-        this.rightSocket.rotation.x = 0.4 * brace;
-        this.rightLeg.rotation.x = 0.24 * brace;
-        this.leftLeg.rotation.x = 0.18 * brace;
-        this.rightLeg.rotation.z = -0.22;
-        this.leftLeg.rotation.z = 0.22;
-        setSquash(0.042 * brace - 0.018 * recoil);
-        break;
-      }
-      case 'stagger': {
-        const hit = Math.sin(p * Math.PI);
-        const wobble = Math.sin(p * Math.PI * 3) * hit;
-        this.pilotBody.rotation.x = 0.18 * hit;
-        this.pilotBody.rotation.z = 0.14 * wobble;
-        this.pilotBody.position.y += 0.025 * hit;
-        this.rightArm.rotation.x = -0.22 + hit * 0.7;
-        this.leftArm.rotation.x = -0.18 + hit * 0.62;
-        this.rightArm.rotation.z = -0.62 - hit * 0.2;
-        this.leftArm.rotation.z = 0.62 + hit * 0.2;
-        this.rightLeg.rotation.x = -0.28 * hit;
-        this.leftLeg.rotation.x = 0.42 * hit;
-        this.rightLeg.rotation.z = -0.22 * hit;
-        this.leftLeg.rotation.z = 0.26 * hit;
-        setSquash(-0.035 * hit);
-        break;
-      }
-      case 'sleep':
-        this.rightArm.rotation.x = -0.25;
-        this.leftArm.rotation.x = -0.25;
-        this.pilotBody.rotation.z = 0.08 * swing;
-        this.rightLeg.rotation.x = 0.38;
-        this.leftLeg.rotation.x = 0.38;
-        setSquash(0.03);
-        break;
-      case 'discover':
-        this.rightArm.rotation.x = -1.65 + swing * 0.16;
-        this.leftArm.rotation.x = -1.05;
-        this.rightArm.rotation.z = -0.2;
-        this.leftArm.rotation.z = 0.62;
-        this.pilotBody.rotation.x = -0.05;
-        this.rightLeg.rotation.x = -0.04;
-        this.leftLeg.rotation.x = 0.08;
-        setSquash(-0.018);
-        break;
       default:
         break;
     }

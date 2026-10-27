@@ -17,9 +17,7 @@ const materials = {
   glow: mat(0xf1d076, 0.44, 0.08, 0xe9a63d),
 };
 
-// Drop materials, one per item, colored from that item's own catalog color
-// (ITEM_DEFS[item].css) so every resource kind reads as visually distinct — instead of
-// collapsing rare/food/part drops into one generic color.
+// Non-wood drops are tinted with the item's catalog color (ITEM_DEFS[item].css).
 const itemMaterials = new Map<ResourceDropSave['item'], THREE.MeshStandardMaterial>();
 function itemMaterial(item: ResourceDropSave['item']): THREE.MeshStandardMaterial {
   let m = itemMaterials.get(item);
@@ -67,13 +65,8 @@ function makeGenericDrop(drop: ResourceDropSave): THREE.Group {
   const g = new THREE.Group();
   g.name = `resource-drop-${drop.item}-${drop.id}`;
   const material = itemMaterial(drop.item);
-  // Round pieces read as forage/food, angular chips read as mined/part material —
-  // a coarse but useful shape cue on top of the per-item color.
-  const kind = ITEM_DEFS[drop.item].kind;
-  const geom = kind === 'food' ? sphere8 : box;
-  const pieceScale: [number, number, number] = kind === 'food' ? [0.1, 0.1, 0.1] : [0.16, 0.12, 0.14];
   for (let i = 0; i < Math.max(1, Math.min(3, drop.count)); i++) {
-    const chip = mesh(geom, material, [-0.1 + i * 0.1, 0.12 + i * 0.035, (i % 2) * 0.08], pieceScale, 'dropChip');
+    const chip = mesh(box, material, [-0.1 + i * 0.1, 0.12 + i * 0.035, (i % 2) * 0.08], [0.16, 0.12, 0.14], 'dropChip');
     chip.rotation.set(i * 0.4, i * 0.7, i * 0.22);
     g.add(chip);
   }
@@ -134,7 +127,7 @@ export class ResourceDropRenderer {
       makeSurfaceBasisFromYaw(frame, yaw, m, vX, vY, vZ);
 
       // Ground height is cached at spawn time (see sim/resourceDrops.ts) so that terrain
-      // edits near an existing drop don't make it visibly snap/teleport every frame. The
+      // changes near an existing drop don't make it visibly snap/teleport every frame. The
       // live lookup is only a defensive fallback for malformed/legacy entries that were
       // never assigned a cached height.
       const ground = drop.groundRadius > 0

@@ -15,7 +15,7 @@
  *    terrain lifts it early. Pitching the view (or Space/Ctrl) climbs and descends.
  *    Touching ground, water, or a wall stows the plane.
  *  - swim: buoyancy floats the player at the surface of the sea
- *  - fly: creative free-flight (F), kept for inspection/debugging
+ *  - fly: free-flight (F), kept for inspection/debugging
  */
 
 import type { Columns } from '../world/columns';
@@ -57,10 +57,6 @@ export interface PlayerInput {
   sprint: boolean;
   jump: boolean;
   swimUp: boolean;
-}
-
-export interface PlayerCollisionContext {
-  structureTraversalBlocker?: (fromTile: number, toTile: number) => unknown;
 }
 
 export class Player {
@@ -196,7 +192,7 @@ export class Player {
     return this.layers.topRadius(this.columns.groundLayerBelow(tile, this.layers.bounds[0]));
   }
 
-  update(dt: number, input: PlayerInput, collisions?: PlayerCollisionContext): void {
+  update(dt: number, input: PlayerInput): void {
     const [ux, uy, uz] = this.up();
     this.reorthonormalize();
     const fx = this.fwdX, fy = this.fwdY, fz = this.fwdZ;
@@ -283,7 +279,7 @@ export class Player {
       }
       this.vx = tx2 + vr * ux; this.vy = ty2 + vr * uy; this.vz = tz2 + vr * uz;
     } else {
-      // fly (creative)
+      // fly (free-flight)
       const boost = input.sprint ? FLY_BOOST : 1;
       const cosP = Math.cos(this.pitch), sinP = Math.sin(this.pitch);
       const vfx = fx * cosP + ux * sinP, vfy = fy * cosP + uy * sinP, vfz = fz * cosP + uz * sinP;
@@ -308,7 +304,6 @@ export class Player {
         const gap = this.layers.bottomRadius(ceilK) - Math.max(groundR, r0 - 0.1);
         if (gap < BODY_HEIGHT) blocked = true;
       }
-      if (!blocked && collisions?.structureTraversalBlocker?.(this.tile, newTile)) blocked = true;
     }
     if (blocked) {
       const vr = this.vx * ux + this.vy * uy + this.vz * uz;

@@ -28,26 +28,14 @@ export interface GamepadFrame {
   jump: boolean;
   down: boolean;
   plane: boolean;
-  use: boolean;
-  pack: boolean;
   craft: boolean;
-  pin: boolean;
-  clearPin: boolean;
-  relocate: boolean;
-  menuUp: boolean;
-  menuDown: boolean;
-  menuLeft: boolean;
-  menuRight: boolean;
   confirm: boolean;
   cancel: boolean;
   mute: boolean;
   help: boolean;
   diag: boolean;
-  mine: boolean;
-  minePressed: boolean;
-  place: boolean;
-  placePressed: boolean;
-  slotDelta: number;
+  chop: boolean;
+  chopPressed: boolean;
 }
 
 export interface GamepadSnapshot {
@@ -71,53 +59,15 @@ const EMPTY_FRAME: GamepadFrame = {
   jump: false,
   down: false,
   plane: false,
-  use: false,
-  pack: false,
   craft: false,
-  pin: false,
-  clearPin: false,
-  relocate: false,
-  menuUp: false,
-  menuDown: false,
-  menuLeft: false,
-  menuRight: false,
   confirm: false,
   cancel: false,
   mute: false,
   help: false,
   diag: false,
-  mine: false,
-  minePressed: false,
-  place: false,
-  placePressed: false,
-  slotDelta: 0,
+  chop: false,
+  chopPressed: false,
 };
-
-const EDGE_FIELDS: (keyof Pick<GamepadFrame,
-  'plane' | 'use' | 'pack' | 'craft' | 'pin' | 'clearPin' |
-  'relocate' | 'menuUp' | 'menuDown' | 'menuLeft' | 'menuRight' | 'confirm' | 'cancel' |
-  'mute' | 'help' | 'diag' | 'minePressed' | 'placePressed' | 'slotDelta'
->)[] = [
-  'plane',
-  'use',
-  'pack',
-  'craft',
-  'pin',
-  'clearPin',
-  'relocate',
-  'menuUp',
-  'menuDown',
-  'menuLeft',
-  'menuRight',
-  'confirm',
-  'cancel',
-  'mute',
-  'help',
-  'diag',
-  'minePressed',
-  'placePressed',
-  'slotDelta',
-];
 
 enum Btn {
   A = 0,
@@ -201,71 +151,15 @@ export function gamepadFrameFromState(gamepad: GamepadLike | null, previous: rea
     jump: down(Btn.A),
     down: lt,
     plane: edge(Btn.Start),
-    use: edge(Btn.B) && !lb,
-    pack: edge(Btn.B) && lb,
     craft: edge(Btn.Y),
-    pin: edge(Btn.DpadRight) && lb,
-    clearPin: edge(Btn.DpadLeft) && lb,
-    relocate: edge(Btn.RT) && lb,
-    menuUp: edge(Btn.DpadUp),
-    menuDown: edge(Btn.DpadDown),
-    menuLeft: edge(Btn.DpadLeft),
-    menuRight: edge(Btn.DpadRight),
     confirm: edge(Btn.A),
     cancel: edge(Btn.B),
     mute: edge(Btn.Back) && lb,
     help: edge(Btn.R3) && !lb,
     diag: edge(Btn.R3) && lb,
-    mine: down(Btn.X),
-    minePressed: edge(Btn.X),
-    place: rt && !lb,
-    placePressed: edge(Btn.RT) && !lb,
-    slotDelta: lb ? 0 : (edge(Btn.DpadRight) ? 1 : 0) + (edge(Btn.DpadLeft) ? -1 : 0),
+    chop: down(Btn.X) || rt,
+    chopPressed: edge(Btn.X) || edge(Btn.RT),
   };
-}
-
-function mergeFrames(a: GamepadFrame, b: GamepadFrame): GamepadFrame {
-  return {
-    active: a.active || b.active,
-    moveX: clampUnit(a.moveX + b.moveX),
-    moveY: clampUnit(a.moveY + b.moveY),
-    lookX: a.lookX + b.lookX,
-    lookY: a.lookY + b.lookY,
-    zoom: clampUnit(a.zoom + b.zoom),
-    sprint: a.sprint || b.sprint,
-    jump: a.jump || b.jump,
-    down: a.down || b.down,
-    plane: a.plane || b.plane,
-    use: a.use || b.use,
-    pack: a.pack || b.pack,
-    craft: a.craft || b.craft,
-    pin: a.pin || b.pin,
-    clearPin: a.clearPin || b.clearPin,
-    relocate: a.relocate || b.relocate,
-    menuUp: a.menuUp || b.menuUp,
-    menuDown: a.menuDown || b.menuDown,
-    menuLeft: a.menuLeft || b.menuLeft,
-    menuRight: a.menuRight || b.menuRight,
-    confirm: a.confirm || b.confirm,
-    cancel: a.cancel || b.cancel,
-    mute: a.mute || b.mute,
-    help: a.help || b.help,
-    diag: a.diag || b.diag,
-    mine: a.mine || b.mine,
-    minePressed: a.minePressed || b.minePressed,
-    place: a.place || b.place,
-    placePressed: a.placePressed || b.placePressed,
-    slotDelta: a.slotDelta + b.slotDelta,
-  };
-}
-
-function stripEdgeFields(frame: GamepadFrame): GamepadFrame {
-  const out = { ...frame };
-  for (const key of EDGE_FIELDS) {
-    if (key === 'slotDelta') out.slotDelta = 0;
-    else out[key] = false;
-  }
-  return out;
 }
 
 function nowMs(): number {
@@ -274,11 +168,9 @@ function nowMs(): number {
 
 export class GamepadControls {
   private previousButtons: boolean[] = [];
-  private lastFrame: GamepadFrame = { ...EMPTY_FRAME };
   private lastPad: GamepadLike | null = null;
   private lastActiveAt = -Infinity;
   private notice: string | null = null;
-  private injected: { frame: GamepadFrame; frames: number } | null = null;
 
   constructor() {
     if (typeof window === 'undefined') return;
@@ -300,16 +192,8 @@ export class GamepadControls {
     } else {
       this.previousButtons = [];
     }
-    let out = live;
-    if (this.injected) {
-      out = mergeFrames(out, this.injected.frame);
-      this.injected.frames--;
-      if (this.injected.frames <= 0) this.injected = null;
-      else this.injected.frame = stripEdgeFields(this.injected.frame);
-    }
-    if (out.active) this.lastActiveAt = nowMs();
-    this.lastFrame = out;
-    return out;
+    if (live.active) this.lastActiveAt = nowMs();
+    return live;
   }
 
   active(): boolean {
@@ -324,13 +208,6 @@ export class GamepadControls {
     const n = this.notice;
     this.notice = null;
     return n;
-  }
-
-  inject(frame: Partial<GamepadFrame>, frames = 2): void {
-    this.injected = {
-      frame: { ...EMPTY_FRAME, ...frame, active: frame.active ?? true },
-      frames: Math.max(1, Math.floor(frames)),
-    };
   }
 
   snapshot(): GamepadSnapshot {

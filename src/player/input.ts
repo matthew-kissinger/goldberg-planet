@@ -2,7 +2,7 @@
  * Keyboard/mouse state. Pointer lock when the environment allows it; otherwise a
  * drag-to-look fallback (embedded webviews and preview panels often deny pointer lock):
  *  - drag any mouse button to look (deltas from clientX/Y, so it works without lock)
- *  - a press-release without movement counts as a click: LMB mines, RMB places
+ *  - a press-release without movement counts as a click: LMB chops
  * Wheel controls the ground-to-orbit zoom axis in both modes.
  */
 
@@ -14,10 +14,8 @@ export class Input {
   mouseDY = 0;
   wheel = 0;
   wheelTouched = false;
-  mineHeld = false;
-  placeHeld = false;
-  minePressed = false;
-  placePressed = false;
+  chopHeld = false;
+  chopPressed = false;
   keyEdges = new Set<string>();
   locked = false;
   lockUnavailable = false;
@@ -57,7 +55,7 @@ export class Input {
     window.addEventListener('mousedown', (e) => {
       if (this.touchMode) return;
       // UI elements handle their own pointers
-      if (e.target instanceof HTMLElement && e.target.closest('#hotbar, #crafting, #storage, .tbtn')) return;
+      if (e.target instanceof HTMLElement && e.target.closest('#hotbar, #crafting, .tbtn')) return;
       if (this.worldInputBlocked()) {
         e.preventDefault();
         this.cancelWorldInput();
@@ -74,8 +72,7 @@ export class Input {
         }
       }
       if (this.locked) {
-        if (e.button === 0) { this.mineHeld = true; this.minePressed = true; }
-        if (e.button === 2) { this.placeHeld = true; this.placePressed = true; }
+        if (e.button === 0) { this.chopHeld = true; this.chopPressed = true; }
       } else {
         this.dragButton = e.button;
         this.dragMoved = 0;
@@ -109,14 +106,12 @@ export class Input {
         return;
       }
       if (this.locked) {
-        if (e.button === 0) this.mineHeld = false;
-        if (e.button === 2) this.placeHeld = false;
+        if (e.button === 0) this.chopHeld = false;
         return;
       }
       if (this.dragButton === e.button) {
         if (this.dragMoved < DRAG_CLICK_SLOP) {
-          if (e.button === 0) this.minePressed = true;
-          if (e.button === 2) this.placePressed = true;
+          if (e.button === 0) this.chopPressed = true;
         }
         this.dragButton = -1;
       }
@@ -154,23 +149,21 @@ export class Input {
     this.mouseDY = 0;
     this.wheel = 0;
     this.wheelTouched = false;
-    this.mineHeld = false;
-    this.placeHeld = false;
-    this.minePressed = false;
-    this.placePressed = false;
+    this.chopHeld = false;
+    this.chopPressed = false;
     this.dragButton = -1;
     this.dragMoved = 0;
   }
 
   /** consume per-frame deltas */
-  drain(): { dx: number; dy: number; wheel: number; mine: boolean; place: boolean; wheelTouched: boolean } {
+  drain(): { dx: number; dy: number; wheel: number; chop: boolean; wheelTouched: boolean } {
     const out = {
       dx: this.mouseDX, dy: this.mouseDY, wheel: this.wheel,
-      mine: this.minePressed, place: this.placePressed,
+      chop: this.chopPressed,
       wheelTouched: this.wheelTouched,
     };
     this.mouseDX = 0; this.mouseDY = 0; this.wheel = 0;
-    this.minePressed = false; this.placePressed = false;
+    this.chopPressed = false;
     this.wheelTouched = false;
     return out;
   }

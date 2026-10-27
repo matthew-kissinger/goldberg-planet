@@ -16,7 +16,6 @@ import type { Layers } from '../world/layers';
 import type { Columns } from '../world/columns';
 import type { ChunkInfo } from '../world/chunks';
 import { treeTangentFrame, type Trees } from '../world/trees';
-import type { CellDamageProvider } from '../sim/mining';
 import { PLANET_RADIUS } from '../world/layers';
 import { materialColor, TRUNK_COLOR, LEAF_COLOR } from './palette';
 
@@ -67,7 +66,6 @@ export function buildChunkMesh(
   layers: Layers,
   columns: Columns,
   trees?: Trees,
-  cellDamage?: CellDamageProvider,
 ): ChunkMeshData | null {
   sink.reset();
   const ax = chunk.cx * PLANET_RADIUS, ay = chunk.cy * PLANET_RADIUS, az = chunk.cz * PLANET_RADIUS;
@@ -109,11 +107,11 @@ export function buildChunkMesh(
       if (above && below) continue;
       if (!above) {
         // top cap at bounds[k]
-        emitCap(deg, bounds[k], tcx, tcy, tcz, ax, ay, az, false, columns.materialAt(id, k), id, isPent, cellDamage?.damageOf(id, k) ?? 0);
+        emitCap(deg, bounds[k], tcx, tcy, tcz, ax, ay, az, false, columns.materialAt(id, k), id, isPent);
       }
       if (!below && k < L - 1) {
         // bottom cap (cave ceiling) at bounds[k+1]
-        emitCap(deg, bounds[k + 1], tcx, tcy, tcz, ax, ay, az, true, columns.materialAt(id, k), id, isPent, cellDamage?.damageOf(id, k) ?? 0);
+        emitCap(deg, bounds[k + 1], tcx, tcy, tcz, ax, ay, az, true, columns.materialAt(id, k), id, isPent);
       }
     }
 
@@ -130,7 +128,7 @@ export function buildChunkMesh(
         const mat = exposed ? columns.materialAt(id, k) : -1;
         if (exposed && bandStart === -1) { bandStart = k; bandMat = mat; }
         else if (bandStart !== -1 && (!exposed || mat !== bandMat)) {
-          emitWall(cAx, cAy, cAz, cBx, cBy, cBz, bounds[bandStart], bounds[k], tcx, tcy, tcz, ax, ay, az, bandMat, id, isPent, cellDamage?.damageOf(id, bandStart) ?? 0);
+          emitWall(cAx, cAy, cAz, cBx, cBy, cBz, bounds[bandStart], bounds[k], tcx, tcy, tcz, ax, ay, az, bandMat, id, isPent);
           bandStart = exposed ? k : -1;
           bandMat = mat;
         }
@@ -161,13 +159,10 @@ function emitCap(
   deg: number, r: number,
   ncx: number, ncy: number, ncz: number,
   ax: number, ay: number, az: number,
-  flip: boolean, mat: number, tileId: number, isPent: boolean, damage = 0,
+  flip: boolean, mat: number, tileId: number, isPent: boolean,
 ): void {
   materialColor(mat, tileId, isPent, colorScratch);
-  const dmg = Math.max(0, Math.min(0.98, damage));
   const cr = colorScratch[0], cg = colorScratch[1], cb = colorScratch[2];
-  const shade = 1 - dmg * 0.2;
-  const crackTriangles = Math.ceil(dmg * Math.max(1, deg - 2));
   const nx = flip ? -ncx : ncx, ny = flip ? -ncy : ncy, nz = flip ? -ncz : ncz;
   sink.ensure((deg - 2) * 3);
   const c = cornerScratch;
@@ -175,11 +170,9 @@ function emitCap(
   for (let t = 1; t < deg - 1; t++) {
     const i1 = flip ? t + 1 : t;
     const i2 = flip ? t : t + 1;
-    const crack = dmg > 0.01 && t <= crackTriangles;
-    const dark = crack ? 0.34 : shade;
-    sink.vert(x0, y0, z0, nx, ny, nz, cr * dark, cg * dark, cb * dark);
-    sink.vert(c[i1 * 3] * r - ax, c[i1 * 3 + 1] * r - ay, c[i1 * 3 + 2] * r - az, nx, ny, nz, cr * dark, cg * dark, cb * dark);
-    sink.vert(c[i2 * 3] * r - ax, c[i2 * 3 + 1] * r - ay, c[i2 * 3 + 2] * r - az, nx, ny, nz, cr * dark, cg * dark, cb * dark);
+    sink.vert(x0, y0, z0, nx, ny, nz, cr, cg, cb);
+    sink.vert(c[i1 * 3] * r - ax, c[i1 * 3 + 1] * r - ay, c[i1 * 3 + 2] * r - az, nx, ny, nz, cr, cg, cb);
+    sink.vert(c[i2 * 3] * r - ax, c[i2 * 3 + 1] * r - ay, c[i2 * 3 + 2] * r - az, nx, ny, nz, cr, cg, cb);
   }
 }
 
@@ -273,12 +266,10 @@ function emitWall(
   rTop: number, rBot: number,
   tcx: number, tcy: number, tcz: number,
   ax: number, ay: number, az: number,
-  mat: number, tileId: number, isPent: boolean, damage = 0,
+  mat: number, tileId: number, isPent: boolean,
 ): void {
   materialColor(mat, tileId, isPent, colorScratch);
-  const dmg = Math.max(0, Math.min(0.98, damage));
-  const dark = dmg > 0.01 ? 1 - dmg * 0.28 : 1;
-  const cr = colorScratch[0] * dark, cg = colorScratch[1] * dark, cb = colorScratch[2] * dark;
+  const cr = colorScratch[0], cg = colorScratch[1], cb = colorScratch[2];
   // quad corners (world, then relative to anchor)
   const v0x = cAx * rTop, v0y = cAy * rTop, v0z = cAz * rTop;
   const v1x = cBx * rTop, v1y = cBy * rTop, v1z = cBz * rTop;

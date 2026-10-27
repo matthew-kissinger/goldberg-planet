@@ -1,7 +1,5 @@
 import { ITEM_DEFS, type ItemId } from './crafting';
 
-export type ResourceDropSource = 'tree' | 'mine' | 'creature' | 'debug';
-
 export interface ResourceDropSave {
   id: number;
   item: ItemId;
@@ -12,13 +10,12 @@ export interface ResourceDropSave {
   /**
    * World-space radius (distance from the planet center) of the ground the drop rests
    * on, captured once at spawn time. Rendering must read this cached value instead of
-   * recomputing it from live terrain every frame — otherwise mining/building near a
+   * recomputing it from live terrain every frame — otherwise a terrain change near a
    * drop makes it visibly snap to the new height. 0 means "not cached yet" (legacy save
    * data); callers should backfill it once from current terrain, then leave it fixed.
    */
   groundRadius: number;
   age: number;
-  source: ResourceDropSource;
 }
 
 export interface DropCollectResult {
@@ -42,10 +39,6 @@ function finite(n: unknown): n is number {
 
 function itemId(v: unknown): ItemId | null {
   return typeof v === 'string' && v in ITEM_DEFS ? v as ItemId : null;
-}
-
-function sourceId(v: unknown): ResourceDropSource {
-  return v === 'mine' || v === 'creature' || v === 'debug' ? v : 'tree';
 }
 
 function hash01(a: number, b: number): number {
@@ -73,7 +66,6 @@ function normalizeDrop(raw: unknown, tileCount: number): ResourceDropSave | null
     offsetB: finite(v.offsetB) ? Math.max(-2.4, Math.min(2.4, v.offsetB)) : 0,
     groundRadius: finite(v.groundRadius) && v.groundRadius > 0 ? v.groundRadius : 0,
     age: finite(v.age) ? Math.max(0, Math.min(3600, v.age)) : 0,
-    source: sourceId(v.source),
   };
 }
 
@@ -102,7 +94,6 @@ export function spawnItemDrops(
   groundRadius: number,
   item: ItemId,
   total = 1,
-  source: ResourceDropSource = 'debug',
   maxStacks = 2,
 ): { drops: ResourceDropSave[]; nextId: number } {
   const count = Math.max(1, Math.trunc(total));
@@ -126,18 +117,13 @@ export function spawnItemDrops(
       offsetB: Math.sin(angle) * radius,
       groundRadius: groundR,
       age: 0,
-      source,
     });
   }
   return { drops, nextId };
 }
 
 export function spawnTreeWoodDrops(tile: number, startId: number, groundRadius: number, total = 6): { drops: ResourceDropSave[]; nextId: number } {
-  return spawnItemDrops(tile, startId, groundRadius, 'wood', total, 'tree', 3);
-}
-
-export function spawnMinedItemDrops(tile: number, startId: number, groundRadius: number, item: ItemId, total = 1): { drops: ResourceDropSave[]; nextId: number } {
-  return spawnItemDrops(tile, startId, groundRadius, item, total, 'mine', Math.min(3, Math.max(1, Math.trunc(total))));
+  return spawnItemDrops(tile, startId, groundRadius, 'wood', total, 3);
 }
 
 export function ageResourceDrops(drops: readonly ResourceDropSave[], dt: number): ResourceDropSave[] {

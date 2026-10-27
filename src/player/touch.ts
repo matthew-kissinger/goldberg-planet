@@ -3,9 +3,8 @@
  *  - a floating joystick spawns where the left thumb lands (bottom-left region); pushing
  *    it to the rim sprints. In plane mode forward/back on the stick works the throttle.
  *  - dragging anywhere else looks around; a second finger pinches to zoom.
- *  - a quick tap mines/chops at the tapped point; holding ~0.4 s places the selected
- *    block there and keeps placing while held (drag to paint a wall).
- *  - round buttons: jump/climb, descend (fly + plane), and craft/board/stow plane.
+ *  - a quick tap chops the tree at the tapped point.
+ *  - round buttons: jump/climb, descend (fly + plane), craft panel, and craft/board/stow plane.
  *
  * Everything routes through the existing Input accumulators (mouseDX/DY, wheel), so the
  * player/camera code doesn't know touch exists. Enabled for coarse-pointer devices, on
@@ -18,8 +17,6 @@ import type { Input } from './input';
 const KNOB_MAX = 46;      // knob travel radius (px)
 const TAP_SLOP = 14;      // movement (px) before a press becomes a look drag
 const TAP_MS = 320;       // max press duration that still counts as a tap
-const HOLD_MS = 400;      // press-and-hold this long (still) = place a block
-const PLACE_REPEAT_MS = 300;
 const LOOK_SCALE = 2.6;   // touch look sensitivity (relative to mouse deltas)
 const PINCH_TO_WHEEL = 4.2;
 
@@ -31,16 +28,10 @@ export interface TouchFrame {
   down: boolean;
   /** plane button edge (craft/board/stow) */
   plane: boolean;
-  /** use/interact button edge */
-  use: boolean;
-  /** long-press use button edge for packing a nearby placed prop */
-  pack: boolean;
-  /** grab/drop a nearby placed prop through the relocation cursor */
-  relocate: boolean;
-  /** taps to mine/chop at, in client px */
-  mines: { x: number; y: number }[];
-  /** long-press placements at, in client px */
-  places: { x: number; y: number }[];
+  /** craft-panel button edge */
+  craft: boolean;
+  /** taps to chop at, in client px */
+  chops: { x: number; y: number }[];
 }
 
 export type PlaneButtonState = 'hidden' | 'craft' | 'fly' | 'flying';
@@ -53,14 +44,8 @@ export class TouchControls {
   private jumpHeld = false;
   private downHeld = false;
   private planeTap = false;
-  private useTap = false;
-  private packTap = false;
-  private relocateTap = false;
-  private usePackedDuringPress = false;
-  private useDownAt = 0;
-  private useHoldTimer: ReturnType<typeof setTimeout> | null = null;
-  private mines: { x: number; y: number }[] = [];
-  private places: { x: number; y: number }[] = [];
+  private craftTap = false;
+  private chops: { x: number; y: number }[] = [];
 
   private joyId = -1;
   private joyX = 0;
@@ -73,9 +58,6 @@ export class TouchControls {
   private lookMoved = 0;
   private lookT0 = 0;
   private pinched = false;
-  private placing = false;
-  private holdTimer: ReturnType<typeof setTimeout> | null = null;
-  private placeTimer: ReturnType<typeof setInterval> | null = null;
   private pinchId = -1;
   private pinchX = 0;
   private pinchY = 0;
@@ -86,8 +68,7 @@ export class TouchControls {
   private btnJump = document.getElementById('btn-jump')!;
   private btnDown = document.getElementById('btn-down')!;
   private btnPlane = document.getElementById('btn-plane')!;
-  private btnUse = document.getElementById('btn-use')!;
-  private btnMove = document.getElementById('btn-move')!;
+  private btnCraft = document.getElementById('btn-craft')!;
   private planeState: PlaneButtonState = 'hidden';
   private planeLabel = '';
 
@@ -148,55 +129,8 @@ export class TouchControls {
       el.addEventListener('pointercancel', off);
       el.addEventListener('lostpointercapture', off);
     };
-    bindTap(this.btnMove, () => { this.relocateTap = true; });
-    this.btnPlane.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      this.btnPlane.classList.add('press');
-      this.planeTap = true;
-    });
-    this.btnPlane.addEventListener('pointerup', () => this.btnPlane.classList.remove('press'));
-    this.btnPlane.addEventListener('pointercancel', () => this.btnPlane.classList.remove('press'));
-    this.btnPlane.addEventListener('lostpointercapture', () => this.btnPlane.classList.remove('press'));
-    this.btnUse.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      try {
-        this.btnUse.setPointerCapture(e.pointerId);
-      } catch { /* synthetic pointer */ }
-      this.btnUse.classList.add('press');
-      this.usePackedDuringPress = false;
-      this.useDownAt = performance.now();
-      if (this.useHoldTimer !== null) clearTimeout(this.useHoldTimer);
-      this.useHoldTimer = setTimeout(() => {
-        this.packTap = true;
-        this.usePackedDuringPress = true;
-        navigator.vibrate?.(16);
-      }, HOLD_MS);
-    });
-    this.btnUse.addEventListener('pointerup', () => {
-      if (this.useHoldTimer !== null) {
-        clearTimeout(this.useHoldTimer);
-        this.useHoldTimer = null;
-      }
-      this.btnUse.classList.remove('press');
-      const heldMs = performance.now() - this.useDownAt;
-      if (!this.usePackedDuringPress && heldMs >= HOLD_MS) {
-        this.packTap = true;
-        this.usePackedDuringPress = true;
-      }
-      if (!this.usePackedDuringPress) this.useTap = true;
-      this.usePackedDuringPress = false;
-      this.useDownAt = 0;
-    });
-    this.btnUse.addEventListener('pointercancel', () => {
-      if (this.useHoldTimer !== null) {
-        clearTimeout(this.useHoldTimer);
-        this.useHoldTimer = null;
-      }
-      this.btnUse.classList.remove('press');
-      this.usePackedDuringPress = false;
-      this.useDownAt = 0;
-    });
-    this.btnUse.addEventListener('lostpointercapture', this.cancelUseButton);
+    bindTap(this.btnPlane, () => { this.planeTap = true; });
+    bindTap(this.btnCraft, () => { this.craftTap = true; });
   }
 
   private capture(id: number): void {
@@ -226,26 +160,15 @@ export class TouchControls {
       this.lookMoved = 0;
       this.lookT0 = performance.now();
       this.pinched = false;
-      this.placing = false;
       this.capture(e.pointerId);
-      this.holdTimer = setTimeout(() => {
-        if (this.lookId < 0 || this.pinched || this.lookMoved >= TAP_SLOP) return;
-        this.placing = true;
-        this.places.push({ x: this.lookX, y: this.lookY });
-        navigator.vibrate?.(12);
-        this.placeTimer = setInterval(() => {
-          if (this.placing) this.places.push({ x: this.lookX, y: this.lookY });
-        }, PLACE_REPEAT_MS);
-      }, HOLD_MS);
       return;
     }
     if (this.pinchId < 0) {
-      // second finger: pinch-zoom; the pending tap/hold is off
+      // second finger: pinch-zoom; the pending tap is off
       this.pinchId = e.pointerId;
       this.pinchX = x;
       this.pinchY = y;
       this.pinched = true;
-      this.clearHold();
       this.capture(e.pointerId);
       this.pinchDist = Math.hypot(x - this.lookX, y - this.lookY);
     }
@@ -276,11 +199,8 @@ export class TouchControls {
         return;
       }
       this.lookMoved += Math.abs(dx) + Math.abs(dy);
-      if (this.lookMoved >= TAP_SLOP && !this.placing) this.clearHold();
-      if (!this.placing) {
-        this.input.mouseDX += dx * LOOK_SCALE;
-        this.input.mouseDY += dy * LOOK_SCALE;
-      }
+      this.input.mouseDX += dx * LOOK_SCALE;
+      this.input.mouseDY += dy * LOOK_SCALE;
       return;
     }
     if (e.pointerId === this.pinchId) {
@@ -300,14 +220,11 @@ export class TouchControls {
       return;
     }
     if (e.pointerId === this.lookId) {
-      const wasTap = !this.pinched && !this.placing && this.lookMoved < TAP_SLOP
-        && performance.now() - this.lookT0 < TAP_MS;
+      const wasTap = !this.pinched && this.lookMoved < TAP_SLOP && performance.now() - this.lookT0 < TAP_MS;
       if (wasTap) {
-        this.mines.push({ x: this.lookStartX, y: this.lookStartY });
+        this.chops.push({ x: this.lookStartX, y: this.lookStartY });
         navigator.vibrate?.(8);
       }
-      this.clearHold();
-      this.placing = false;
       this.lookId = -1;
       return;
     }
@@ -323,16 +240,6 @@ export class TouchControls {
     }
   };
 
-  private cancelUseButton = (): void => {
-    if (this.useHoldTimer !== null) {
-      clearTimeout(this.useHoldTimer);
-      this.useHoldTimer = null;
-    }
-    this.btnUse.classList.remove('press');
-    this.usePackedDuringPress = false;
-    this.useDownAt = 0;
-  };
-
   cancelWorldInput = (): void => {
     this.moveX = 0;
     this.moveY = 0;
@@ -340,30 +247,16 @@ export class TouchControls {
     this.jumpHeld = false;
     this.downHeld = false;
     this.planeTap = false;
-    this.useTap = false;
-    this.packTap = false;
-    this.relocateTap = false;
-    this.usePackedDuringPress = false;
-    this.useDownAt = 0;
-    if (this.useHoldTimer !== null) {
-      clearTimeout(this.useHoldTimer);
-      this.useHoldTimer = null;
-    }
-    this.mines = [];
-    this.places = [];
+    this.chops = [];
     this.joyId = -1;
     this.lookId = -1;
     this.pinchId = -1;
     this.pinched = false;
-    this.placing = false;
-    this.clearHold();
     this.joyEl.style.display = 'none';
     this.setKnob(0, 0);
     this.btnJump.classList.remove('press');
     this.btnDown.classList.remove('press');
     this.btnPlane.classList.remove('press');
-    this.btnUse.classList.remove('press');
-    this.btnMove.classList.remove('press');
   };
 
   private pinch(): void {
@@ -371,17 +264,6 @@ export class TouchControls {
     this.input.wheel -= (d - this.pinchDist) * PINCH_TO_WHEEL;
     this.input.wheelTouched = true;
     this.pinchDist = d;
-  }
-
-  private clearHold(): void {
-    if (this.holdTimer !== null) {
-      clearTimeout(this.holdTimer);
-      this.holdTimer = null;
-    }
-    if (this.placeTimer !== null) {
-      clearInterval(this.placeTimer);
-      this.placeTimer = null;
-    }
   }
 
   private setKnob(dx: number, dy: number): void {
@@ -397,18 +279,12 @@ export class TouchControls {
       jump: this.jumpHeld,
       down: this.downHeld,
       plane: this.planeTap,
-      use: this.useTap,
-      pack: this.packTap,
-      relocate: this.relocateTap,
-      mines: this.mines,
-      places: this.places,
+      craft: this.craftTap,
+      chops: this.chops,
     };
     this.planeTap = false;
-    this.useTap = false;
-    this.packTap = false;
-    this.relocateTap = false;
-    this.mines = [];
-    this.places = [];
+    this.craftTap = false;
+    this.chops = [];
     return out;
   }
 
@@ -424,15 +300,5 @@ export class TouchControls {
 
   setDownVisible(v: boolean): void {
     this.btnDown.classList.toggle('show', v);
-  }
-
-  setUseVisible(v: boolean): void {
-    this.btnUse.classList.toggle('show', v);
-  }
-
-  setMoveButton(active: boolean, dropping = false): void {
-    this.btnMove.classList.toggle('show', active);
-    this.btnMove.classList.toggle('ready', dropping);
-    this.btnMove.innerHTML = dropping ? '<span>drop</span><span class="sub">move</span>' : '<span>move</span>';
   }
 }
