@@ -233,7 +233,7 @@ export class Character {
 
     const makeArm = (sign: 1 | -1, socket: THREE.Group): THREE.Group => {
       const arm = new THREE.Group();
-      arm.position.set(sign * 0.31, 1.30, 0);
+      arm.position.set(sign * 0.36, 1.30, 0);
       const armShell = markRole(
         mesh(cyl6, armorTealMat, [0, -0.22, 0], [0.115, 0.28, 0.115], sign > 0 ? 'rightSdfBlendArm' : 'leftSdfBlendArm'),
         sign > 0 ? 'right soft-facet arm' : 'left soft-facet arm',
@@ -253,9 +253,9 @@ export class Character {
       return arm;
     };
     this.rightArm.add(...makeArm(1, this.rightSocket).children);
-    this.rightArm.position.set(0.31, 1.30, 0);
+    this.rightArm.position.set(0.36, 1.30, 0);
     this.leftArm.add(...makeArm(-1, this.leftSocket).children);
-    this.leftArm.position.set(-0.31, 1.30, 0);
+    this.leftArm.position.set(-0.36, 1.30, 0);
 
     const setupLeg = (leg: THREE.Group, sign: 1 | -1): void => {
       leg.position.set(sign * 0.15, 0.72, 0.0);
@@ -526,10 +526,11 @@ export class Character {
       this.pilotBody.scale.set(1 + a * 0.85, 1 - a, 1 + a * 0.55);
     };
     setSquash(Math.sin(this.walkPhase * 0.6) * 0.008);
-    this.rightArm.rotation.set(0.08, 0, -0.2);
-    this.leftArm.rotation.set(0.08, 0, 0.2);
-    this.rightLeg.rotation.set(0, 0, -0.04);
-    this.leftLeg.rotation.set(0, 0, 0.04);
+    // Positive rotation.z on rightArm (+X) splays outward away from the torso; negative on leftArm (-X) splays outward
+    this.rightArm.rotation.set(0.06, 0, 0.14);
+    this.leftArm.rotation.set(0.06, 0, -0.14);
+    this.rightLeg.rotation.set(0, 0, 0.02);
+    this.leftLeg.rotation.set(0, 0, -0.02);
     this.rightSocket.rotation.set(0.25, 0, 0.08);
     this.leftSocket.rotation.set(0.25, 0, -0.08);
 
@@ -540,8 +541,10 @@ export class Character {
     const applyGait = (intensity: number): void => {
       const gait = Math.sin(this.walkPhase);
       const lift = Math.max(0, Math.sin(this.walkPhase * 2));
-      this.rightArm.rotation.x = gait * 0.3 * intensity;
-      this.leftArm.rotation.x = -gait * 0.3 * intensity;
+      this.rightArm.rotation.x = gait * 0.34 * intensity;
+      this.leftArm.rotation.x = -gait * 0.34 * intensity;
+      this.rightArm.rotation.z = 0.15 + 0.03 * intensity;
+      this.leftArm.rotation.z = -0.15 - 0.03 * intensity;
       this.rightLeg.rotation.x = -gait * 0.52 * intensity;
       this.leftLeg.rotation.x = gait * 0.52 * intensity;
       this.pilotBody.rotation.x = -0.03 * intensity;
@@ -557,20 +560,20 @@ export class Character {
       }
       if (state.action === 'sprint') {
         applyGait(1.45);
-        this.rightArm.rotation.z = -0.34;
-        this.leftArm.rotation.z = 0.34;
+        this.rightArm.rotation.z = 0.22;
+        this.leftArm.rotation.z = -0.22;
         this.pilotBody.rotation.x = -0.08;
         return;
       }
       if (state.action === 'jump') {
         this.rightArm.rotation.x = 0.62;
         this.leftArm.rotation.x = 0.5;
-        this.rightArm.rotation.z = -0.36;
-        this.leftArm.rotation.z = 0.36;
+        this.rightArm.rotation.z = 0.26;
+        this.leftArm.rotation.z = -0.26;
         this.rightLeg.rotation.x = -0.48;
         this.leftLeg.rotation.x = -0.32;
-        this.rightLeg.rotation.z = -0.18;
-        this.leftLeg.rotation.z = 0.18;
+        this.rightLeg.rotation.z = 0.08;
+        this.leftLeg.rotation.z = -0.08;
         this.pilotBody.rotation.x = -0.08;
         setSquash(-0.035);
         return;
@@ -579,8 +582,8 @@ export class Character {
         const paddle = Math.sin(this.walkPhase * 1.35);
         this.rightArm.rotation.x = -0.82 + paddle * 0.22;
         this.leftArm.rotation.x = -0.82 - paddle * 0.22;
-        this.rightArm.rotation.z = -0.58;
-        this.leftArm.rotation.z = 0.58;
+        this.rightArm.rotation.z = 0.38;
+        this.leftArm.rotation.z = -0.38;
         this.rightLeg.rotation.x = -0.2 - paddle * 0.26;
         this.leftLeg.rotation.x = -0.2 + paddle * 0.26;
         this.pilotBody.rotation.x = -0.28;
@@ -603,9 +606,10 @@ export class Character {
     switch (state.action) {
       case 'chop':
         this.rightArm.rotation.x = 0.45 + swing * 1.35;
-        this.rightArm.rotation.z = -0.32;
+        this.rightArm.rotation.z = 0.16;
         this.rightSocket.rotation.z = 0.55 * swing;
         this.leftArm.rotation.x = 0.25;
+        this.leftArm.rotation.z = -0.18;
         this.pilotBody.rotation.x = -0.06 * swing;
         this.rightLeg.rotation.x = -0.08;
         this.leftLeg.rotation.x = 0.12;
@@ -614,8 +618,8 @@ export class Character {
       case 'craft':
         this.rightArm.rotation.x = -0.85 + Math.sin(p * Math.PI * 4) * 0.12;
         this.leftArm.rotation.x = -0.75 - Math.sin(p * Math.PI * 4) * 0.12;
-        this.rightArm.rotation.z = -0.42;
-        this.leftArm.rotation.z = 0.42;
+        this.rightArm.rotation.z = 0.14;
+        this.leftArm.rotation.z = -0.14;
         this.rightLeg.rotation.x = 0.06;
         this.leftLeg.rotation.x = 0.06;
         setSquash(Math.abs(Math.sin(p * Math.PI * 4)) * 0.012);
@@ -627,15 +631,15 @@ export class Character {
         this.pilotBody.position.y -= 0.045 * reach;
         this.rightArm.rotation.x = -0.96 - reach * 0.34 + lift * 0.3;
         this.leftArm.rotation.x = -0.78 - reach * 0.22 + lift * 0.22;
-        this.rightArm.rotation.z = -0.26 - reach * 0.2 + lift * 0.1;
-        this.leftArm.rotation.z = 0.24 + reach * 0.16 - lift * 0.08;
+        this.rightArm.rotation.z = 0.16 + reach * 0.08;
+        this.leftArm.rotation.z = -0.16 - reach * 0.08;
         this.rightSocket.rotation.x = 0.82 * reach - 0.18 * lift;
         this.rightSocket.rotation.z = -0.26 * reach + 0.18 * lift;
         this.leftSocket.rotation.x = 0.6 * reach;
         this.rightLeg.rotation.x = 0.22 * reach - 0.08 * lift;
         this.leftLeg.rotation.x = 0.18 * reach;
-        this.rightLeg.rotation.z = -0.08 - 0.08 * reach;
-        this.leftLeg.rotation.z = 0.08 + 0.08 * reach;
+        this.rightLeg.rotation.z = 0.06;
+        this.leftLeg.rotation.z = -0.06;
         setSquash(0.04 * reach - 0.018 * lift);
         break;
       }

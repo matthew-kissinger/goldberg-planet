@@ -46,6 +46,8 @@ describe('Out-of-Core Structure Persistence & Planetary Automation Network', () 
     const grid = store.analyzePlanetGrid(geo, p0);
     expect(grid.structureCount).toBe(2);
     expect(grid.links.length).toBe(1);
+    // Cached call returns identical reference without recalculation
+    expect(store.analyzePlanetGrid(geo, p0)).toBe(grid);
     // Pentagon Wonder gives 2.5x power boost (25 * 2.5 = 62.5 -> 63 kW)
     expect(grid.powerGeneratedKw).toBeGreaterThanOrEqual(62);
     expect(grid.powerEfficiency).toBeCloseTo(1.6, 5);

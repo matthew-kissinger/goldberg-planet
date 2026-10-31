@@ -117,7 +117,7 @@ async function boot(): Promise<void> {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x04060c);
-  const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 48000);
+  const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 48000);
   const sun = new THREE.DirectionalLight(0xfff2e0, 3.0);
   const sunTarget = new THREE.Object3D();
   sun.target = sunTarget;
@@ -328,9 +328,14 @@ async function boot(): Promise<void> {
   }
 
   // Keep `CoreLoop`, `CameraRig`, `WildlifeManager`, and `FarSphere` synchronized whenever the active planet changes
-  solarSystem.onPlanetChange((nextPlanet) => {
+  solarSystem.onPlanetChange((nextPlanet, dx, dy, dz) => {
     loop.rebindPlanet(nextPlanet.layers, nextPlanet.columns, nextPlanet.trees, nextPlanet.drops);
-    rig.rebindPlanet(nextPlanet.layers, nextPlanet.columns);
+    if (dx !== undefined && dy !== undefined && dz !== undefined) {
+      rig.rebindPlanet(nextPlanet.layers, nextPlanet.columns, dx, dy, dz, player.up());
+    } else {
+      rig.rebindPlanet(nextPlanet.layers, nextPlanet.columns);
+      rig.snapTo(player);
+    }
     wildlife.clear();
     farSphere.setResidentChunks(streamer.residentKeys());
     streamer.residencyDirty = false;

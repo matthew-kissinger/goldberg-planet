@@ -17,7 +17,7 @@ import { materialColor } from './palette';
 import { encodePackedMat } from './mesher';
 import { chunkKeyOfTile } from '../world/chunks';
 
-export const FAR_MARGIN = 6;
+export const FAR_MARGIN = 12;
 const MAX_CHUNK_KEY = 20 * 4096;
 
 function buildGoldbergTriIndex(geo: Goldberg): Uint32Array {
@@ -85,6 +85,9 @@ export class FarSphere {
     this.fullIndex = fullIndex;
     this.triChunkKey = triChunkKey;
     this.triangles = fullIndex.length / 3;
+    material.polygonOffset = true;
+    material.polygonOffsetFactor = 4.0;
+    material.polygonOffsetUnits = 4.0;
     this.mesh = new THREE.Mesh(geometry, material);
     this.mesh.frustumCulled = false;
     this.buildMs = buildMs;
@@ -275,11 +278,15 @@ export class FarSphere {
 
     // Distant ocean shell if the planet has an ocean
     if (cfg.ocean.hasOcean) {
-      const oceanGeom = new THREE.IcosahedronGeometry(R + cfg.waterSurfaceOffset, 4);
+      const oceanGeom = new THREE.IcosahedronGeometry(R + cfg.waterSurfaceOffset - 0.2, 4);
       const oceanMat = new THREE.MeshStandardMaterial({
         color: new THREE.Color(cfg.ocean.shallowColor[0], cfg.ocean.shallowColor[1], cfg.ocean.shallowColor[2]),
         roughness: cfg.ocean.kind === 'magma' ? 0.35 : 0.15,
         metalness: 0.08,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: 1.0,
+        polygonOffsetUnits: 1.0,
         emissive: new THREE.Color(
           cfg.ocean.shallowColor[0] * cfg.ocean.emissiveIntensity * 0.4,
           cfg.ocean.shallowColor[1] * cfg.ocean.emissiveIntensity * 0.4,

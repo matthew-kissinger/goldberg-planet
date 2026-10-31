@@ -126,50 +126,41 @@ export class WaterfallRenderer {
 
     const drop = Math.max(0, rA - rB);
 
-    // 1. Horizontal stream channel across tileA toward tileB's edge (2.6m long)
-    const stream = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.10, 2.75), this.waterMat);
-    stream.position.set(0, 0.06, 1.25);
-    meshGroup.add(stream);
-
-    for (let i = 0; i < 2; i++) {
-      const ripple = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.12, 0.32), this.foamMat);
-      ripple.position.set(0, 0.08, 0.4 + i * 1.1);
-      meshGroup.add(ripple);
-      scrollParts.push(ripple);
+    // Only render true vertical cliff cascades and sky-island waterfalls.
+    // Eliminate flat horizontal stream boxes / treadmill slats on level ground.
+    if (drop < 2.0 && !isSkyCascade) {
+      return;
     }
 
-    // 2. If there is a vertical drop (cliff step or sky-island edge), emit a cascading waterfall sheet!
-    if (drop >= 1.2 || isSkyCascade) {
-      const fallHeight = isSkyCascade ? Math.min(44, Math.max(18, drop)) : drop + 0.25;
-      const fallSheet = new THREE.Mesh(
-        new THREE.BoxGeometry(isSkyCascade ? 1.55 : 1.38, fallHeight, 0.24),
-        this.waterMat,
-      );
-      fallSheet.position.set(0, -fallHeight * 0.5 + 0.05, 2.55);
-      meshGroup.add(fallSheet);
+    const fallHeight = isSkyCascade ? Math.min(48, Math.max(18, drop)) : drop + 0.25;
+    const fallSheet = new THREE.Mesh(
+      new THREE.BoxGeometry(isSkyCascade ? 1.65 : 1.38, fallHeight, 0.24),
+      this.waterMat,
+    );
+    fallSheet.position.set(0, -fallHeight * 0.5 + 0.05, 2.55);
+    meshGroup.add(fallSheet);
 
-      // Animated falling foam streaks down the waterfall face
-      const streakCount = Math.min(5, Math.max(2, Math.floor(fallHeight / 3.5)));
-      for (let s = 0; s < streakCount; s++) {
-        const streak = new THREE.Mesh(
-          new THREE.BoxGeometry(0.92, Math.min(2.2, fallHeight * 0.28), 0.28),
-          this.foamMat,
-        );
-        streak.position.set(0, -(s / streakCount) * fallHeight, 2.56);
-        streak.userData.fallHeight = fallHeight;
-        streak.userData.phaseOffset = s / streakCount;
-        meshGroup.add(streak);
-        scrollParts.push(streak);
-      }
-
-      // Plunge pool foam ring at the bottom of the waterfall
-      foamRing = new THREE.Mesh(
-        new THREE.CylinderGeometry(1.15, 1.35, 0.14, 8),
+    // Animated falling foam streaks down the waterfall face
+    const streakCount = Math.min(5, Math.max(2, Math.floor(fallHeight / 3.5)));
+    for (let s = 0; s < streakCount; s++) {
+      const streak = new THREE.Mesh(
+        new THREE.BoxGeometry(0.92, Math.min(2.2, fallHeight * 0.28), 0.28),
         this.foamMat,
       );
-      foamRing.position.set(0, -fallHeight + 0.08, 2.65);
-      meshGroup.add(foamRing);
+      streak.position.set(0, -(s / streakCount) * fallHeight, 2.56);
+      streak.userData.fallHeight = fallHeight;
+      streak.userData.phaseOffset = s / streakCount;
+      meshGroup.add(streak);
+      scrollParts.push(streak);
     }
+
+    // Plunge pool foam ring at the bottom of the waterfall
+    foamRing = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.15, 1.35, 0.14, 8),
+      this.foamMat,
+    );
+    foamRing.position.set(0, -fallHeight + 0.08, 2.65);
+    meshGroup.add(foamRing);
 
     this.group.add(meshGroup);
     this.nodes.set(key, {
@@ -202,12 +193,12 @@ export class WaterfallRenderer {
 
     this.syncPalette(columns);
 
-    // Gather tiles within BFS ring 1..8 around player.tile
+    // Gather tiles within compact BFS ring 1..4 around player.tile (~36 tiles)
     const seen = new Set<number>([player.tile]);
     let frontier = [player.tile];
     const localTiles: number[] = [player.tile];
 
-    for (let ring = 1; ring <= 8; ring++) {
+    for (let ring = 1; ring <= 4; ring++) {
       const next: number[] = [];
       for (const t of frontier) {
         const deg = geo.degreeOf(t);
@@ -250,7 +241,7 @@ export class WaterfallRenderer {
         if (h0 < 7.5) continue;
 
         let cur = seedTile;
-        for (let step = 0; step < 8; step++) {
+        for (let step = 0; step < 4; step++) {
           const curK = columns.topLayerOf(cur);
           const curR = layers.topRadius(curK);
           if (curR <= layers.waterSurface + 0.3) break;
@@ -303,7 +294,7 @@ export class WaterfallRenderer {
 
     this.scanTimer -= dt;
     if (this.scanTimer <= 0) {
-      this.scanTimer = 1.2;
+      this.scanTimer = 2.5;
       this.scanLocalHydrology(geo, layers, columns, player);
     }
 
@@ -316,9 +307,6 @@ export class WaterfallRenderer {
         if (fallH) {
           const phase = ((this.timeAccum * 1.35 + (part.userData.phaseOffset as number)) % 1);
           part.position.y = -phase * fallH;
-        } else {
-          const zPhase = ((this.timeAccum * 1.8) % 1.2);
-          part.position.z = 0.35 + zPhase * 1.6;
         }
       }
       if (node.foamRing) {

@@ -68,7 +68,7 @@ export class SolarSystem {
   readonly planetById = new Map<string, PlanetState>();
   private activeIndex = 0;
   private bindings: SolarSystemRenderBindings | null = null;
-  private readonly changeListeners: Array<(planet: PlanetState) => void> = [];
+  private readonly changeListeners: Array<(planet: PlanetState, dx?: number, dy?: number, dz?: number) => void> = [];
 
   constructor(
     universeSeed: string,
@@ -120,7 +120,7 @@ export class SolarSystem {
     this.syncBindingsToActive();
   }
 
-  onPlanetChange(listener: (planet: PlanetState) => void): void {
+  onPlanetChange(listener: (planet: PlanetState, dx?: number, dy?: number, dz?: number) => void): void {
     this.changeListeners.push(listener);
   }
 
@@ -161,9 +161,25 @@ export class SolarSystem {
 
     this.activeIndex = target.index;
     player.rebindPlanet(target.layers, target.columns);
+
+    // Orient heading along orbital velocity tangent, and pitch downward toward the planet
+    const [ux, uy, uz] = player.up();
+    const vdotU = player.vx * ux + player.vy * uy + player.vz * uz;
+    let vtx = player.vx - vdotU * ux;
+    let vty = player.vy - vdotU * uy;
+    let vtz = player.vz - vdotU * uz;
+    const vtl = Math.hypot(vtx, vty, vtz);
+    if (vtl > 0.5) {
+      player.fwdX = vtx / vtl;
+      player.fwdY = vty / vtl;
+      player.fwdZ = vtz / vtl;
+    }
+    // Set pitch downward so the camera and player look directly down upon the entered world
+    player.pitch = -0.38;
+
     this.syncBindingsToActive();
 
-    for (const cb of this.changeListeners) cb(target);
+    for (const cb of this.changeListeners) cb(target, dx, dy, dz);
     return true;
   }
 

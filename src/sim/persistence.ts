@@ -257,6 +257,7 @@ export function structureWorldPosition(
  */
 export class StructureStore {
   readonly byId = new Map<string, PlacedStructure>();
+  private readonly gridCache = new Map<string, PlanetGridSummary>();
   private seq = 1;
   simTimeSec = 0;
 
@@ -384,11 +385,14 @@ export class StructureStore {
       targetPlanetId: params.targetPlanetId,
     };
     this.byId.set(id, s);
+    this.gridCache.clear();
     return s;
   }
 
   remove(id: string): boolean {
-    return this.byId.delete(id);
+    const deleted = this.byId.delete(id);
+    if (deleted) this.gridCache.clear();
+    return deleted;
   }
 
   /**
@@ -441,6 +445,9 @@ export class StructureStore {
    * `extractor`, `synthesizer`, `mass_driver`) so survival campfires/workbenches never draw cyan wires.
    */
   analyzePlanetGrid(geo: Goldberg, planetConfig: PlanetConfig): PlanetGridSummary {
+    const cached = this.gridCache.get(planetConfig.id);
+    if (cached) return cached;
+
     const list = this.list(planetConfig.id);
     const positions = new Map<string, [number, number, number]>();
     let powerGen = 0;
@@ -492,7 +499,7 @@ export class StructureStore {
           ? 1.6
           : 0.65 + 0.95 * (powerGen / powerUse);
 
-    return {
+    const summary: PlanetGridSummary = {
       planetId: planetConfig.id,
       structureCount: list.length,
       powerGeneratedKw: Math.round(powerGen),
@@ -501,6 +508,8 @@ export class StructureStore {
       totalStoredItems: totalStored,
       links,
     };
+    this.gridCache.set(planetConfig.id, summary);
+    return summary;
   }
 
   /**
@@ -634,6 +643,7 @@ export class StructureStore {
 
   importAll(list: readonly PlacedStructure[]): void {
     this.byId.clear();
+    this.gridCache.clear();
     for (const raw of list) {
       if (!raw || typeof raw !== 'object') continue;
       if (!(raw.kind in STRUCTURE_DEFS)) continue;

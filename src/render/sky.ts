@@ -52,7 +52,7 @@ export class Sky {
   readonly clouds: THREE.Mesh | null = null;
   readonly stars: THREE.Points;
   /** live-tunable: atmosphere glow strength */
-  readonly kGlow = uniform(0.006);
+  readonly kGlow = uniform(0.0035);
   /** live-tunable: cloud coverage threshold (lower = more cloud) */
   readonly cover = uniform(0.65);
   private readonly camU = uniform(new THREE.Vector3());
@@ -176,12 +176,12 @@ export class Sky {
       mat.transparent = true;
       mat.blending = THREE.AdditiveBlending;
       mat.depthWrite = false;
-      mat.depthTest = false;
+      mat.depthTest = true;
       mat.side = THREE.BackSide;
       mat.fog = false;
       this.atmo = new THREE.Mesh(new THREE.IcosahedronGeometry(BASE_RA, 4), mat);
       this.atmo.frustumCulled = false;
-      this.atmo.renderOrder = 6;
+      this.atmo.renderOrder = 2;
       scene.add(this.atmo);
     }
 
@@ -280,7 +280,7 @@ export class Sky {
     this.uSunset.value.set(...config.atmosphere.sunsetColor);
     this.uCloudTint.value.set(...config.atmosphere.cloudTint);
 
-    this.kGlow.value = 0.006 * config.atmosphere.density;
+    this.kGlow.value = 0.0035 * config.atmosphere.density;
     this.atmo.scale.setScalar(ra / BASE_RA);
 
     if (this.clouds) {

@@ -43,6 +43,7 @@ export function createTerrainMaterial(initialConfig?: PlanetConfig): TerrainMate
   const uSoilTint = uniform(new THREE.Vector3(1, 1, 1));
   const uFoliageTint = uniform(new THREE.Vector3(1, 1, 1));
   const uEmissiveTint = uniform(new THREE.Vector3(0.2, 0.9, 0.7));
+  const uHorizonTint = uniform(new THREE.Vector3(0.62, 0.78, 1.0));
   const uTriplanarScale = uniform(0.045);
 
   const packedAttr = attribute('packedMat', 'float');
@@ -75,18 +76,24 @@ export function createTerrainMaterial(initialConfig?: PlanetConfig): TerrainMate
     clamp(isRockLike.add(isGrassOrLeaf), 0.0, 1.0),
   );
 
-  // Subtle cliff-wall strata darkening + crisp top-cap highlight
-  const wallShade = float(1.0).sub(isCliffWall.mul(0.12)).add(isCliffWall.mul(strataBand));
-  const capHighlight = smoothstep(0.85, 0.99, capAlignment).mul(0.04);
+  // Deep cliff-wall ambient occlusion / shadow (0.35) + crisp top-cap highlight
+  const wallShade = float(1.0).sub(isCliffWall.mul(0.35)).add(isCliffWall.mul(strataBand.mul(0.5)));
+  const capHighlight = smoothstep(0.85, 0.99, capAlignment).mul(0.06);
 
   const wetnessDarken = float(1.0).sub(wetness.mul(0.14));
-  const shadedColor = vCol
+  const baseShadedColor = vCol
     .mul(planetTint)
     .mul(wallShade)
     .add(macroPatch.add(capHighlight))
     .mul(wetnessDarken);
 
-  mat.colorNode = clamp(shadedColor, 0.02, 1.35);
+  // Clean distance atmospheric depth: ZERO haze within 220m for razor-sharp foreground clarity,
+  // then smoothly blend into atmospheric horizon color across 220m - 2200m
+  const distCam = positionWorld.length();
+  const distHaze = smoothstep(220.0, 2200.0, distCam).mul(0.55);
+  const finalColor = mix(baseShadedColor, uHorizonTint, distHaze);
+
+  mat.colorNode = clamp(finalColor, 0.02, 1.35);
 
   mat.roughnessNode = clamp(
     float(0.88)
@@ -105,42 +112,43 @@ export function createTerrainMaterial(initialConfig?: PlanetConfig): TerrainMate
   const handle: TerrainMaterialHandle = {
     material: mat,
     applyPlanetConfig(cfg: PlanetConfig): void {
+      uHorizonTint.value.set(...cfg.atmosphere.horizonColor);
       switch (cfg.archetype) {
         case 'canyon':
-          uRockTint.value.set(0.82, 0.45, 0.28);
-          uSoilTint.value.set(0.75, 0.52, 0.34);
-          uFoliageTint.value.set(0.55, 0.68, 0.32);
-          uEmissiveTint.value.set(0.95, 0.55, 0.22);
+          uRockTint.value.set(1.15, 0.88, 0.72);
+          uSoilTint.value.set(1.10, 0.82, 0.65);
+          uFoliageTint.value.set(0.95, 1.02, 0.65);
+          uEmissiveTint.value.set(1.0, 0.65, 0.25);
           break;
         case 'volcanic':
-          uRockTint.value.set(0.28, 0.26, 0.30);
-          uSoilTint.value.set(0.35, 0.28, 0.25);
-          uFoliageTint.value.set(0.85, 0.38, 0.18);
-          uEmissiveTint.value.set(1.0, 0.32, 0.05);
+          uRockTint.value.set(0.82, 0.80, 0.85);
+          uSoilTint.value.set(0.88, 0.78, 0.72);
+          uFoliageTint.value.set(1.05, 0.72, 0.45);
+          uEmissiveTint.value.set(1.0, 0.45, 0.08);
           break;
         case 'cryo':
-          uRockTint.value.set(0.72, 0.84, 0.95);
-          uSoilTint.value.set(0.82, 0.90, 0.98);
-          uFoliageTint.value.set(0.48, 0.82, 0.92);
-          uEmissiveTint.value.set(0.35, 0.85, 1.0);
+          uRockTint.value.set(0.92, 0.98, 1.08);
+          uSoilTint.value.set(0.95, 1.02, 1.10);
+          uFoliageTint.value.set(0.85, 1.05, 1.12);
+          uEmissiveTint.value.set(0.45, 0.92, 1.0);
           break;
         case 'biolum':
-          uRockTint.value.set(0.34, 0.38, 0.52);
-          uSoilTint.value.set(0.26, 0.48, 0.44);
-          uFoliageTint.value.set(0.18, 0.88, 0.72);
-          uEmissiveTint.value.set(0.18, 0.95, 0.78);
+          uRockTint.value.set(0.85, 0.90, 1.05);
+          uSoilTint.value.set(0.78, 1.02, 0.95);
+          uFoliageTint.value.set(0.65, 1.15, 1.02);
+          uEmissiveTint.value.set(0.25, 1.0, 0.85);
           break;
         case 'shattered':
-          uRockTint.value.set(0.52, 0.48, 0.62);
-          uSoilTint.value.set(0.45, 0.42, 0.55);
-          uFoliageTint.value.set(0.68, 0.52, 0.95);
-          uEmissiveTint.value.set(0.55, 0.78, 1.0);
+          uRockTint.value.set(0.95, 0.90, 1.05);
+          uSoilTint.value.set(0.92, 0.88, 1.02);
+          uFoliageTint.value.set(1.05, 0.85, 1.15);
+          uEmissiveTint.value.set(0.65, 0.88, 1.0);
           break;
         default:
-          uRockTint.value.set(0.55, 0.53, 0.50);
-          uSoilTint.value.set(0.48, 0.38, 0.28);
-          uFoliageTint.value.set(0.30, 0.62, 0.28);
-          uEmissiveTint.value.set(0.25, 0.85, 0.92);
+          uRockTint.value.set(1.0, 1.0, 1.0);
+          uSoilTint.value.set(1.0, 0.98, 0.95);
+          uFoliageTint.value.set(1.0, 1.05, 0.98);
+          uEmissiveTint.value.set(0.35, 0.95, 1.0);
           break;
       }
       uTriplanarScale.value = 0.045;

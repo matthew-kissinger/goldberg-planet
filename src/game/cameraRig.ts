@@ -44,10 +44,37 @@ export class CameraRig {
     private columns: Columns,
   ) {}
 
-  rebindPlanet(layers: Layers, columns: Columns): void {
+  rebindPlanet(
+    layers: Layers,
+    columns: Columns,
+    dx = 0,
+    dy = 0,
+    dz = 0,
+    newUp?: readonly [number, number, number],
+  ): void {
     this.layers = layers;
     this.columns = columns;
     this.obstruct = Infinity;
+    this.world.x += dx;
+    this.world.y += dy;
+    this.world.z += dz;
+    if (newUp) {
+      this.upX = newUp[0];
+      this.upY = newUp[1];
+      this.upZ = newUp[2];
+    }
+  }
+
+  snapTo(player: Player): void {
+    const [ux, uy, uz] = player.up();
+    this.upX = ux;
+    this.upY = uy;
+    this.upZ = uz;
+    this.obstruct = Infinity;
+    const eye = player.eye();
+    this.world.x = eye[0];
+    this.world.y = eye[1];
+    this.world.z = eye[2];
   }
 
   update(dt: number, player: Player, wheel: number, wheelTouched: boolean): void {
@@ -159,7 +186,7 @@ export class CameraRig {
     const dx = tx - w.x, dy = ty - w.y, dz = tz - w.z;
     const dl = Math.hypot(dx, dy, dz) || 1;
     this.dir.x = dx / dl; this.dir.y = dy / dl; this.dir.z = dz / dl;
-    const wantNear = Math.min(60, Math.max(0.09, this.dist * 0.02));
+    const wantNear = Math.min(60, Math.max(0.45, this.dist * 0.02));
     if (Math.abs(wantNear - cam.near) / cam.near > 0.05) {
       cam.near = wantNear;
       cam.updateProjectionMatrix();
