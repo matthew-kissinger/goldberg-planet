@@ -2,10 +2,9 @@ import { TREE_CHOP_STAGES, type Trees } from '../world/trees';
 import type { MoveMode, Player } from '../player/player';
 import { normalizeInventory, type Inventory } from './crafting';
 import { normalizeResourceDrops, type ResourceDropSave } from './resourceDrops';
+import type { PlacedStructure } from './persistence';
+import type { SerializedColumnEdit } from '../world/columns';
 
-// v4 (2026-10-26): burned down to the core loop (walk, chop, craft the plane, fly). Terrain
-// edits, structures, tools, food, weather and landmark progress left the save; older saves
-// are incompatible and intentionally not migrated.
 export const SAVE_VERSION = 4;
 
 export interface TreeChopProgressSave {
@@ -25,6 +24,14 @@ export interface PlayerSave {
   planeSpeed: number;
 }
 
+export interface PlanetDeltaSave {
+  choppedTrees: number[];
+  treeChopProgress: TreeChopProgressSave[];
+  columnEdits: SerializedColumnEdit[];
+  seededEcoTiles: number[];
+  drops: ResourceDropSave[];
+}
+
 export interface WorldSave {
   version: typeof SAVE_VERSION;
   seed: string;
@@ -36,6 +43,9 @@ export interface WorldSave {
   choppedTrees: number[];
   treeChopProgress: TreeChopProgressSave[];
   drops: ResourceDropSave[];
+  activePlanetId?: string;
+  structures?: PlacedStructure[];
+  planetDeltas?: Record<string, PlanetDeltaSave>;
 }
 
 export interface CaptureWorldSaveInput {
@@ -47,6 +57,9 @@ export interface CaptureWorldSaveInput {
   drops?: readonly ResourceDropSave[];
   planeCrafted: boolean;
   savedAt?: number;
+  activePlanetId?: string;
+  structures?: readonly PlacedStructure[];
+  planetDeltas?: Record<string, PlanetDeltaSave>;
 }
 
 function finite(n: unknown): n is number {
@@ -155,7 +168,7 @@ export function applyTreeChopProgress(trees: Trees, progress: readonly TreeChopP
 }
 
 export function captureWorldSave(input: CaptureWorldSaveInput): WorldSave {
-  return {
+  const out: WorldSave = {
     version: SAVE_VERSION,
     seed: input.seed,
     frequency: input.frequency,
@@ -167,6 +180,10 @@ export function captureWorldSave(input: CaptureWorldSaveInput): WorldSave {
     treeChopProgress: serializeTreeChopProgress(input.trees),
     drops: normalizeResourceDrops(input.drops, Number.MAX_SAFE_INTEGER),
   };
+  if (input.activePlanetId) out.activePlanetId = input.activePlanetId;
+  if (input.structures && input.structures.length > 0) out.structures = [...input.structures];
+  if (input.planetDeltas) out.planetDeltas = input.planetDeltas;
+  return out;
 }
 
 export function parseWorldSaveJson(json: string): WorldSave | null {
@@ -184,7 +201,7 @@ export function parseWorldSaveJson(json: string): WorldSave | null {
     if (!playerNums.every(finite)) return null;
     const choppedTrees = intArray(v.choppedTrees);
     if (!choppedTrees) return null;
-    return {
+    const out: WorldSave = {
       version: SAVE_VERSION,
       seed: v.seed,
       frequency: Math.trunc(v.frequency),
@@ -206,6 +223,10 @@ export function parseWorldSaveJson(json: string): WorldSave | null {
       treeChopProgress: normalizeTreeChopProgress(v.treeChopProgress, Number.MAX_SAFE_INTEGER, choppedTrees),
       drops: normalizeResourceDrops(v.drops, Number.MAX_SAFE_INTEGER),
     };
+    if (typeof v.activePlanetId === 'string') out.activePlanetId = v.activePlanetId;
+    if (Array.isArray(v.structures)) out.structures = v.structures;
+    if (v.planetDeltas && typeof v.planetDeltas === 'object') out.planetDeltas = v.planetDeltas;
+    return out;
   } catch {
     return null;
   }

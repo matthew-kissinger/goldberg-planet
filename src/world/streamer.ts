@@ -2,11 +2,9 @@
  * Chunk residency: generates chunk meshes on demand around the player and releases them
  * behind, with hysteresis and a per-frame build budget so motion never stalls.
  *
- * The desired set is an angular cap around the player's direction from the core; its radius
- * follows the horizon for the current altitude, clamped so high flight leans on the far
- * sphere instead of unbounded residency. Chunk *data* (columns, edits) lives elsewhere —
- * releasing a chunk here only frees mesh memory; edits persist and regeneration is
- * deterministic.
+ * Supports dynamic `PlanetConfig` / `Layers` rebinding (`rebindPlanet`) when traveling
+ * between worlds in the solar system, and border-tile neighbor chunk queuing so voxel
+ * edits across chunk boundaries stay watertight at 144 fps.
  */
 
 import * as THREE from 'three/webgpu';
@@ -16,12 +14,8 @@ import type { Columns } from './columns';
 import type { Trees } from './trees';
 import { chunkKeyOfTile, enumerateChunks, type ChunkInfo } from './chunks';
 import { buildChunkMesh } from '../render/mesher';
-import { PLANET_RADIUS } from './layers';
 import { HEIGHT_MAX } from './terrain';
 
-// Full-detail residency must reach every peak the player can see: a summit of height H is
-// visible from acos(R/(R+H)) beyond the eye's own horizon (~0.48 rad for +115 m at R=900).
-const PEAK_HORIZON = Math.acos(PLANET_RADIUS / (PLANET_RADIUS + HEIGHT_MAX));
 const THETA_MIN = 0.55;
 const THETA_CAP = 0.88;
 const RELEASE_FACTOR = 1.12;
@@ -30,7 +24,7 @@ const BUILD_BUDGET_MS = 4.5;
 const BUILD_BUDGET_COUNT = 4;
 
 interface Resident {
-  mesh: THREE.Mesh | null; // null = built but empty (fully open chunk — cannot happen with bedrock, but stay safe)
+  mesh: THREE.Mesh | null;
   info: ChunkInfo;
   triangles: number;
 }
@@ -41,9 +35,7 @@ export class Streamer {
   readonly resident = new Map<number, Resident>();
   private queue: ChunkInfo[] = [];
   private queued = new Set<number>();
-  // last-known camera position (floating origin). Meshes are positioned from this at
-  // CREATION, so a chunk built at any point in the frame — in particular a tree rebuild
-  // that runs after the per-frame transform pass — is never rendered untransformed.
+  private neighborRebuildQueue: number[] = [];
   private eyeX = 0;
   private eyeY = 0;
   private eyeZ = 0;
@@ -57,20 +49,41 @@ export class Streamer {
 
   constructor(
     private readonly geo: Goldberg,
-    private readonly layers: Layers,
-    private readonly columns: Columns,
+    private layers: Layers,
+    private columns: Columns,
     private readonly scene: THREE.Scene,
     private readonly material: THREE.Material,
-    private readonly trees?: Trees,
+    private trees?: Trees,
   ) {
     this.all = enumerateChunks(geo);
     this.list = [...this.all.values()];
   }
 
+  /** Switch the streamer to a newly entered planet's layers, columns, and flora. */
+  rebindPlanet(layers: Layers, columns: Columns, trees?: Trees): void {
+    this.clearAllResident();
+    this.layers = layers;
+    this.columns = columns;
+    this.trees = trees;
+    this.queue.length = 0;
+    this.queued.clear();
+    this.neighborRebuildQueue.length = 0;
+    this.residencyDirty = true;
+  }
+
+  /** Unload all resident chunks (e.g., when in deep interplanetary space or switching planets). */
+  clearAllResident(): void {
+    for (const [key, res] of [...this.resident.entries()]) {
+      this.disposeResident(key, res);
+    }
+  }
+
   thetaFor(altitude: number): number {
+    const R = this.layers.planetRadius;
+    const peakHorizon = Math.acos(Math.min(1, R / (R + HEIGHT_MAX)));
     const h = Math.max(2, altitude);
-    const horizon = Math.acos(Math.min(1, PLANET_RADIUS / (PLANET_RADIUS + h)));
-    return Math.min(THETA_CAP, Math.max(THETA_MIN, horizon + PEAK_HORIZON));
+    const horizon = Math.acos(Math.min(1, R / (R + h)));
+    return Math.min(THETA_CAP, Math.max(THETA_MIN, horizon + peakHorizon));
   }
 
   /** Recompute desired set (cheap: ~900 dot products). Called every few frames. */
@@ -115,6 +128,14 @@ export class Streamer {
 
   /** Build queued chunks within the frame budget. Returns number built. */
   pump(maxMs = BUILD_BUDGET_MS, maxCount = BUILD_BUDGET_COUNT): number {
+    // Drain 1 border-neighbor rebuild per frame so cross-chunk edits never spike frame time
+    if (this.neighborRebuildQueue.length > 0) {
+      const nKey = this.neighborRebuildQueue.shift()!;
+      if (this.resident.has(nKey)) {
+        this.rebuildNow(nKey);
+      }
+    }
+
     if (this.queue.length === 0) return 0;
     const t0 = performance.now();
     let built = 0;
@@ -137,6 +158,7 @@ export class Streamer {
       geom.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
       geom.setAttribute('normal', new THREE.BufferAttribute(data.normals, 3));
       geom.setAttribute('color', new THREE.BufferAttribute(data.colors, 3));
+      geom.setAttribute('packedMat', new THREE.BufferAttribute(data.packedMat, 1));
       geom.computeBoundingSphere();
       mesh = new THREE.Mesh(geom, this.material);
       mesh.userData.anchor = data.anchor;
@@ -153,7 +175,7 @@ export class Streamer {
   /**
    * Rebuild one chunk immediately. The resident SET is unchanged by a rebuild,
    * so this must NOT dirty the far-sphere filter — that refilter is a 184k-tri scan plus
-   * a full index re-upload, and letting rebuilds trigger it was a per-chop frame spike.
+   * a full index re-upload.
    */
   rebuildNow(key: number): void {
     const res = this.resident.get(key);
@@ -162,15 +184,28 @@ export class Streamer {
     const wasDirty = this.residencyDirty;
     if (res) this.disposeResident(key, res);
     this.buildChunk(info);
-    this.loads--; // rebuilds aren't loads
+    this.loads--;
     this.releases--;
     this.residencyDirty = wasDirty;
   }
 
-  /** Rebuild the chunk holding a tile (a tree changed there), if it is resident. */
-  rebuildTile(tile: number): void {
+  /**
+   * Rebuild the chunk holding `tile` immediately, and queue any adjacent chunks if `tile`
+   * sits on a chunk border (for watertight cross-chunk voxel mining/building).
+   */
+  rebuildTile(tile: number, includeNeighbors = false): void {
     const key = chunkKeyOfTile(this.geo, tile);
     if (this.resident.has(key)) this.rebuildNow(key);
+    if (includeNeighbors) {
+      const deg = this.geo.degrees[tile];
+      for (let e = 0; e < deg; e++) {
+        const nbr = this.geo.nbrs[tile * 6 + e];
+        const nKey = chunkKeyOfTile(this.geo, nbr);
+        if (nKey !== key && this.resident.has(nKey) && !this.neighborRebuildQueue.includes(nKey)) {
+          this.neighborRebuildQueue.push(nKey);
+        }
+      }
+    }
   }
 
   /** Per-frame: update camera-relative transforms (floating origin). */

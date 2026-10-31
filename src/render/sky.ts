@@ -1,17 +1,9 @@
 /**
- * Sky: a raymarched atmosphere shell and a voxel cloud band.
+ * Sky: a raymarched atmosphere shell, a smooth cloud band, and a deep-space starfield.
  *
- * Both draw as backside spheres with depth *testing off* — the old fresnel shell was
- * depth-tested, which clipped the glow hard at the planet silhouette (the "flat edge").
- * Occlusion is instead done per pixel inside the shader: every view ray is clamped by
- * the scene depth buffer (viewportLinearDepth) and by the analytic water sphere, so the
- * glow hazes distant terrain (aerial perspective), stops at ocean, and never bleeds
- * through nearby cliffs, trees, or cave ceilings.
- *
- * All ray math runs in the planet frame: the shells are recentered on the planet every
- * frame (floating origin), so positionLocal is planet-centered and the camera sits at
- * camU = the planet-frame camera position. The fragment ray is exact — the interpolated
- * shell point IS the pixel's world position, so rd = normalize(positionLocal - camU).
+ * Dynamically parameterized via TSL uniforms (`applyPlanetConfig`) so each world in the
+ * solar system renders its own physical Rayleigh/Mie horizon tint, scale height, and
+ * cloud deck when entered.
  */
 
 import * as THREE from 'three/webgpu';
@@ -22,31 +14,27 @@ import {
   positionLocal, pow, smoothstep, sqrt, time, uniform, vec3, vec4,
 } from 'three/tsl';
 import { PLANET_RADIUS, WATER_SURFACE } from '../world/layers';
+import type { PlanetConfig } from '../world/planetConfig';
+import { mulberry32 } from '../util/prng';
 
-const RG = WATER_SURFACE;             // occluder sphere + density floor
-const RA = PLANET_RADIUS * 1.2;       // atmosphere top
-const ATMO_H = 46;                    // density scale height (m)
-const CLOUD_LO = 120;                 // cloud band above the surface (m) — clears peaks and builds
+const BASE_RA = PLANET_RADIUS * 1.2;
+const ATMO_H = 46;
+const CLOUD_LO = 125;
 const CLOUD_HI = 165;
-const CLOUD_CELL = 21;                // voxel size (m)
-const R_LO = PLANET_RADIUS + CLOUD_LO;
-const R_HI = PLANET_RADIUS + CLOUD_HI;
+const BASE_R_HI = PLANET_RADIUS + CLOUD_HI;
 
 export type SkyQuality = 'high' | 'low';
-const ATMO_STEPS = { high: 12, low: 8 };
-const CLOUD_MARCH = { high: { steps: 44, len: 11.5 }, low: { steps: 22, len: 17 } };
+const ATMO_STEPS = { high: 10, low: 6 };
+const CLOUD_MARCH = { high: { steps: 18, len: 18 }, low: { steps: 10, len: 26 } };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-// fract-based hash (Dave Hoskins style): stays precise for large |p|, which matters
-// because cloud cells drift with time indefinitely (sin-based hashes fall apart)
 const hash3 = Fn(([pIn]: any[]) => {
   const q = fract(vec3(pIn).mul(0.1031)).toVar();
   q.addAssign(dot(q, q.zyx.add(31.32)));
   return fract(q.x.add(q.y).mul(q.z));
 });
 
-// trilinear value noise over the integer lattice — smooth cloud-bank coverage
 const vnoise = Fn(([pIn]: any[]) => {
   const p = vec3(pIn);
   const i = floor(p).toVar();
@@ -62,21 +50,76 @@ const vnoise = Fn(([pIn]: any[]) => {
 export class Sky {
   readonly atmo: THREE.Mesh;
   readonly clouds: THREE.Mesh | null = null;
+  readonly stars: THREE.Points;
   /** live-tunable: atmosphere glow strength */
   readonly kGlow = uniform(0.006);
   /** live-tunable: cloud coverage threshold (lower = more cloud) */
-  readonly cover = uniform(0.62);
+  readonly cover = uniform(0.65);
   private readonly camU = uniform(new THREE.Vector3());
   private readonly fwdU = uniform(new THREE.Vector3(0, 0, -1));
+  private readonly uPlanetRadius = uniform(PLANET_RADIUS);
+  private readonly uRG = uniform(WATER_SURFACE);
+  private readonly uRA = uniform(BASE_RA);
+  private readonly uRLo = uniform(PLANET_RADIUS + CLOUD_LO);
+  private readonly uRHi = uniform(BASE_R_HI);
+  private readonly uZenith = uniform(new THREE.Vector3(0.18, 0.45, 0.95));
+  private readonly uHorizon = uniform(new THREE.Vector3(0.62, 0.78, 1.0));
+  private readonly uSunset = uniform(new THREE.Vector3(1.0, 0.42, 0.15));
+  private readonly uCloudTint = uniform(new THREE.Vector3(0.97, 0.985, 1.0));
 
   constructor(scene: THREE.Scene, sunDir: THREE.Vector3, quality: SkyQuality, withClouds: boolean) {
     const sunU = uniform(sunDir);
     const camU = this.camU;
     const fwdU = this.fwdU;
+    const uPlanetRadius = this.uPlanetRadius;
+    const uRG = this.uRG;
+    const uRA = this.uRA;
+    const uRLo = this.uRLo;
+    const uRHi = this.uRHi;
+    const uZenith = this.uZenith;
+    const uHorizon = this.uHorizon;
+    const uSunset = this.uSunset;
+    const uCloudTint = this.uCloudTint;
 
-    // distance along the current view ray at which the depth buffer's surface sits
     const sceneT = (rd: any): any =>
       cameraNear.add(viewportLinearDepth.mul(cameraFar.sub(cameraNear))).div(max(dot(rd, fwdU), 1e-4));
+
+    // --- deep-space pinpoint starfield dome ---
+    {
+      const starCount = 1400;
+      const rng = mulberry32(0x51a7f1ed);
+      const starPos = new Float32Array(starCount * 3);
+      const starCol = new Float32Array(starCount * 3);
+      const starR = 22000;
+      for (let i = 0; i < starCount; i++) {
+        const u = rng() * 2 - 1;
+        const theta = rng() * 2 * Math.PI;
+        const s = Math.sqrt(Math.max(0, 1 - u * u));
+        starPos[i * 3] = s * Math.cos(theta) * starR;
+        starPos[i * 3 + 1] = u * starR;
+        starPos[i * 3 + 2] = s * Math.sin(theta) * starR;
+        const b = 0.35 + 0.65 * Math.pow(rng(), 3);
+        const warm = rng();
+        starCol[i * 3] = b * (0.85 + 0.15 * warm);
+        starCol[i * 3 + 1] = b * (0.88 + 0.10 * (1 - Math.abs(warm - 0.5)));
+        starCol[i * 3 + 2] = b * (0.90 + 0.10 * (1 - warm));
+      }
+      const starGeom = new THREE.BufferGeometry();
+      starGeom.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+      starGeom.setAttribute('color', new THREE.BufferAttribute(starCol, 3));
+      const starMat = new THREE.PointsMaterial({
+        size: 2.0,
+        sizeAttenuation: false,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.72,
+        depthWrite: false,
+      });
+      this.stars = new THREE.Points(starGeom, starMat);
+      this.stars.frustumCulled = false;
+      this.stars.renderOrder = 0;
+      scene.add(this.stars);
+    }
 
     // --- atmosphere: integrate exponential density along the shell chord ---
     {
@@ -88,14 +131,15 @@ export class Sky {
         const b = dot(ro, rd).toVar();
         const roro = dot(ro, ro).toVar();
         const col = vec3(0).toVar();
-        const disc = b.mul(b).sub(roro).add(RA * RA).toVar();
-        // camera below the water sphere = underground/underwater: no sky
-        If(disc.greaterThan(0).and(roro.greaterThan(RG * RG)), () => {
+        const raSq = uRA.mul(uRA);
+        const rgSq = uRG.mul(uRG);
+        const disc = b.mul(b).sub(roro).add(raSq).toVar();
+        If(disc.greaterThan(0).and(roro.greaterThan(rgSq)), () => {
           const sq = sqrt(disc);
           const t0 = max(b.negate().sub(sq), 0).toVar();
           const t1 = b.negate().add(sq).toVar();
           t1.assign(min(t1, sceneT(rd)));
-          const discW = b.mul(b).sub(roro).add(RG * RG);
+          const discW = b.mul(b).sub(roro).add(rgSq);
           If(discW.greaterThan(0), () => {
             const tw = b.negate().sub(sqrt(discW));
             If(tw.greaterThan(0), () => { t1.assign(min(t1, tw)); });
@@ -107,7 +151,7 @@ export class Sky {
             Loop(N, ({ i }: any) => {
               const p = ro.add(rd.mul(t0.add(float(i).add(0.5).mul(dt))));
               const r = length(p);
-              const dens = exp(max(r.sub(RG), 0).div(-ATMO_H));
+              const dens = exp(max(r.sub(uRG), 0).div(-ATMO_H));
               const day = smoothstep(-0.28, 0.22, dot(p, sunU).div(r));
               od.addAssign(dens);
               li.addAssign(dens.mul(day));
@@ -115,14 +159,12 @@ export class Sky {
             od.mulAssign(dt);
             li.mulAssign(dt);
             const glow = float(1).sub(exp(li.mul(kGlow).negate())).toVar();
-            // deep blue that whitens as the glow saturates; warm band at the terminator
             const pm = ro.add(rd.mul(t0.add(t1).mul(0.5)));
             const sdm = dot(normalize(pm), sunU);
             const warm = pow(float(1).sub(min(sdm.abs().mul(2.8), 1)), 3);
-            const base = mix(vec3(0.18, 0.45, 0.95), vec3(0.62, 0.78, 1.0), glow.mul(glow));
+            const base = mix(uZenith, uHorizon, glow.mul(glow));
             col.assign(base.mul(glow));
-            col.assign(mix(col, vec3(1.0, 0.42, 0.15).mul(glow), warm.mul(0.5)));
-            // faint cold rim on the night side so the dark limb never cuts to pure black
+            col.assign(mix(col, uSunset.mul(glow), warm.mul(0.5)));
             const night = float(1).sub(exp(od.mul(-0.0012)));
             col.addAssign(vec3(0.05, 0.08, 0.16).mul(night).mul(float(1).sub(glow)));
           });
@@ -137,13 +179,13 @@ export class Sky {
       mat.depthTest = false;
       mat.side = THREE.BackSide;
       mat.fog = false;
-      this.atmo = new THREE.Mesh(new THREE.IcosahedronGeometry(RA, 4), mat);
+      this.atmo = new THREE.Mesh(new THREE.IcosahedronGeometry(BASE_RA, 4), mat);
       this.atmo.frustumCulled = false;
       this.atmo.renderOrder = 6;
       scene.add(this.atmo);
     }
 
-    // --- voxel clouds: march the band, cell-quantized occupancy from banked noise ---
+    // --- smooth billowing cloud deck (no blocky floor() artifacts) ---
     if (withClouds) {
       const { steps: N, len: STEP } = CLOUD_MARCH[quality];
       const cover = this.cover;
@@ -154,20 +196,22 @@ export class Sky {
         const roro = dot(ro, ro).toVar();
         const acc = vec3(0).toVar();
         const trans = float(1).toVar();
-        const disc = b.mul(b).sub(roro).add(R_HI * R_HI).toVar();
-        If(disc.greaterThan(0).and(roro.greaterThan(RG * RG)), () => {
+        const rHiSq = uRHi.mul(uRHi);
+        const rLoSq = uRLo.mul(uRLo);
+        const rgSq = uRG.mul(uRG);
+        const disc = b.mul(b).sub(roro).add(rHiSq).toVar();
+        If(disc.greaterThan(0).and(roro.greaterThan(rgSq)), () => {
           const sq = sqrt(disc);
           const t0 = max(b.negate().sub(sq), 0).toVar();
           const t1 = b.negate().add(sq).toVar();
           t1.assign(min(t1, sceneT(rd)));
-          const discW = b.mul(b).sub(roro).add(RG * RG);
+          const discW = b.mul(b).sub(roro).add(rgSq);
           If(discW.greaterThan(0), () => {
             const tw = b.negate().sub(sqrt(discW));
             If(tw.greaterThan(0), () => { t1.assign(min(t1, tw)); });
           });
-          // camera below the band: skip straight up to its underside
-          If(roro.lessThan(R_LO * R_LO), () => {
-            const discL = b.mul(b).sub(roro).add(R_LO * R_LO);
+          If(roro.lessThan(rLoSq), () => {
+            const discL = b.mul(b).sub(roro).add(rLoSq);
             t0.assign(max(t0, b.negate().add(sqrt(max(discL, 0)))));
           });
           If(t1.sub(t0).greaterThan(0.5), () => {
@@ -176,24 +220,22 @@ export class Sky {
               If(t.greaterThanEqual(t1), () => { Break(); });
               const p = ro.add(rd.mul(t)).toVar();
               const r = length(p).toVar();
-              const h = r.sub(PLANET_RADIUS).toVar();
+              const h = r.sub(uPlanetRadius).toVar();
               If(h.greaterThan(CLOUD_LO).and(h.lessThan(CLOUD_HI)), () => {
-                const pd = p.add(vec3(2.2, 0.5, -1.6).mul(time));
-                const q = floor(pd.div(CLOUD_CELL)).toVar();
-                const covN = vnoise(q.mul(0.1)).mul(0.72).add(vnoise(q.mul(0.23)).mul(0.28));
+                const pd = p.add(vec3(1.8, 0.3, -1.2).mul(time)).mul(0.011);
+                const covN = vnoise(pd).mul(0.68).add(vnoise(pd.mul(2.3)).mul(0.32));
                 const shellF = h.sub(CLOUD_LO).div(CLOUD_HI - CLOUD_LO);
-                const field = covN.add(hash3(q).mul(0.09)).sub(shellF.mul(0.22));
+                const verticalEnvelope = shellF.mul(float(1).sub(shellF)).mul(4.0);
+                const field = covN.mul(verticalEnvelope);
                 If(field.greaterThan(cover), () => {
                   const day = smoothstep(-0.25, 0.3, dot(p, sunU).div(r));
-                  // per-cell brightness jitter makes adjacent voxels read as distinct blocks
-                  const cellJit = hash3(q.add(7.31)).mul(0.16).add(0.92);
-                  const bright = mix(0.62, 1.08, shellF).mul(cellJit);
-                  const cS = mix(vec3(0.05, 0.075, 0.14), vec3(0.97, 0.985, 1.0).mul(bright), day);
-                  // fade the first ~45 m so flying through a bank stays readable
-                  const a = smoothstep(6, 45, t).mul(0.7);
+                  const bright = mix(0.68, 1.05, shellF);
+                  const cS = mix(vec3(0.06, 0.09, 0.16), uCloudTint.mul(bright), day);
+                  const density = smoothstep(cover, cover.add(0.18), field);
+                  const a = smoothstep(25, 95, t).mul(density).mul(0.38);
                   acc.addAssign(cS.mul(trans.mul(a)));
                   trans.mulAssign(float(1).sub(a));
-                  If(trans.lessThan(0.05), () => { Break(); });
+                  If(trans.lessThan(0.08), () => { Break(); });
                 });
               });
             });
@@ -208,14 +250,47 @@ export class Sky {
       mat.opacityNode = out.w;
       mat.transparent = true;
       mat.depthWrite = false;
-      mat.depthTest = false;
+      mat.depthTest = true;
       mat.side = THREE.BackSide;
       mat.fog = false;
-      const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(R_HI, 4), mat);
+      const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(BASE_R_HI, 4), mat);
       mesh.frustumCulled = false;
       mesh.renderOrder = 5;
       scene.add(mesh);
       this.clouds = mesh;
+    }
+  }
+
+  /** Re-parameterize the raymarched atmosphere and clouds for a newly entered planet. */
+  applyPlanetConfig(config: PlanetConfig): void {
+    const R = config.radius;
+    const rg = config.ocean.hasOcean ? R + config.waterSurfaceOffset : R - 35;
+    const ra = R + config.atmosphere.thickness;
+    const rLo = R + CLOUD_LO;
+    const rHi = R + CLOUD_HI;
+
+    this.uPlanetRadius.value = R;
+    this.uRG.value = rg;
+    this.uRA.value = ra;
+    this.uRLo.value = rLo;
+    this.uRHi.value = rHi;
+
+    this.uZenith.value.set(...config.atmosphere.zenithColor);
+    this.uHorizon.value.set(...config.atmosphere.horizonColor);
+    this.uSunset.value.set(...config.atmosphere.sunsetColor);
+    this.uCloudTint.value.set(...config.atmosphere.cloudTint);
+
+    this.kGlow.value = 0.006 * config.atmosphere.density;
+    this.atmo.scale.setScalar(ra / BASE_RA);
+
+    if (this.clouds) {
+      if (config.atmosphere.cloudCoverage <= 0.05) {
+        this.clouds.visible = false;
+      } else {
+        this.clouds.visible = true;
+        this.cover.value = 0.62 - config.atmosphere.cloudCoverage * 0.14;
+        this.clouds.scale.setScalar(rHi / BASE_R_HI);
+      }
     }
   }
 

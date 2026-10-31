@@ -38,9 +38,28 @@ export interface FrameIntent {
   mute: boolean;
   diag: boolean;
   help: boolean;
+  /** V: mine terrain voxel cell */
+  mineCell: boolean;
+  /** Q: place selected out-of-core structure */
+  placeStructure: boolean;
+  /** Z / X: cycle selected structure blueprint */
+  cycleStructurePrev: boolean;
+  cycleStructureNext: boolean;
+  /** R: rotate structure yaw (60 deg) */
+  rotateStructure: boolean;
+  /** G: deploy Ecosystem Seed Pod */
+  deployEcoPod: boolean;
+  /** C / T: eat cooked meat to restore Hunger & trigger Health regen */
+  eatFood: boolean;
+  /** 1..6: quick interplanetary warp / nav target (0..5, or -1 if none) */
+  warpPlanetIndex: number;
 }
 
-const EDGE_KEYS = ['KeyE', 'KeyB', 'KeyF', 'KeyN', 'KeyH', 'F3', 'Escape'] as const;
+const EDGE_KEYS = [
+  'KeyE', 'KeyB', 'KeyF', 'KeyN', 'KeyH', 'KeyM', 'F3', 'Escape',
+  'KeyV', 'KeyQ', 'KeyZ', 'KeyX', 'KeyR', 'KeyG', 'KeyC', 'KeyT',
+  'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6',
+] as const;
 type EdgeKey = typeof EDGE_KEYS[number];
 
 export class Controls {
@@ -69,6 +88,14 @@ export class Controls {
     const tf = this.touch.frame();
     const gp = this.gamepad.frame(dt);
     const keys = Object.fromEntries(EDGE_KEYS.map((code) => [code, this.edge(code)])) as Record<EdgeKey, boolean>;
+    const warpPlanetIndex =
+      keys.Digit1 ? 0
+      : keys.Digit2 ? 1
+      : keys.Digit3 ? 2
+      : keys.Digit4 ? 3
+      : keys.Digit5 ? 4
+      : keys.Digit6 ? 5
+      : -1;
     const panelVerbs = {
       plane: keys.KeyE || tf.plane || gp.plane,
       toggleCrafting: keys.KeyB || tf.craft || gp.craft,
@@ -77,7 +104,15 @@ export class Controls {
       toggleFly: keys.KeyF,
       mute: keys.KeyN || gp.mute,
       diag: keys.F3 || gp.diag,
-      help: keys.KeyH || gp.help,
+      help: keys.KeyH || keys.KeyM || gp.help,
+      mineCell: keys.KeyV,
+      placeStructure: keys.KeyQ,
+      cycleStructurePrev: keys.KeyZ,
+      cycleStructureNext: keys.KeyX,
+      rotateStructure: keys.KeyR,
+      deployEcoPod: keys.KeyG,
+      eatFood: keys.KeyT || keys.KeyC,
+      warpPlanetIndex,
     };
     if (panelOpen) {
       input.cancelWorldInput();
@@ -86,6 +121,8 @@ export class Controls {
         ...panelVerbs,
         plane: false,
         toggleFly: false,
+        mineCell: false,
+        placeStructure: false,
         lookX: 0, lookY: 0, aiming: false, wheel: 0, wheelTouched: false,
         forward: 0, strafe: 0, jump: false, down: false, sprint: false,
         chop: false, chopHeld: false, chopTaps: [],

@@ -1,12 +1,14 @@
 /**
- * Global radial layer grid, shared by every tile so walls between neighboring columns
- * always line up exactly.
+ * Global radial layer grid, shared by every tile on a planet so walls between neighboring
+ * columns always line up exactly.
  *
  * Cell k occupies radii [bounds[k+1], bounds[k]]. Layer 0 is the build ceiling.
  * Near-surface cells are uniform (fine) for mining/building feel; below the surface band,
  * thickness grows geometrically — resolution decreases with depth, so a full column is
  * O(log R) cells and total addressable volume scales with surface tile count, not R^3.
  */
+
+import type { PlanetConfig } from './planetConfig';
 
 export const PLANET_RADIUS = 900;
 /** sea level radius; oceans render just below a layer boundary to avoid z-fighting beach tops */
@@ -22,30 +24,43 @@ const DEPTH_GROWTH = 1.5;
 const CORE_RADIUS = 60;
 
 export interface Layers {
-  /** L+1 radii, strictly decreasing; bounds[0] = BUILD_CEILING, bounds[L] = CORE_RADIUS */
+  /** L+1 radii, strictly decreasing; bounds[0] = buildCeiling, bounds[L] = coreRadius */
   bounds: Float64Array;
   L: number;
   uniformLayers: number;
+  planetRadius: number;
+  waterSurface: number;
+  buildCeiling: number;
+  cellH: number;
   layerOfRadius(r: number): number;
   topRadius(k: number): number;
   bottomRadius(k: number): number;
   thickness(k: number): number;
 }
 
-export function buildLayers(): Layers {
-  const b: number[] = [BUILD_CEILING];
-  let r = BUILD_CEILING;
+export function buildLayers(
+  config?: Partial<Pick<PlanetConfig, 'radius' | 'layerH' | 'waterSurfaceOffset'>>,
+): Layers {
+  const planetRadius = config?.radius ?? PLANET_RADIUS;
+  const cellH = config?.layerH ?? CELL_H;
+  const waterSurfaceOffset = config?.waterSurfaceOffset ?? -0.35;
+  const waterSurface = planetRadius + waterSurfaceOffset;
+  const buildCeiling = planetRadius + 130;
+  const coreRadius = Math.max(30, Math.min(CORE_RADIUS, Math.floor(planetRadius * 0.12)));
+
+  const b: number[] = [buildCeiling];
+  let r = buildCeiling;
   for (let k = 0; k < UNIFORM_LAYERS; k++) {
-    r -= CELL_H;
+    r -= cellH;
     b.push(r);
   }
-  let t = CELL_H * DEPTH_GROWTH;
-  while (r - t > CORE_RADIUS + 40) {
+  let t = cellH * DEPTH_GROWTH;
+  while (r - t > coreRadius + 40) {
     r -= t;
     b.push(r);
     t *= DEPTH_GROWTH;
   }
-  b.push(CORE_RADIUS); // final bedrock cell (unmineable)
+  b.push(coreRadius); // final bedrock cell (unmineable)
   const bounds = new Float64Array(b);
   const L = bounds.length - 1;
   const uniformBottom = bounds[UNIFORM_LAYERS];
@@ -54,7 +69,7 @@ export function buildLayers(): Layers {
     if (radius >= bounds[0]) return -1; // above build ceiling
     if (radius <= bounds[L]) return L - 1;
     if (radius >= uniformBottom) {
-      const k = Math.floor((bounds[0] - radius) / CELL_H);
+      const k = Math.floor((bounds[0] - radius) / cellH);
       return Math.min(k, UNIFORM_LAYERS - 1);
     }
     // few coarse layers: linear scan
@@ -68,6 +83,10 @@ export function buildLayers(): Layers {
     bounds,
     L,
     uniformLayers: UNIFORM_LAYERS,
+    planetRadius,
+    waterSurface,
+    buildCeiling,
+    cellH,
     layerOfRadius,
     topRadius: (k) => bounds[k],
     bottomRadius: (k) => bounds[k + 1],

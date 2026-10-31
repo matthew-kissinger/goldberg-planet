@@ -27,9 +27,9 @@ export class CameraRig {
   /** unit view direction (world) */
   readonly dir = { x: 0, y: 0, z: 1 };
   /** boom length in metres; 0 = first person */
-  dist = 0;
-  private zoomExp = 0;
-  private zoomExpTarget = 0;
+  dist = 5.2;
+  private zoomExp = 0.105;
+  private zoomExpTarget = 0.105;
   private planeAutoZoom = false;
   private obstruct = Infinity;
   private upX = 0;
@@ -40,9 +40,15 @@ export class CameraRig {
   constructor(
     private readonly camera: THREE.PerspectiveCamera,
     private readonly geo: Goldberg,
-    private readonly layers: Layers,
-    private readonly columns: Columns,
+    private layers: Layers,
+    private columns: Columns,
   ) {}
+
+  rebindPlanet(layers: Layers, columns: Columns): void {
+    this.layers = layers;
+    this.columns = columns;
+    this.obstruct = Infinity;
+  }
 
   update(dt: number, player: Player, wheel: number, wheelTouched: boolean): void {
     this.frame++;
@@ -88,7 +94,7 @@ export class CameraRig {
     }
     if (this.planeAutoZoom && player.mode !== 'plane') {
       this.planeAutoZoom = false;
-      this.zoomExpTarget = 0;
+      this.zoomExpTarget = 0.105;
     }
     this.zoomExpTarget = Math.max(0, Math.min(1, this.zoomExpTarget + wheel * 0.00045));
     this.zoomExp += (this.zoomExpTarget - this.zoomExp) * Math.min(1, dt * 7);

@@ -54,34 +54,36 @@ export function pickTree(
       if (tested.has(id)) continue;
       tested.add(id);
       if (!trees.hasTree(id)) continue;
-      const p = trees.paramsFor(id);
       const ux = c[id * 3], uy = c[id * 3 + 1], uz = c[id * 3 + 2];
       const rG = layers.topRadius(columns.topLayerOf(id));
       treeTangentFrame(ux, uy, uz, treeFrame);
-      const bx = ux * (rG - 0.2) + treeFrame[0] * p.offA + treeFrame[3] * p.offB;
-      const by = uy * (rG - 0.2) + treeFrame[1] * p.offA + treeFrame[4] * p.offB;
-      const bz = uz * (rG - 0.2) + treeFrame[2] * p.offA + treeFrame[5] * p.offB;
-      const trunkTop = 0.2 + p.trunk;
-      const apexH = trunkTop + p.canopy;
-      // closest approach between the ray (o + d·tt) and the tree axis (b + u·s)
-      const w0x = ox - bx, w0y = oy - by, w0z = oz - bz;
-      const bdot = dx * ux + dy * uy + dz * uz;
-      const d0 = dx * w0x + dy * w0y + dz * w0z;
-      const e = ux * w0x + uy * w0y + uz * w0z;
-      const denom = 1 - bdot * bdot;
-      let s = denom > 1e-6 ? e + bdot * ((bdot * e - d0) / denom) : -e;
-      s = Math.max(-0.3, Math.min(apexH, s));
-      let tt = bdot * s - d0;
-      tt = Math.max(0, Math.min(maxDist, tt));
-      const qx = ox + dx * tt - bx, qy = oy + dy * tt - by, qz = oz + dz * tt - bz;
-      const along = qx * ux + qy * uy + qz * uz;
-      if (along < -0.5 || along > apexH + 0.3) continue;
-      const offx = qx - ux * along, offy = qy - uy * along, offz = qz - uz * along;
-      const rad = Math.hypot(offx, offy, offz);
-      const allowed = along <= trunkTop
-        ? p.girth + 0.35
-        : p.spread * (1 - (along - trunkTop) / Math.max(0.001, p.canopy)) + 0.3;
-      if (rad <= allowed && (!best || tt < best.dist)) best = { tile: id, dist: tt };
+      const grove = typeof trees.groveTreesFor === 'function' ? trees.groveTreesFor(id) : [trees.paramsFor(id)];
+      for (const p of grove) {
+        const bx = ux * (rG - 0.2) + treeFrame[0] * p.offA + treeFrame[3] * p.offB;
+        const by = uy * (rG - 0.2) + treeFrame[1] * p.offA + treeFrame[4] * p.offB;
+        const bz = uz * (rG - 0.2) + treeFrame[2] * p.offA + treeFrame[5] * p.offB;
+        const trunkTop = 0.2 + p.trunk;
+        const apexH = trunkTop + p.canopy;
+        // closest approach between the ray (o + d·tt) and the tree axis (b + u·s)
+        const w0x = ox - bx, w0y = oy - by, w0z = oz - bz;
+        const bdot = dx * ux + dy * uy + dz * uz;
+        const d0 = dx * w0x + dy * w0y + dz * w0z;
+        const e = ux * w0x + uy * w0y + uz * w0z;
+        const denom = 1 - bdot * bdot;
+        let s = denom > 1e-6 ? e + bdot * ((bdot * e - d0) / denom) : -e;
+        s = Math.max(-0.3, Math.min(apexH, s));
+        let tt = bdot * s - d0;
+        tt = Math.max(0, Math.min(maxDist, tt));
+        const qx = ox + dx * tt - bx, qy = oy + dy * tt - by, qz = oz + dz * tt - bz;
+        const along = qx * ux + qy * uy + qz * uz;
+        if (along < -0.5 || along > apexH + 0.3) continue;
+        const offx = qx - ux * along, offy = qy - uy * along, offz = qz - uz * along;
+        const rad = Math.hypot(offx, offy, offz);
+        const allowed = along <= trunkTop
+          ? p.girth + 0.35
+          : p.spread * (1 - (along - trunkTop) / Math.max(0.001, p.canopy)) + 0.3;
+        if (rad <= allowed && (!best || tt < best.dist)) best = { tile: id, dist: tt };
+      }
     }
   }
   return best;

@@ -5,123 +5,404 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>Goldberg Planet</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='16,2 28,9 28,23 16,30 4,23 4,9' fill='%236fae4e' stroke='%232c4a22' stroke-width='2'/%3E%3C/svg%3E" />
+  <title>Goldberg Planet — Procedural Survival &amp; Interplanetary Sandbox</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='16,2 28,9 28,23 16,30 4,23 4,9' fill='%2338bdf8' stroke='%230f172a' stroke-width='2'/%3E%3C/svg%3E" />
   <style>
     :root {
-      --hotbar-slot: 50px;
-      --hotbar-gap: 5px;
+      --hotbar-slot: 56px;
+      --hotbar-gap: 6px;
       --ux-touch-target: 44px;
+      --ui-font: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono-font: 'Cascadia Mono', Consolas, ui-monospace, monospace;
     }
     html, body {
-      margin: 0; padding: 0; overflow: hidden; background: #05060a; height: 100%;
+      margin: 0; padding: 0; overflow: hidden; background: #05070d; height: 100%;
       user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
       touch-action: none; overscroll-behavior: none;
+      font-family: var(--ui-font);
     }
     #app { position: fixed; inset: 0; touch-action: none; }
     #app canvas { display: block; }
     .hud {
-      position: fixed; font-family: 'Cascadia Mono', Consolas, ui-monospace, monospace; font-size: 12px;
-      color: #cfd8e3; pointer-events: none; user-select: none; text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+      position: fixed; font-family: var(--ui-font); font-size: 12px;
+      color: #e2ecf7; pointer-events: none; user-select: none;
     }
+
+    /* --- Top-Left Real Game Vitals & Status Card --- */
     #vitals {
-      top: calc(8px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left));
-      font-size: 11px; color: #6d7d94; letter-spacing: 0.3px;
+      top: calc(10px + env(safe-area-inset-top));
+      left: calc(12px + env(safe-area-inset-left));
+      width: 248px;
+      background: linear-gradient(155deg, rgba(10, 16, 28, 0.84), rgba(6, 10, 18, 0.76));
+      border: 1px solid rgba(120, 175, 235, 0.26);
+      border-radius: 12px;
+      padding: 9px 11px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      pointer-events: auto;
+      z-index: 5;
     }
+    .vitals-top {
+      display: flex; align-items: center; justify-content: space-between; gap: 6px;
+      margin-bottom: 7px; padding-bottom: 5px;
+      border-bottom: 1px solid rgba(140, 175, 220, 0.16);
+    }
+    .vitals-world {
+      font-weight: 700; font-size: 12.5px; color: #f0f7ff; letter-spacing: 0.2px;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .vitals-fps {
+      font-family: var(--mono-font); font-size: 10px; color: #8ba4c4;
+    }
+    .menu-trigger-btn {
+      background: linear-gradient(180deg, rgba(38, 78, 128, 0.85), rgba(22, 48, 84, 0.85));
+      border: 1px solid rgba(110, 200, 255, 0.55);
+      color: #eaf6ff; border-radius: 6px; padding: 3px 8px;
+      font: 600 10.5px/1.2 var(--ui-font); cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+    .menu-trigger-btn:hover {
+      background: linear-gradient(180deg, rgba(52, 102, 162, 0.95), rgba(30, 66, 112, 0.95));
+      border-color: #7dd3fc;
+    }
+    .bar-row {
+      display: flex; flex-direction: column; gap: 2px; margin-bottom: 5px;
+    }
+    .bar-row:last-child { margin-bottom: 0; }
+    .bar-label {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 10.5px; font-weight: 600; color: #c4d6eb;
+    }
+    .bar-badge {
+      font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px;
+      letter-spacing: 0.3px;
+    }
+    .badge-regen { background: rgba(34, 197, 94, 0.22); color: #86efac; border: 1px solid rgba(74, 222, 128, 0.4); }
+    .badge-fed { background: rgba(245, 158, 11, 0.22); color: #fcd34d; border: 1px solid rgba(251, 191, 36, 0.4); }
+    .badge-warn { background: rgba(239, 68, 68, 0.25); color: #fca5a5; border: 1px solid rgba(248, 113, 113, 0.45); }
+    .bar-track {
+      height: 7px; width: 100%; background: rgba(15, 23, 38, 0.85);
+      border-radius: 99px; overflow: hidden;
+      border: 1px solid rgba(140, 170, 205, 0.18);
+    }
+    .bar-fill {
+      height: 100%; border-radius: 99px; transition: width 0.2s ease-out;
+    }
+    .fill-hp { background: linear-gradient(90deg, #ef4444, #22c55e); }
+    .fill-hunger { background: linear-gradient(90deg, #d97706, #fbbf24); }
+    .fill-shield { background: linear-gradient(90deg, #0284c7, #38bdf8); }
+
+    /* --- Top-Center Planetary Navigation Bar --- */
+    #planet-bar {
+      top: calc(10px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      pointer-events: auto; z-index: 4; max-width: 54vw;
+    }
+    #planet-bar .planet-pills {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 4px;
+      background: rgba(8, 13, 24, 0.78); border: 1px solid rgba(135, 175, 225, 0.25);
+      border-radius: 10px; padding: 4px 7px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+    #planet-bar button.planet-pill {
+      background: rgba(20, 30, 48, 0.72); border: 1px solid rgba(140, 170, 210, 0.24);
+      color: #c2d4ea; border-radius: 6px; padding: 3px 8px;
+      font: 600 10.5px/1.25 var(--ui-font);
+      cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    }
+    #planet-bar button.planet-pill:hover {
+      border-color: rgba(125, 211, 252, 0.75); color: #f0f9ff;
+    }
+    #planet-bar button.planet-pill.active {
+      background: linear-gradient(180deg, rgba(36, 92, 148, 0.88), rgba(22, 58, 98, 0.88));
+      border-color: #38bdf8; color: #ffffff;
+    }
+    #planet-bar .planet-status {
+      font-size: 10.5px; font-weight: 500; color: #c8dcf2;
+      background: rgba(8, 13, 24, 0.68);
+      border: 1px solid rgba(140, 170, 210, 0.18); border-radius: 99px; padding: 2px 11px;
+      white-space: nowrap;
+    }
+
+    /* --- Top-Right Live Survival Objective & Explanatory Guide Card --- */
+    #objective-card {
+      top: calc(10px + env(safe-area-inset-top));
+      right: calc(12px + env(safe-area-inset-right));
+      width: 276px;
+      background: linear-gradient(155deg, rgba(10, 18, 32, 0.84), rgba(7, 12, 22, 0.76));
+      border: 1px solid rgba(110, 200, 255, 0.26);
+      border-radius: 12px;
+      padding: 9px 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      pointer-events: auto;
+      z-index: 5;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    body.crafting-open #objective-card {
+      opacity: 0; pointer-events: none; transform: translateY(-6px);
+    }
+    .obj-header {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+      color: #38bdf8; margin-bottom: 3px;
+    }
+    .obj-title {
+      font-size: 12.5px; font-weight: 700; color: #f4f9ff; margin-bottom: 4px;
+    }
+    .obj-desc {
+      font-size: 11px; line-height: 1.4; color: #b6cae2; margin-bottom: 6px;
+    }
+    .obj-steps {
+      display: flex; flex-direction: column; gap: 3px;
+      font-size: 10.5px; color: #d4e4f7;
+    }
+    .obj-step {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .obj-step.done { color: #86efac; }
+    .obj-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: rgba(148, 163, 184, 0.45); flex-shrink: 0;
+    }
+    .obj-step.done .obj-dot { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+
     #diag {
-      top: calc(28px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left));
-      line-height: 1.55; white-space: pre; display: none;
-      background: rgba(8, 12, 20, 0.5); border: 1px solid rgba(140,160,190,0.14); border-radius: 8px;
-      padding: 8px 10px; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+      top: calc(148px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left));
+      font-family: var(--mono-font); font-size: 11px;
+      line-height: 1.5; white-space: pre; display: none;
+      background: rgba(8, 12, 20, 0.72); border: 1px solid rgba(140,160,190,0.2); border-radius: 8px;
+      padding: 8px 10px; backdrop-filter: blur(4px); z-index: 5;
     }
-    #help {
-      bottom: calc(12px + env(safe-area-inset-bottom)); left: calc(12px + env(safe-area-inset-left));
-      line-height: 1.6; color: #7e8fa5; white-space: pre; font-size: 11.5px;
-      opacity: 1; transition: opacity 0.7s;
-    }
-    #help.hide { opacity: 0; }
+    /* Hide legacy overlapping bottom-left monospace help block; replaced by Action Bar & Codex */
+    #help { display: none !important; }
+
     #msg {
-      bottom: calc(126px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
-      color: #dfe9f6; text-align: center; line-height: 1.5; max-width: 84vw;
-      opacity: 0; transition: opacity 0.3s;
-      background: rgba(8, 12, 20, 0.55); border: 1px solid rgba(140,160,190,0.16); border-radius: 9px;
-      padding: 5px 12px; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+      bottom: calc(114px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+      color: #f0f7ff; font-weight: 600; font-size: 12.5px; text-align: center; line-height: 1.4; max-width: 84vw;
+      opacity: 0; transition: opacity 0.25s;
+      background: rgba(10, 18, 32, 0.85); border: 1px solid rgba(110, 200, 255, 0.35); border-radius: 99px;
+      padding: 6px 16px; box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      z-index: 6;
     }
     #msg.on { opacity: 1; }
+
     #flight {
-      bottom: calc(96px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
-      color: #a8bcd6; font-size: 12px; letter-spacing: 0.6px; display: none; white-space: pre;
+      bottom: calc(148px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+      color: #e0f2fe; font-weight: 600; font-size: 12px; letter-spacing: 0.4px;
+      background: rgba(8, 22, 42, 0.78); border: 1px solid rgba(56, 189, 248, 0.42);
+      border-radius: 99px; padding: 4px 14px;
+      display: none; white-space: pre; z-index: 5;
     }
+
+    /* --- Action Dock Above Hotbar --- */
+    #build-strip {
+      bottom: calc(76px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+      color: #d8f3ff; font-size: 11.5px; font-weight: 500;
+      background: rgba(8, 15, 28, 0.82);
+      border: 1px solid rgba(96, 195, 250, 0.32); border-radius: 99px; padding: 4px 14px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+      white-space: nowrap; pointer-events: auto; cursor: pointer; z-index: 5;
+    }
+    #build-strip kbd {
+      background: rgba(38, 62, 96, 0.85); border: 1px solid rgba(135, 195, 255, 0.45);
+      border-radius: 4px; padding: 1px 5px; font: 700 10px var(--mono-font); color: #7dd3fc;
+      margin-right: 2px;
+    }
+
     #crosshair {
-      top: 50%; left: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px;
-      background: rgba(255,255,255,0.85); border-radius: 50%;
-      box-shadow: 0 0 3px rgba(0,0,0,0.9);
+      top: 50%; left: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px;
+      background: rgba(255,255,255,0.92); border-radius: 50%;
+      border: 1.5px solid rgba(15, 23, 42, 0.85);
+      box-shadow: 0 0 6px rgba(56, 189, 248, 0.7);
     }
+
     #splash {
       position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-      background: #05060a; color: #cfd8e3; font-family: Consolas, monospace; font-size: 14px;
-      z-index: 10; flex-direction: column; gap: 12px;
+      background: radial-gradient(circle at 50% 35%, #0f1c32 0%, #05070d 75%);
+      color: #e2ecf7; font-family: var(--ui-font); font-size: 15px; font-weight: 600;
+      z-index: 20; flex-direction: column; gap: 14px;
     }
-    #splash .bar { width: 260px; height: 3px; background: #1a2230; }
-    #splash .bar > div { height: 100%; width: 0%; background: #5b8fd6; transition: width 0.2s; }
+    #splash .bar { width: 280px; height: 5px; background: #162238; border-radius: 99px; overflow: hidden; }
+    #splash .bar > div { height: 100%; width: 0%; background: linear-gradient(90deg, #38bdf8, #818cf8); transition: width 0.2s; }
+
+    /* --- Redesigned Real-Game Hotbar with SVG Icons --- */
     #hotbar {
       bottom: calc(12px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
       display: flex; gap: var(--hotbar-gap); pointer-events: auto;
+      background: rgba(7, 12, 22, 0.74);
+      border: 1px solid rgba(135, 175, 225, 0.24);
+      padding: 5px 7px; border-radius: 13px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.52);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      z-index: 5;
     }
     #hotbar .slot {
-      width: var(--hotbar-slot); height: var(--hotbar-slot); position: relative; border-radius: 8px;
-      background: rgba(10, 14, 22, 0.5); border: 1.5px solid rgba(150, 165, 185, 0.3);
-      box-sizing: border-box; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+      width: var(--hotbar-slot); height: var(--hotbar-slot); position: relative; border-radius: 9px;
+      background: linear-gradient(160deg, rgba(20, 30, 48, 0.82), rgba(10, 16, 28, 0.88));
+      border: 1.5px solid rgba(145, 175, 215, 0.28);
+      box-sizing: border-box;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.15s, transform 0.12s;
     }
-    #hotbar .swatch {
-      position: absolute; inset: 8px; border-radius: 4px;
-      box-shadow: inset -2px -3px 0 rgba(0,0,0,0.25), inset 2px 2px 0 rgba(255,255,255,0.18);
+    #hotbar .slot:hover {
+      border-color: rgba(125, 211, 252, 0.75);
+      transform: translateY(-2px);
     }
-    #hotbar .key { position: absolute; top: 2px; left: 5px; font-size: 9px; color: #93a3b8; }
-    #hotbar .count { position: absolute; bottom: 2px; right: 5px; font-size: 11px; color: #eef3fa; text-shadow: 0 1px 2px rgba(0,0,0,0.9); }
+    #hotbar .slot-icon {
+      width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,0.65));
+    }
+    #hotbar .slot-icon svg {
+      width: 28px; height: 28px; display: block;
+    }
+    #hotbar .key {
+      position: absolute; top: 3px; left: 5px; right: 5px;
+      font-size: 8.5px; font-weight: 600; color: #b8cce4;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.95);
+    }
+    #hotbar .count {
+      position: absolute; bottom: 2px; right: 4px;
+      background: rgba(8, 14, 26, 0.85);
+      border: 1px solid rgba(145, 180, 225, 0.28);
+      border-radius: 5px; padding: 0 4px;
+      font-family: var(--mono-font); font-size: 10px; font-weight: 700; color: #f8fafc;
+    }
+
+    /* --- Crafting & Progression Panel --- */
     #crafting {
-      top: calc(18px + env(safe-area-inset-top)); right: calc(16px + env(safe-area-inset-right));
-      width: min(340px, calc(100vw - 32px)); max-height: min(70vh, 620px); overflow: auto;
+      top: calc(12px + env(safe-area-inset-top)); right: calc(14px + env(safe-area-inset-right));
+      width: min(370px, calc(100vw - 28px)); max-height: min(78vh, 690px); overflow: auto;
       pointer-events: auto; display: flex; flex-direction: column; gap: 7px;
-      background: rgba(7, 11, 18, 0.68); border: 1px solid rgba(165, 185, 210, 0.18); border-radius: 8px;
-      padding: 9px; box-sizing: border-box; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      background: linear-gradient(160deg, rgba(10, 17, 30, 0.92), rgba(6, 11, 20, 0.90));
+      border: 1px solid rgba(120, 185, 245, 0.32); border-radius: 12px;
+      padding: 11px; box-sizing: border-box;
+      box-shadow: 0 14px 36px rgba(0,0,0,0.6);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      z-index: 8;
     }
     #crafting.hide { display: none; }
     #crafting .craft-head {
       display: flex; align-items: center; justify-content: space-between;
-      color: #dce7f4; font-size: 12px; letter-spacing: 0; padding: 0 2px 2px;
+      color: #7dd3fc; font-weight: 700; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 0 2px 3px;
     }
     #crafting .craft-head span:last-child {
-      color: #8fa2bb; border: 1px solid rgba(165, 185, 210, 0.22); border-radius: 4px;
-      min-width: 20px; height: 18px; display: inline-flex; align-items: center; justify-content: center;
-      font-size: 10px;
+      color: #cfe4fa; border: 1px solid rgba(135, 185, 235, 0.32); border-radius: 5px;
+      min-width: 22px; height: 19px; display: inline-flex; align-items: center; justify-content: center;
+      font-family: var(--mono-font); font-size: 10px; padding: 0 6px; text-transform: none;
     }
     #crafting .craft-row {
-      display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px; align-items: start;
-      border-top: 1px solid rgba(165, 185, 210, 0.11); padding-top: 7px;
+      display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 9px; align-items: start;
+      border-top: 1px solid rgba(145, 175, 215, 0.14); padding-top: 8px;
     }
     #crafting button {
-      width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(180, 205, 230, 0.36);
-      background: rgba(34, 54, 75, 0.72); color: #eff7ff; font: 18px/1 Consolas, monospace;
-      cursor: pointer;
+      width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(145, 195, 245, 0.42);
+      background: rgba(30, 58, 92, 0.78); color: #f0f9ff; font: 700 16px/1 var(--ui-font);
+      cursor: pointer; transition: background 0.15s, transform 0.1s;
+    }
+    #crafting button:hover:not(:disabled) {
+      background: rgba(45, 88, 138, 0.92); transform: scale(1.04);
     }
     #crafting button:disabled {
-      cursor: default; color: #617189; border-color: rgba(130, 150, 175, 0.18);
-      background: rgba(18, 24, 34, 0.48);
+      cursor: default; color: #52637a; border-color: rgba(120, 140, 165, 0.16);
+      background: rgba(16, 22, 34, 0.52);
     }
-    #crafting .ready button { border-color: rgba(154, 220, 156, 0.62); color: #d8f4d5; }
+    #crafting .ready button {
+      border-color: rgba(74, 222, 128, 0.75);
+      background: linear-gradient(180deg, rgba(22, 101, 52, 0.85), rgba(20, 83, 45, 0.85));
+      color: #dcfce7;
+    }
     #crafting .craft-copy { min-width: 0; }
-    #crafting strong { color: #f0f5fb; font-weight: 600; font-size: 12px; }
-    #crafting p { margin: 2px 0 4px; color: #91a2b8; line-height: 1.35; font-size: 10.5px; }
+    #crafting strong { color: #f8fafc; font-weight: 700; font-size: 12px; }
+    #crafting p { margin: 2px 0 5px; color: #9cb2cc; line-height: 1.35; font-size: 10.5px; }
     #crafting .craft-req { display: flex; flex-wrap: wrap; gap: 4px; }
     #crafting .craft-req span {
-      border-radius: 4px; border: 1px solid rgba(165, 185, 210, 0.13);
-      padding: 2px 5px; color: #aebdd0; font-size: 9.5px; line-height: 1.2;
+      border-radius: 5px; border: 1px solid rgba(165, 185, 210, 0.16);
+      padding: 2px 6px; color: #b8cae0; font-size: 9.5px; font-weight: 600; line-height: 1.2;
     }
-    #crafting .craft-req .ok { color: #cfe8c9; border-color: rgba(146, 206, 143, 0.28); }
-    #crafting .craft-req .miss { color: #d0a69b; border-color: rgba(218, 141, 118, 0.22); }
+    #crafting .craft-req .ok { color: #bbf7d0; border-color: rgba(74, 222, 128, 0.38); background: rgba(22, 101, 52, 0.25); }
+    #crafting .craft-req .miss { color: #fecaca; border-color: rgba(248, 113, 113, 0.28); background: rgba(127, 29, 29, 0.22); }
 
-    /* --- touch controls (enabled by adding .touch to body) --- */
+    /* --- Interactive Main Menu & Survival/Planetary Codex Modal --- */
+    #game-menu {
+      position: fixed; inset: 0; z-index: 15;
+      background: radial-gradient(circle at 50% 25%, rgba(12, 26, 48, 0.82), rgba(4, 7, 14, 0.90));
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px; box-sizing: border-box;
+      pointer-events: auto;
+    }
+    #game-menu.hide { display: none; }
+    .menu-card {
+      width: min(880px, 95vw); max-height: min(86vh, 720px);
+      background: linear-gradient(165deg, rgba(12, 20, 36, 0.96), rgba(7, 12, 22, 0.96));
+      border: 1px solid rgba(110, 195, 255, 0.36);
+      border-radius: 16px;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.75);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .menu-header {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+      padding: 16px 22px;
+      background: linear-gradient(90deg, rgba(20, 42, 74, 0.55), rgba(12, 24, 44, 0.25));
+      border-bottom: 1px solid rgba(125, 185, 245, 0.22);
+    }
+    .menu-brand h1 {
+      margin: 0; font-size: 20px; font-weight: 800; letter-spacing: 0.4px;
+      background: linear-gradient(90deg, #f8fafc, #7dd3fc);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .menu-brand p {
+      margin: 3px 0 0; font-size: 11.5px; color: #94b2d4;
+    }
+    .menu-actions {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .btn-resume {
+      background: linear-gradient(180deg, #0ea5e9, #0284c7);
+      border: 1px solid #7dd3fc; color: #ffffff;
+      border-radius: 8px; padding: 8px 18px;
+      font: 700 12.5px/1 var(--ui-font); cursor: pointer;
+      box-shadow: 0 4px 14px rgba(14, 165, 233, 0.4);
+    }
+    .btn-resume:hover { background: linear-gradient(180deg, #38bdf8, #0ea5e9); }
+    .menu-tabs {
+      display: flex; gap: 6px; padding: 10px 22px 0;
+      border-bottom: 1px solid rgba(125, 175, 230, 0.16);
+    }
+    .menu-tab {
+      background: transparent; border: none; border-bottom: 2.5px solid transparent;
+      color: #8da8c8; padding: 8px 14px; font: 700 12px var(--ui-font); cursor: pointer;
+    }
+    .menu-tab.active {
+      color: #38bdf8; border-bottom-color: #38bdf8;
+    }
+    .menu-body {
+      padding: 18px 22px; overflow-y: auto; display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)); gap: 12px;
+    }
+    .codex-box {
+      background: rgba(16, 26, 44, 0.72);
+      border: 1px solid rgba(130, 175, 225, 0.2);
+      border-radius: 10px; padding: 12px 14px;
+    }
+    .codex-box h3 {
+      margin: 0 0 6px; font-size: 13px; color: #e0f2fe; display: flex; align-items: center; gap: 6px;
+    }
+    .codex-box p {
+      margin: 0; font-size: 11.5px; line-height: 1.45; color: #abc2dc;
+    }
+    .codex-tag {
+      display: inline-block; margin-top: 7px; padding: 2px 7px; border-radius: 4px;
+      background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35);
+      font-size: 10px; font-weight: 600; color: #7dd3fc;
+    }
+
+    /* --- touch controls --- */
     #joy {
       position: fixed; width: 128px; height: 128px; border-radius: 50%; display: none;
       background: rgba(10, 14, 24, 0.25); border: 1.5px solid rgba(165, 185, 210, 0.28);
@@ -135,9 +416,8 @@
       position: fixed; border-radius: 50%; display: none; z-index: 5;
       background: rgba(10, 14, 24, 0.38); border: 1.5px solid rgba(165, 185, 210, 0.34);
       color: #dfe8f4; pointer-events: auto; user-select: none;
-      font-family: 'Cascadia Mono', Consolas, ui-monospace, monospace;
+      font-family: var(--mono-font);
       align-items: center; justify-content: center; flex-direction: column; line-height: 1.1;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
     }
     .tbtn.press { background: rgba(95, 125, 175, 0.5); border-color: rgba(200, 218, 240, 0.6); }
     .tbtn .sub { font-size: 9px; color: #9fb0c6; }
@@ -156,87 +436,37 @@
     #btn-plane.ready { border-color: rgba(150, 210, 145, 0.7); color: #cdeec8; }
     #btn-craft {
       width: 66px; height: 42px; font-size: 11px; border-radius: 8px;
-      left: calc(10px + env(safe-area-inset-left)); top: calc(58px + env(safe-area-inset-top));
+      left: calc(10px + env(safe-area-inset-left)); top: calc(148px + env(safe-area-inset-top));
     }
     #btn-craft.active { border-color: rgba(255, 210, 105, 0.58); color: #ffe1a0; }
     body.touch #btn-craft { display: flex; }
     body.touch.crafting-open #btn-jump,
     body.touch.crafting-open #btn-down,
     body.touch.crafting-open #btn-plane { display: none !important; }
-
-    body.touch #help { display: none; }
     body.touch #crosshair { display: none; }
     body.touch #btn-jump { display: flex; }
     body.touch #btn-down.show { display: flex; }
     body.touch #btn-plane.show { display: flex; }
     body.touch { --hotbar-slot: 46px; --hotbar-gap: 5px; }
-    body.touch #hotbar .key { display: none; }
-    body.touch #crafting {
-      top: auto; left: calc(10px + env(safe-area-inset-left)); right: calc(10px + env(safe-area-inset-right));
-      bottom: calc(174px + env(safe-area-inset-bottom)); width: auto; max-height: 42vh;
-    }
-    body.ux-gamepad #crafting .craft-head span:last-child {
-      min-width: 44px;
-    }
-    body.ux-laptop #crafting{ max-height: min(62vh, 540px); }
-    body.ux-compact #diag {
-      max-width: calc(100vw - 20px); max-height: 46vh; overflow: auto;
-      white-space: pre-wrap;
-    }
     body.ux-phone { --hotbar-slot: 42px; --hotbar-gap: 4px; }
-    body.ux-phone #vitals {
-      left: calc(74px + env(safe-area-inset-left));
-      right: calc(10px + env(safe-area-inset-right));
-      max-width: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      font-size: 10px;
-    }
-    body.ux-phone #msg {
-      bottom: calc(72px + var(--hotbar-slot) + env(safe-area-inset-bottom));
-      max-width: calc(100vw - 34px);
-    }
-    body.ux-phone #flight { bottom: calc(62px + var(--hotbar-slot) + env(safe-area-inset-bottom)); }
-    body.ux-phone #crafting{
-      left: calc(8px + env(safe-area-inset-left));
-      right: calc(8px + env(safe-area-inset-right));
-      bottom: calc(158px + env(safe-area-inset-bottom));
-      max-height: 43vh;
-      padding: 8px;
-    }
-    body.ux-phone #btn-jump {
-      width: 72px; height: 72px;
-      right: calc(18px + env(safe-area-inset-right)); bottom: calc(108px + env(safe-area-inset-bottom));
-    }
-    body.ux-phone #btn-plane {
-      right: calc(24px + env(safe-area-inset-right)); bottom: calc(202px + env(safe-area-inset-bottom));
-    }
-    body.ux-phone #btn-craft {
-      left: calc(8px + env(safe-area-inset-left)); top: calc(58px + env(safe-area-inset-top));
-      width: 64px;
-    }
-    body.ux-phone #btn-down {
-      right: calc(104px + env(safe-area-inset-right)); bottom: calc(88px + env(safe-area-inset-bottom));
-    }
-    body.ux-tablet.touch { --hotbar-slot: 52px; --hotbar-gap: 6px; }
-    body.ux-tablet.touch #btn-jump { width: 88px; height: 88px; font-size: 30px; }
-    body.ux-tablet.touch #btn-plane,
-    body.ux-tablet.touch #btn-down { width: 66px; height: 66px; }
-    body.ux-phone.ux-landscape #crafting{ max-height: 58vh; bottom: calc(72px + env(safe-area-inset-bottom)); }
-    @media (max-width: 480px) {
-      #crafting { font-size: 11px; }
-    }
+    body.ux-phone #objective-card { display: none; }
   </style>
 </head>
 <body>
   <div id="app"></div>
-  <div id="splash"><div>forging planet…</div><div class="bar"><div id="splashbar"></div></div><div id="splashmsg" style="color:#5f7189;font-size:12px"></div></div>
+  <div id="splash"><div>Forging Procedural Solar System…</div><div class="bar"><div id="splashbar"></div></div><div id="splashmsg" style="color:#7da0c4;font-size:12px"></div></div>
   <div id="vitals" class="hud"></div>
+  <div id="planet-bar" class="hud"></div>
+  <div id="objective-card" class="hud"></div>
   <div id="diag" class="hud"></div>
   <div id="msg" class="hud"></div>
   <div id="flight" class="hud"></div>
+  <div id="build-strip" class="hud"></div>
   <div id="crosshair" class="hud"></div>
   <div id="crafting" class="hud hide"></div>
   <div id="hotbar" class="hud"></div>
   <div id="help" class="hud"></div>
+  <div id="game-menu" class="hide"></div>
   <div id="joy"><div id="joyknob"></div></div>
   <div id="btn-jump" class="tbtn">▲</div>
   <div id="btn-down" class="tbtn">▼</div>

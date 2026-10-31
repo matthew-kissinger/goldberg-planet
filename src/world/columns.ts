@@ -3,23 +3,33 @@
  *
  * - Unedited columns store nothing but a lazily-filled surface layer index (2 bytes/tile)
  *   plus a cached height (4 bytes/tile): O(surface tiles) total, independent of planet volume.
- * - Edited columns get a sparse 96-bit solid mask + 96-bit "player placed" mask, only for
+ * - Edited columns get a sparse solid mask + "player placed" mask, only for
  *   tiles actually touched. Arbitrary solid/empty runs per column: tunnels and overhangs work.
+ * - Supports cross-planet ecosystem seeding (`seededEcoTiles`) so high-tier Eco-Pods can
+ *   establish living biomes on barren worlds.
  * - Everything is derived deterministically from the seed; a released region regenerates
  *   identically (edits persist independently of residency).
  */
 
 import type { Goldberg } from '../geo/goldberg';
 import type { Layers } from './layers';
-import { PLANET_RADIUS } from './layers';
 import { MAT, type MaterialId, Terrain } from './terrain';
 import { NATURAL_VOID_SCAN_LAYERS, NaturalCaves, type NaturalVoidKind, type NaturalVoidSample } from './caves';
+import { evaluatePentagonWonder, type PentagonWonderEvaluation } from './planetRecipe';
 
 export interface ColumnEdit {
   solid: Uint32Array;
   placed: Uint32Array;
   /** material id per placed cell; allocated on first place (0/absent = legacy BUILT) */
   mat?: Uint8Array;
+}
+
+export interface SerializedColumnEdit {
+  tile: number;
+  solid: number[];
+  placed: number[];
+  /** Sparse [layerIndex, materialId] pairs for placed cells */
+  mat?: Array<[number, number]>;
 }
 
 const TOP_SENTINEL = -32768;
@@ -50,6 +60,8 @@ export class Columns {
   private readonly caves: NaturalCaves;
   /** sparse: only edited tiles */
   readonly edits = new Map<number, ColumnEdit>();
+  /** tiles terraformed via cross-planet Ecosystem Seed Pods */
+  readonly seededEcoTiles = new Set<number>();
   generatedCount = 0;
 
   constructor(geo: Goldberg, layers: Layers, terrain: Terrain) {
@@ -60,7 +72,7 @@ export class Columns {
     this.tops = new Int16Array(geo.count).fill(TOP_SENTINEL);
     this.heights = new Float32Array(geo.count).fill(NaN);
     this.naturalVoidFlags = new Int8Array(geo.count).fill(VOID_FLAG_UNKNOWN);
-    this.caves = new NaturalCaves(terrain.seed);
+    this.caves = new NaturalCaves(terrain.seed, layers.planetRadius, layers.waterSurface);
   }
 
   /** surface height (m, relative to planet radius) — generates on demand, deterministic. */
@@ -69,11 +81,41 @@ export class Columns {
     if (Number.isNaN(h)) {
       const c = this.geo.centers;
       h = this.terrain.heightAt(c[id * 3], c[id * 3 + 1], c[id * 3 + 2]);
+      if (this.terrain.archetype !== 'terran' && id >= 0 && id < 12) {
+        const wonder = evaluatePentagonWonder(this.geo, id, this.terrain.config.pentagonWonder);
+        h = Math.max(-35, Math.min(115, h + wonder.heightDelta));
+      }
       this.heights[id] = h;
-      this.tops[id] = this.layers.layerOfRadius(PLANET_RADIUS + h);
+      this.tops[id] = this.layers.layerOfRadius(this.layers.planetRadius + h);
       this.generatedCount++;
     }
     return h;
+  }
+
+  /** Evaluate Pentagon Wonder properties for `id` ("The Twelve Bells"). */
+  pentagonWonderOf(id: number): PentagonWonderEvaluation {
+    return evaluatePentagonWonder(this.geo, id, this.terrain.config.pentagonWonder);
+  }
+
+  /** Seed a living ecosystem oasis on `tileId` and its immediate ring of neighbors. */
+  seedEcosystem(tileId: number, includeNeighbors = true): number[] {
+    const affected: number[] = [];
+    if (tileId < 0 || tileId >= this.geo.count) return affected;
+    if (!this.seededEcoTiles.has(tileId)) {
+      this.seededEcoTiles.add(tileId);
+      affected.push(tileId);
+    }
+    if (includeNeighbors) {
+      const deg = this.geo.degrees[tileId];
+      for (let e = 0; e < deg; e++) {
+        const n = this.geo.nbrs[tileId * 6 + e];
+        if (!this.seededEcoTiles.has(n)) {
+          this.seededEcoTiles.add(n);
+          affected.push(n);
+        }
+      }
+    }
+    return affected;
   }
 
   /** default (pre-edit) surface layer of the column */
@@ -162,7 +204,25 @@ export class Columns {
     return null;
   }
 
+  /**
+   * Evaluate whether `id` hosts a Volumetric Floating Sky-Island layer band `[topK .. botK]`
+   * suspended high above the ground (`k < topLayerOf(id)`).
+   */
+  skyIslandRange(id: number): { topK: number; botK: number; isRim: boolean } | null {
+    if (!this.terrain.config.hasFloatingIslands) return null;
+    const c = this.geo.centers;
+    const h = this.heightOf(id);
+    const sample = this.caves.sampleSkyIsland(c[id * 3], c[id * 3 + 1], c[id * 3 + 2], h);
+    if (!sample) return null;
+    const topK = Math.max(1, this.layers.layerOfRadius(this.layers.planetRadius + sample.topHeight));
+    const botK = Math.min(this.topLayerOf(id) - 10, this.layers.layerOfRadius(this.layers.planetRadius + sample.bottomHeight));
+    if (botK < topK) return null;
+    return { topK, botK, isRim: sample.isRim };
+  }
+
   private defaultSolidAt(id: number, k: number): boolean {
+    const sky = this.skyIslandRange(id);
+    if (sky && k >= sky.topK && k <= sky.botK) return true;
     return k >= this.topLayerOf(id) && !this.naturalVoidAt(id, k);
   }
 
@@ -173,13 +233,15 @@ export class Columns {
     return this.defaultSolidAt(id, k);
   }
 
-  /** materialize the default mask for a tile (solid from topLayer down) */
+  /** materialize the default mask for a tile (solid from topLayer or skyIsland down) */
   private materialize(id: number): ColumnEdit {
     let e = this.edits.get(id);
     if (e) return e;
     const top = this.topLayerOf(id);
+    const sky = this.skyIslandRange(id);
+    const startK = sky ? Math.min(sky.topK, top) : top;
     const solid = new Uint32Array(this.words);
-    for (let k = Math.max(0, top); k < this.layers.L; k++) {
+    for (let k = Math.max(0, startK); k < this.layers.L; k++) {
       if (this.defaultSolidAt(id, k)) solid[k >> 5] |= 1 << (k & 31);
     }
     e = { solid, placed: new Uint32Array(this.words) };
@@ -223,13 +285,47 @@ export class Columns {
     }
     if (k >= this.layers.L - 1) return MAT.BEDROCK;
     const top = this.topLayerOf(id);
+    const sky = this.skyIslandRange(id);
+    if (sky && k >= sky.topK && k <= sky.botK) {
+      if (k === sky.topK) {
+        if (this.terrain.archetype === 'biolum') return MAT.MYCELIUM;
+        if (this.terrain.archetype === 'canyon') return MAT.TERRACOTTA;
+        if (this.terrain.archetype === 'shattered') return MAT.CRYSTAL;
+        return MAT.GRASS;
+      }
+      if (k === sky.botK && !sky.isRim) return MAT.CRYSTAL;
+      if (k === sky.topK + 1) return MAT.DIRT;
+      return MAT.ROCK;
+    }
+
     const h = this.heightOf(id);
     const depth = k - top;
-    if (depth <= 0) return this.terrain.surfaceMaterial(h);
-    const surf = this.terrain.surfaceMaterial(h);
-    if (depth <= 3 && (surf === MAT.GRASS || surf === MAT.SAND)) return MAT.DIRT;
+    const c = this.geo.centers;
+    const cx = c[id * 3], cy = c[id * 3 + 1], cz = c[id * 3 + 2];
+
+    if (depth <= 0) {
+      if (this.seededEcoTiles.has(id)) {
+        return this.terrain.archetype === 'biolum' ? MAT.GRASS : MAT.MYCELIUM;
+      }
+      if (this.terrain.archetype !== 'terran' && id >= 0 && id < 12) {
+        const wonder = evaluatePentagonWonder(this.geo, id, this.terrain.config.pentagonWonder);
+        if (wonder.materialOverride !== null) return wonder.materialOverride;
+      }
+      return this.terrain.surfaceMaterial(h, cx, cy, cz);
+    }
+
+    // Deep abyssal caverns expose glowing crystal veins along cavern roofs/floors
+    if (depth >= 16 && ((id + k) % 5 === 0) && (this.naturalVoidAt(id, k - 1)?.crystalVein || this.naturalVoidAt(id, k + 1)?.crystalVein)) {
+      return MAT.CRYSTAL;
+    }
+
+    const surf = this.terrain.surfaceMaterial(h, cx, cy, cz);
+    if (depth <= 3 && (surf === MAT.GRASS || surf === MAT.SAND || surf === MAT.MYCELIUM || surf === MAT.TERRACOTTA)) {
+      return this.terrain.subsurfaceMaterial(surf);
+    }
     if (depth <= 2 && surf === MAT.SEABED) return MAT.SEABED;
-    return MAT.ROCK;
+    if (depth <= 4 && surf === MAT.ICE) return MAT.ICE;
+    return this.terrain.archetype === 'volcanic' ? MAT.BASALT : MAT.ROCK;
   }
 
   /**
@@ -253,6 +349,50 @@ export class Columns {
       if (this.solidAt(id, k)) return k;
     }
     return -1;
+  }
+
+  /** Export sparse column edits for save/multiplayer persistence. */
+  exportEdits(): SerializedColumnEdit[] {
+    const out: SerializedColumnEdit[] = [];
+    const sortedTiles = [...this.edits.keys()].sort((a, b) => a - b);
+    for (const tile of sortedTiles) {
+      const e = this.edits.get(tile)!;
+      const matPairs: Array<[number, number]> = [];
+      if (e.mat) {
+        for (let k = 0; k < e.mat.length; k++) {
+          if (e.mat[k] !== 0 && (e.placed[k >> 5] & (1 << (k & 31))) !== 0) {
+            matPairs.push([k, e.mat[k]]);
+          }
+        }
+      }
+      out.push({
+        tile,
+        solid: Array.from(e.solid),
+        placed: Array.from(e.placed),
+        ...(matPairs.length > 0 ? { mat: matPairs } : {}),
+      });
+    }
+    return out;
+  }
+
+  /** Restore sparse column edits from save/multiplayer state. */
+  importEdits(list: readonly SerializedColumnEdit[]): void {
+    this.edits.clear();
+    for (const item of list) {
+      if (!Number.isInteger(item.tile) || item.tile < 0 || item.tile >= this.geo.count) continue;
+      const solid = new Uint32Array(this.words);
+      const placed = new Uint32Array(this.words);
+      for (let i = 0; i < Math.min(this.words, item.solid.length); i++) solid[i] = item.solid[i] >>> 0;
+      for (let i = 0; i < Math.min(this.words, item.placed.length); i++) placed[i] = item.placed[i] >>> 0;
+      let mat: Uint8Array | undefined;
+      if (item.mat && item.mat.length > 0) {
+        mat = new Uint8Array(this.layers.L);
+        for (const [k, m] of item.mat) {
+          if (k >= 0 && k < this.layers.L) mat[k] = m;
+        }
+      }
+      this.edits.set(item.tile, { solid, placed, mat });
+    }
   }
 
   /** rough storage accounting for measurements/tests */

@@ -25,6 +25,12 @@ const COLORS: Record<number, [number, number, number]> = {
   [MAT.BUILT]: lin(0x9aa7b8),
   [MAT.SEABED]: lin(0x6e6a4e),
   [MAT.WOOD]: lin(0xa8763f),
+  [MAT.ICE]: lin(0x7cd4f0),
+  [MAT.TERRACOTTA]: lin(0xc86442),
+  [MAT.BASALT]: lin(0x383a42),
+  [MAT.CRYSTAL]: lin(0x6ce8e0),
+  [MAT.MAGMA]: lin(0xff5a18),
+  [MAT.MYCELIUM]: lin(0x28b89a),
 };
 
 const VARIANT_RAMPS: Record<number, readonly [number, number, number][]> = {
@@ -37,11 +43,22 @@ const VARIANT_RAMPS: Record<number, readonly [number, number, number][]> = {
   [MAT.BUILT]: [lin(0x8f9baa), lin(0xa7b2bf), lin(0x9fa88f), lin(0x8d9999)],
   [MAT.SEABED]: [lin(0x5f6348), lin(0x777053), lin(0x596b60), lin(0x74684d)],
   [MAT.WOOD]: [lin(0x8f6135), lin(0xb17b44), lin(0x7c5c38), lin(0xaa7048)],
+  [MAT.ICE]: [lin(0x66c8ea), lin(0x88def6), lin(0x54b4dc), lin(0xa2ecfc)],
+  [MAT.TERRACOTTA]: [lin(0xb85234), lin(0xd4714a), lin(0xa2462e), lin(0xe0885a)],
+  [MAT.BASALT]: [lin(0x2e3038), lin(0x3f424c), lin(0x35363d), lin(0x484b56)],
+  [MAT.CRYSTAL]: [lin(0x54e2dc), lin(0x88f4ff), lin(0x7898ff), lin(0x60f8d0)],
+  [MAT.MAGMA]: [lin(0xff4810), lin(0xff781c), lin(0xd82c08), lin(0xffa428)],
+  [MAT.MYCELIUM]: [lin(0x22a88c), lin(0x34c8a8), lin(0x4298b8), lin(0x2ad89e)],
 };
 
-/** tree part colors (linear), tinted per tree by the mesher */
+/** tree & flora part colors (linear), tinted per tree by the mesher */
 export const TRUNK_COLOR = lin(0x5d4128);
 export const LEAF_COLOR = lin(0x3d7a33);
+export const BROADLEAF_COLOR = lin(0x56983c);
+export const CACTUS_COLOR = lin(0x4b8b3b);
+export const FUNGAL_STEM_COLOR = lin(0x88b8c6);
+export const FUNGAL_CAP_COLOR = lin(0x28e2c4);
+export const CRYSTAL_FLORA_COLOR = lin(0x6cf0ff);
 
 function clamp01(value: number): number {
   return value < 0 ? 0 : value > 1 ? 1 : value;
@@ -58,7 +75,7 @@ function mixColor(a: readonly number[], b: readonly number[], t: number, out: [n
 /**
  * Material color with deterministic per-tile swatches so each hex material has
  * texture-like variation without adding texture maps, material splits, or draw calls.
- * Pentagons retain a gentle warm boost so the twelve of them are spottable.
+ * Pentagons retain a gentle warm/harmonic boost so the twelve of them are spottable.
  */
 export function materialColor(mat: number, tileId: number, isPentagon: boolean, out: Float32Array | number[], o = 0): void {
   const ramp = VARIANT_RAMPS[mat] ?? [COLORS[mat] ?? COLORS[MAT.ROCK]];
@@ -69,6 +86,9 @@ export function materialColor(mat: number, tileId: number, isPentagon: boolean, 
   const base = mixColor(ramp[index], ramp[(index + 1) % ramp.length], blend * 0.22, [0, 0, 0]);
   const tint = 0.9 + 0.2 * tintSeed;
   let r = base[0] * tint, g = base[1] * tint, b = base[2] * tint;
-  if (isPentagon) { r = Math.min(1, r * 1.25 + 0.02); g = Math.min(1, g * 1.08); }
+  if (isPentagon) {
+    r = Math.min(1, r * 1.25 + 0.02);
+    g = Math.min(1, g * 1.08);
+  }
   out[o] = clamp01(r); out[o + 1] = clamp01(g); out[o + 2] = clamp01(b);
 }

@@ -14,7 +14,15 @@ export type CharacterAction =
 /** what the character holds in the right hand: bare mittens or an inventory item */
 export type CharacterPropId = ItemId | 'hands';
 
-export const CHARACTER_PROP_IDS: readonly CharacterPropId[] = ['hands', 'wood', 'planeFrame'] as const;
+export const CHARACTER_PROP_IDS: readonly CharacterPropId[] = [
+  'hands',
+  'wood',
+  'hatchet',
+  'pickaxe',
+  'spear',
+  'cooked_meat',
+  'planeFrame',
+] as const;
 
 export interface CharacterVisualState {
   action: CharacterAction;
