@@ -16,6 +16,11 @@ const DIST_MAX = 4200;
 /** zoom exponent that puts the boom ~15 m behind the plane */
 const PLANE_CAM_EXP = Math.log(15 / DIST_MIN) / Math.log(DIST_MAX / DIST_MIN);
 
+/** Preserve sub-metre surface depth at orbit while keeping the nearby explorer/skiff in view. */
+export function nearPlaneForView(surfaceDistance: number, playerDistance: number): number {
+  return Math.max(0.5, Math.min(20, surfaceDistance * 0.005, playerDistance * 0.15));
+}
+
 function smoothstep(a: number, b: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
@@ -109,6 +114,13 @@ export class CameraRig {
       tx = eye[0] * (1 - blend); ty = eye[1] * (1 - blend); tz = eye[2] * (1 - blend);
     }
     this.aim(dt, player, ux, uy, uz, blend * 0.95, tx, ty, tz);
+    const viewDistance = Math.max(this.dist, Math.hypot(this.world.x, this.world.y, this.world.z) - this.layers.planetRadius);
+    const playerDistance = Math.hypot(this.world.x - player.px, this.world.y - player.py, this.world.z - player.pz);
+    const near = nearPlaneForView(viewDistance, playerDistance);
+    if (this.camera.near !== near) {
+      this.camera.near = near;
+      this.camera.updateProjectionMatrix();
+    }
   }
 
   private updateZoom(dt: number, player: Player, wheel: number, wheelTouched: boolean): void {

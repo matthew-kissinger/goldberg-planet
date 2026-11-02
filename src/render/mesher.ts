@@ -17,6 +17,7 @@ import type { Columns } from '../world/columns';
 import type { ChunkInfo } from '../world/chunks';
 import { treeTangentFrame, type TreeParams, type Trees } from '../world/trees';
 import { MAT } from '../world/terrain';
+import type { PlanetArchetype } from '../world/planetConfig';
 import {
   BROADLEAF_COLOR,
   CACTUS_COLOR,
@@ -149,10 +150,10 @@ export function buildChunkMesh(
       const below = solidHere(k + 1) || k === L - 1;
       if (above && below) continue;
       if (!above) {
-        emitCap(deg, bounds[k], tcx, tcy, tcz, ax, ay, az, false, columns.materialAt(id, k), id, isPent, moist);
+        emitCap(deg, bounds[k], tcx, tcy, tcz, ax, ay, az, false, columns.materialAt(id, k), id, isPent, moist, columns.terrain.archetype);
       }
       if (!below && k < L - 1) {
-        emitCap(deg, bounds[k + 1], tcx, tcy, tcz, ax, ay, az, true, columns.materialAt(id, k), id, isPent, moist);
+        emitCap(deg, bounds[k + 1], tcx, tcy, tcz, ax, ay, az, true, columns.materialAt(id, k), id, isPent, moist, columns.terrain.archetype);
       }
     }
 
@@ -169,7 +170,7 @@ export function buildChunkMesh(
         const mat = exposed ? columns.materialAt(id, k) : -1;
         if (exposed && bandStart === -1) { bandStart = k; bandMat = mat; }
         else if (bandStart !== -1 && (!exposed || mat !== bandMat)) {
-          emitWall(cAx, cAy, cAz, cBx, cBy, cBz, bounds[bandStart], bounds[k], tcx, tcy, tcz, ax, ay, az, bandMat, id, isPent, moist);
+          emitWall(cAx, cAy, cAz, cBx, cBy, cBz, bounds[bandStart], bounds[k], tcx, tcy, tcz, ax, ay, az, bandMat, id, isPent, moist, columns.terrain.archetype);
           bandStart = exposed ? k : -1;
           bandMat = mat;
         }
@@ -178,8 +179,11 @@ export function buildChunkMesh(
   }
 
   // --- flora / trees (into the same buffers: they stream, release, and rebuild with the chunk) ---
-  if (trees) {
+  // Rebuilt expedition worlds are owned by the shared vegetation kit, including
+  // player-seeded trees. Worker chunk meshes must never duplicate legacy flora.
+  if (trees && !columns.terrain.aurelia && !columns.terrain.expeditionWorld) {
     for (const id of chunk.tiles) {
+      // Composed habitat instances share interaction identities, but own their art.
       if (trees.hasTree(id)) {
         const rG = layers.topRadius(columns.topLayerOf(id));
         const dmg = trees.damageOf(id);
@@ -214,9 +218,9 @@ function emitCap(
   ncx: number, ncy: number, ncz: number,
   ax: number, ay: number, az: number,
   flip: boolean, mat: number, tileId: number, isPent: boolean,
-  moist: number,
+  moist: number, archetype: PlanetArchetype,
 ): void {
-  materialColor(mat, tileId, isPent, colorScratch);
+  materialColor(mat, tileId, isPent, colorScratch, 0, archetype);
   const cr = colorScratch[0], cg = colorScratch[1], cb = colorScratch[2];
   const nx = flip ? -ncx : ncx, ny = flip ? -ncy : ncy, nz = flip ? -ncz : ncz;
   const packed = encodePackedMat(mat, false, isPent, false, moist);
@@ -386,9 +390,9 @@ function emitWall(
   tcx: number, tcy: number, tcz: number,
   ax: number, ay: number, az: number,
   mat: number, tileId: number, isPent: boolean,
-  moist: number,
+  moist: number, archetype: PlanetArchetype,
 ): void {
-  materialColor(mat, tileId, isPent, colorScratch);
+  materialColor(mat, tileId, isPent, colorScratch, 0, archetype);
   const cr = colorScratch[0], cg = colorScratch[1], cb = colorScratch[2];
   const packed = encodePackedMat(mat, true, isPent, false, moist);
   const v0x = cAx * rTop, v0y = cAy * rTop, v0z = cAz * rTop;

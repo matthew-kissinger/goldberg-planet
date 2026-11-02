@@ -62,9 +62,19 @@ export class WaterfallRenderer {
 
   clear(): void {
     for (const node of this.nodes.values()) {
-      this.group.remove(node.mesh);
+      this.releaseNode(node);
     }
     this.nodes.clear();
+  }
+
+  /** Nodes own geometry; water/foam materials belong to the renderer and survive streaming. */
+  private releaseNode(node: HydroNode): void {
+    this.group.remove(node.mesh);
+    const geometries = new Set<THREE.BufferGeometry>();
+    node.mesh.traverse((part) => {
+      if (part instanceof THREE.Mesh) geometries.add(part.geometry);
+    });
+    for (const geometry of geometries) geometry.dispose();
   }
 
   private syncPalette(columns: Columns): void {
@@ -182,7 +192,7 @@ export class WaterfallRenderer {
     for (const [key, node] of this.nodes) {
       const d = Math.hypot(node.wx - player.px, node.wy - player.py, node.wz - player.pz);
       if (d > 135) {
-        this.group.remove(node.mesh);
+        this.releaseNode(node);
         this.nodes.delete(key);
       }
     }

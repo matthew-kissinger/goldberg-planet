@@ -16,6 +16,7 @@ import {
 import { PLANET_RADIUS, WATER_SURFACE } from '../world/layers';
 import type { PlanetConfig } from '../world/planetConfig';
 import { mulberry32 } from '../util/prng';
+import { hasAtmosphere, planetVisualProfile, PLANET_VISUAL_PROFILES } from './planetVisualProfile';
 
 const BASE_RA = PLANET_RADIUS * 1.2;
 const ATMO_H = 46;
@@ -51,6 +52,10 @@ export class Sky {
   readonly atmo: THREE.Mesh;
   readonly clouds: THREE.Mesh | null = null;
   readonly stars: THREE.Points;
+  private readonly sunlight = new THREE.Vector3();
+  private atmosphereEnabled = true;
+  private skyProfile = PLANET_VISUAL_PROFILES.terran.sky;
+  private atmosphereThickness = 220;
   /** live-tunable: atmosphere glow strength */
   readonly kGlow = uniform(0.0035);
   /** live-tunable: cloud coverage threshold (lower = more cloud) */
@@ -66,8 +71,16 @@ export class Sky {
   private readonly uHorizon = uniform(new THREE.Vector3(0.62, 0.78, 1.0));
   private readonly uSunset = uniform(new THREE.Vector3(1.0, 0.42, 0.15));
   private readonly uCloudTint = uniform(new THREE.Vector3(0.97, 0.985, 1.0));
+  private readonly uScaleHeight = uniform(ATMO_H);
+  private readonly uNight = uniform(new THREE.Vector3(.05, .08, .16));
+  private readonly uCloudLow = uniform(CLOUD_LO);
+  private readonly uCloudHigh = uniform(CLOUD_HI);
+  private readonly uCloudSpeed = uniform(1);
+  private readonly uForwardHaze = uniform(0);
+  private readonly uCloudOpacity = uniform(.38);
 
   constructor(scene: THREE.Scene, sunDir: THREE.Vector3, quality: SkyQuality, withClouds: boolean) {
+    this.sunlight.copy(sunDir).normalize();
     const sunU = uniform(sunDir);
     const camU = this.camU;
     const fwdU = this.fwdU;
@@ -80,6 +93,11 @@ export class Sky {
     const uHorizon = this.uHorizon;
     const uSunset = this.uSunset;
     const uCloudTint = this.uCloudTint;
+    const uScaleHeight = this.uScaleHeight;
+    const uNight = this.uNight;
+    const uCloudLow = this.uCloudLow, uCloudHigh = this.uCloudHigh;
+    const uCloudSpeed = this.uCloudSpeed, uForwardHaze = this.uForwardHaze;
+    const uCloudOpacity = this.uCloudOpacity;
 
     const sceneT = (rd: any): any =>
       cameraNear.add(viewportLinearDepth.mul(cameraFar.sub(cameraNear))).div(max(dot(rd, fwdU), 1e-4));
@@ -127,10 +145,11 @@ export class Sky {
       const kGlow = this.kGlow;
       const shader = Fn(() => {
         const ro = vec3(camU).toVar();
-        const rd = normalize(positionLocal.sub(camU)).toVar();
+        const rd = normalize(positionLocal.mul(uRA.div(BASE_RA)).sub(camU)).toVar();
         const b = dot(ro, rd).toVar();
         const roro = dot(ro, ro).toVar();
         const col = vec3(0).toVar();
+        const alpha = float(0).toVar();
         const raSq = uRA.mul(uRA);
         const rgSq = uRG.mul(uRG);
         const disc = b.mul(b).sub(roro).add(raSq).toVar();
@@ -151,13 +170,15 @@ export class Sky {
             Loop(N, ({ i }: any) => {
               const p = ro.add(rd.mul(t0.add(float(i).add(0.5).mul(dt))));
               const r = length(p);
-              const dens = exp(max(r.sub(uRG), 0).div(-ATMO_H));
+              // Density datum is the planet radius, not an oasis/magma sea level.
+              const dens = exp(max(r.sub(uPlanetRadius), 0).div(uScaleHeight.negate()));
               const day = smoothstep(-0.28, 0.22, dot(p, sunU).div(r));
               od.addAssign(dens);
               li.addAssign(dens.mul(day));
             });
             od.mulAssign(dt);
             li.mulAssign(dt);
+            alpha.assign(float(1).sub(exp(od.mul(kGlow).negate())));
             const glow = float(1).sub(exp(li.mul(kGlow).negate())).toVar();
             const pm = ro.add(rd.mul(t0.add(t1).mul(0.5)));
             const sdm = dot(normalize(pm), sunU);
@@ -165,16 +186,21 @@ export class Sky {
             const base = mix(uZenith, uHorizon, glow.mul(glow));
             col.assign(base.mul(glow));
             col.assign(mix(col, uSunset.mul(glow), warm.mul(0.5)));
+            // Dust/ash forward scatter uses the existing integration, no extra march.
+            col.addAssign(uHorizon.mul(max(dot(rd, sunU), 0).pow(8)).mul(glow).mul(uForwardHaze));
             const night = float(1).sub(exp(od.mul(-0.0012)));
-            col.addAssign(vec3(0.05, 0.08, 0.16).mul(night).mul(float(1).sub(glow)));
+            col.addAssign(uNight.mul(night).mul(float(1).sub(glow)));
           });
         });
-        return col;
+        // Normal compositing attenuates rings/stars through the same atmosphere;
+        // additive light alone left orbital debris fully bright in a dusty sky.
+        return vec4(col.div(max(alpha, 1e-5)), alpha);
       });
       const mat = new THREE.MeshBasicNodeMaterial();
-      mat.colorNode = shader();
+      const out = shader();
+      mat.colorNode = out.xyz;
+      mat.opacityNode = out.w;
       mat.transparent = true;
-      mat.blending = THREE.AdditiveBlending;
       mat.depthWrite = false;
       mat.depthTest = true;
       mat.side = THREE.BackSide;
@@ -191,7 +217,7 @@ export class Sky {
       const cover = this.cover;
       const shader = Fn(() => {
         const ro = vec3(camU).toVar();
-        const rd = normalize(positionLocal.sub(camU)).toVar();
+        const rd = normalize(positionLocal.mul(uRHi.div(BASE_R_HI)).sub(camU)).toVar();
         const b = dot(ro, rd).toVar();
         const roro = dot(ro, ro).toVar();
         const acc = vec3(0).toVar();
@@ -214,17 +240,37 @@ export class Sky {
             const discL = b.mul(b).sub(roro).add(rLoSq);
             t0.assign(max(t0, b.negate().add(sqrt(max(discL, 0)))));
           });
-          If(t1.sub(t0).greaterThan(0.5), () => {
+          // Skip clear air below the deck, retaining both visible shell lobes.
+          // Discarding the far lobe would introduce a coverage discontinuity
+          // as a grazing ray first touches the lower cloud sphere.
+          const nearEnd = t1.toVar(), farStart = t1.toVar();
+          If(roro.greaterThanEqual(rLoSq), () => {
+            const discL = b.mul(b).sub(roro).add(rLoSq);
+            If(discL.greaterThan(0), () => {
+              const lowerEntry = b.negate().sub(sqrt(discL));
+              const lowerExit = b.negate().add(sqrt(discL));
+              nearEnd.assign(min(t1, max(t0, lowerEntry)));
+              farStart.assign(min(t1, max(t0, lowerExit)));
+            });
+          });
+          const nearLength = max(nearEnd.sub(t0), 0);
+          const cloudLength = nearLength.add(max(t1.sub(farStart), 0));
+          If(cloudLength.greaterThan(0.5), () => {
+            // Integrate the entire visible segment. Fixed metre steps used to
+            // truncate the deck at N*STEP, leaving a moving hard coverage edge.
+            const segmentStep = cloudLength.div(N).toVar();
             Loop(N, ({ i }: any) => {
-              const t = t0.add(float(i).add(0.5).mul(STEP));
+              const distance = float(i).add(0.5).mul(segmentStep);
+              const t = t0.add(distance).toVar();
+              If(distance.greaterThanEqual(nearLength), () => { t.assign(farStart.add(distance.sub(nearLength))); });
               If(t.greaterThanEqual(t1), () => { Break(); });
               const p = ro.add(rd.mul(t)).toVar();
               const r = length(p).toVar();
               const h = r.sub(uPlanetRadius).toVar();
-              If(h.greaterThan(CLOUD_LO).and(h.lessThan(CLOUD_HI)), () => {
-                const pd = p.add(vec3(1.8, 0.3, -1.2).mul(time)).mul(0.011);
+              If(h.greaterThan(uCloudLow).and(h.lessThan(uCloudHigh)), () => {
+                const pd = p.add(vec3(1.8, 0.3, -1.2).mul(time).mul(uCloudSpeed)).mul(0.011);
                 const covN = vnoise(pd).mul(0.68).add(vnoise(pd.mul(2.3)).mul(0.32));
-                const shellF = h.sub(CLOUD_LO).div(CLOUD_HI - CLOUD_LO);
+                const shellF = h.sub(uCloudLow).div(uCloudHigh.sub(uCloudLow));
                 const verticalEnvelope = shellF.mul(float(1).sub(shellF)).mul(4.0);
                 const field = covN.mul(verticalEnvelope);
                 If(field.greaterThan(cover), () => {
@@ -232,7 +278,11 @@ export class Sky {
                   const bright = mix(0.68, 1.05, shellF);
                   const cS = mix(vec3(0.06, 0.09, 0.16), uCloudTint.mul(bright), day);
                   const density = smoothstep(cover, cover.add(0.18), field);
-                  const a = smoothstep(25, 95, t).mul(density).mul(0.38);
+                  // Beer-Lambert opacity stays consistent as segment length
+                  // changes; smooth shell extinction softens grazing rays.
+                  const extinction = density.mul(uCloudOpacity).mul(segmentStep.div(STEP))
+                    .mul(smoothstep(0, .18, shellF)).mul(float(1).sub(smoothstep(.82, 1, shellF)));
+                  const a = float(1).sub(exp(extinction.negate())).mul(smoothstep(25, 95, t));
                   acc.addAssign(cS.mul(trans.mul(a)));
                   trans.mulAssign(float(1).sub(a));
                   If(trans.lessThan(0.08), () => { Break(); });
@@ -261,30 +311,53 @@ export class Sky {
     }
   }
 
+  /** Cover saved vacuum/day starts too; compile the same shell/star layouts once. */
+  prepareWarmup(): () => void {
+    const atmo = this.atmo.visible, clouds = this.clouds?.visible, stars = this.stars.visible;
+    this.atmo.visible = this.stars.visible = true;
+    if (this.clouds) this.clouds.visible = true;
+    return () => {
+      this.atmo.visible = atmo; this.stars.visible = stars;
+      if (this.clouds) this.clouds.visible = clouds!;
+    };
+  }
+
   /** Re-parameterize the raymarched atmosphere and clouds for a newly entered planet. */
   applyPlanetConfig(config: PlanetConfig): void {
+    const profile = planetVisualProfile(config).sky;
+    this.skyProfile = profile;
+    this.atmosphereThickness = config.atmosphere.thickness;
+    this.atmosphereEnabled = hasAtmosphere(config);
     const R = config.radius;
     const rg = config.ocean.hasOcean ? R + config.waterSurfaceOffset : R - 35;
     const ra = R + config.atmosphere.thickness;
-    const rLo = R + CLOUD_LO;
-    const rHi = R + CLOUD_HI;
+    const rLo = R + profile.cloudLow;
+    const rHi = R + profile.cloudHigh;
 
     this.uPlanetRadius.value = R;
     this.uRG.value = rg;
     this.uRA.value = ra;
     this.uRLo.value = rLo;
     this.uRHi.value = rHi;
+    this.uScaleHeight.value = profile.scaleHeight;
+    this.uNight.value.set(...profile.night);
+    this.uCloudLow.value = profile.cloudLow; this.uCloudHigh.value = profile.cloudHigh;
+    this.uCloudSpeed.value = profile.cloudSpeed; this.uForwardHaze.value = profile.forwardHaze;
+    this.uCloudOpacity.value = profile.cloudOpacity;
 
     this.uZenith.value.set(...config.atmosphere.zenithColor);
     this.uHorizon.value.set(...config.atmosphere.horizonColor);
     this.uSunset.value.set(...config.atmosphere.sunsetColor);
-    this.uCloudTint.value.set(...config.atmosphere.cloudTint);
+    this.uCloudTint.value.set(...config.atmosphere.cloudTint).lerp(new THREE.Vector3(...config.atmosphere.horizonColor), 1 - profile.cloudContrast);
 
-    this.kGlow.value = 0.0035 * config.atmosphere.density;
+    // Optical depth is dimensionless. Normalize by scale height so a small
+    // world's thin shell does not accidentally become an almost black vacuum.
+    this.kGlow.value = profile.opticalDepth / profile.scaleHeight * config.atmosphere.density;
+    this.atmo.visible = this.atmosphereEnabled;
     this.atmo.scale.setScalar(ra / BASE_RA);
 
     if (this.clouds) {
-      if (config.atmosphere.cloudCoverage <= 0.05) {
+      if (!this.atmosphereEnabled || config.atmosphere.cloudCoverage <= 0.05) {
         this.clouds.visible = false;
       } else {
         this.clouds.visible = true;
@@ -296,6 +369,18 @@ export class Sky {
 
   /** floating origin: recenter the shells and refresh the planet-frame camera uniforms */
   update(camX: number, camY: number, camZ: number, camera: THREE.PerspectiveCamera): void {
+    const radius = Math.hypot(camX, camY, camZ) || 1;
+    // These miniature planets need dense readable air at walking height, but
+    // that scale height creates a thick opaque limb from orbit. Compress only
+    // the display falloff after leaving the shell; no gameplay datum changes.
+    const orbitalDisplay = THREE.MathUtils.smoothstep(radius - this.uPlanetRadius.value,
+      this.atmosphereThickness + 40, this.atmosphereThickness * 3 + 200);
+    this.uScaleHeight.value = this.skyProfile.scaleHeight * (1 - orbitalDisplay * .72);
+    this.uCloudOpacity.value = this.skyProfile.cloudOpacity * (1 - orbitalDisplay * .75);
+    const day = THREE.MathUtils.smoothstep((camX * this.sunlight.x + camY * this.sunlight.y + camZ * this.sunlight.z) / radius, -0.2, 0.25);
+    const space = THREE.MathUtils.smoothstep(radius - this.uPlanetRadius.value, 120, 450);
+    (this.stars.material as THREE.PointsMaterial).opacity = 0.72 * (this.atmosphereEnabled ? Math.max(1 - day, space) : 1);
+    this.stars.visible = (this.stars.material as THREE.PointsMaterial).opacity > 0.01;
     this.camU.value.set(camX, camY, camZ);
     camera.getWorldDirection(this.fwdU.value);
     this.atmo.position.set(-camX, -camY, -camZ);

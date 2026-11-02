@@ -14,6 +14,7 @@ import type { Columns } from '../world/columns';
 import type { TreeParams, Trees } from '../world/trees';
 import type { Streamer } from '../world/streamer';
 import type { Player } from '../player/player';
+import { SPRINT_GAIT_SPEED } from '../player/locomotion';
 import type { Hud, CraftingRecipeView } from '../demo/hud';
 import type { GameAudio } from '../audio/gameAudio';
 import type { ResourceDropRenderer } from '../render/resourceDrops';
@@ -22,6 +23,7 @@ import {
   ITEM_DEFS,
   PLANE_WOOD_COST,
   RECIPES,
+  RECIPE_BY_ID,
   addItem,
   craftRecipe,
   itemCount,
@@ -29,7 +31,9 @@ import {
   spendItem,
   type Inventory,
   type ItemId,
+  type RecipeDef,
 } from '../sim/crafting';
+import { refillCreativeInventory } from '../sim/gameMode';
 import {
   ageResourceDrops,
   collectReadyResourceDrops,
@@ -52,6 +56,8 @@ export const WOOD_PER_TREE = 6;
 export const CHOP_COOLDOWN = 0.17;
 
 export interface CoreLoopDeps {
+  /** Creative bypasses spending/stations and supplies every equipment unlock. */
+  creative?: boolean;
   geo: Goldberg;
   layers: Layers;
   columns: Columns;
@@ -78,6 +84,7 @@ export interface CoreLoopState {
 }
 
 export class CoreLoop {
+  readonly creative: boolean;
   inventory: Inventory;
   planeCrafted: boolean;
   drops: ResourceDropSave[];
@@ -91,7 +98,9 @@ export class CoreLoop {
   };
 
   constructor(private readonly d: CoreLoopDeps, state: CoreLoopState) {
+    this.creative = d.creative ?? false;
     this.inventory = state.inventory;
+    if (this.creative) refillCreativeInventory(this.inventory);
     this.planeCrafted = state.planeCrafted || itemCount(state.inventory, 'planeFrame') > 0;
     this.structures = d.structures ?? new StructureStore();
     this.drops = this.backfillGroundRadius(state.drops);
@@ -108,6 +117,20 @@ export class CoreLoop {
     return this.d.activePlanetId ? this.d.activePlanetId() : 'planet-0';
   }
 
+  /** Explicit refill hook for Creative UI; routine actions also keep stock supplied. */
+  refillCreativeSupplies(): void {
+    if (!this.creative) return;
+    const changed = refillCreativeInventory(this.inventory);
+    this.planeCrafted = true; this.syncPlayerTechUpgrades();
+    if (changed) this.d.changed();
+  }
+
+  private hasRecipeStation(recipe: RecipeDef): boolean {
+    if (this.creative || !recipe.station) return true;
+    const { geo, player } = this.d;
+    return this.structures.isNearStation(geo, this.currentPlanetId, recipe.station, player.px, player.py, player.pz, 10);
+  }
+
   /** Rebind active planet references when the player travels between worlds. */
   rebindPlanet(layers: Layers, columns: Columns, trees: Trees, planetDrops: ResourceDropSave[]): void {
     this.d.layers = layers;
@@ -122,6 +145,8 @@ export class CoreLoop {
     const { player } = this.d;
     const hasThruster = itemCount(this.inventory, 'orbital_thruster') > 0;
     const hasThermal = itemCount(this.inventory, 'thermal_hull') > 0;
+    // The Starfarer is a complete craft, including when made before a skiff.
+    if (hasThruster) this.planeCrafted = true;
     player.hasOrbitalThruster = hasThruster;
     player.suitTier = hasThermal ? 3 : hasThruster ? 1 : 0;
   }
@@ -231,6 +256,11 @@ export class CoreLoop {
   /** Eat Roasted Meat (`cooked_meat`) or Raw Venison (`raw_meat`) to restore Hunger & trigger Health regeneration. */
   consumeFood(): boolean {
     const { player, hud, audio } = this.d;
+    if (this.creative) {
+      this.refillCreativeSupplies(); player.eatFood(100, 100);
+      audio.playEvent('craftConfirm'); hud.flash('Creative supplies replenished', 2);
+      return true;
+    }
     if (spendItem(this.inventory, 'cooked_meat', 1)) {
       player.eatFood(35, 16);
       this.pose('pickup', 'cooked_meat', 0.55);
@@ -243,12 +273,12 @@ export class CoreLoop {
       player.eatFood(15, 5);
       this.pose('pickup', 'hands', 0.45);
       audio.playEvent('gatherSoft');
-      hud.flash(`ate raw venison (+15% hunger — roast at a Campfire for +35% & healing!)`, 2.8);
+      hud.flash('Ate raw game meat (+15% hunger). Roast at a Campfire for +35% and healing.', 2.8);
       this.d.changed();
       return true;
     }
     audio.playEvent('uiDeny');
-    hud.flash('no meat in inventory — hunt a Hex-Horn Stag and roast venison at a Campfire!', 2.6);
+    hud.flash('No meat in your satchel. Hunt wildlife, then roast the meat at a placed Campfire.', 2.6);
     return false;
   }
 
@@ -276,7 +306,7 @@ export class CoreLoop {
   ): PlacedStructure | null {
     const { columns, streamer, hud, audio } = this.d;
     const groundRadius = this.groundRadiusAt(anchorTile);
-    const res = this.structures.buildWithInventory(this.inventory, {
+    const params = {
       planetId: this.currentPlanetId,
       kind,
       anchorTile,
@@ -285,7 +315,10 @@ export class CoreLoop {
       groundRadius,
       yaw,
       targetPlanetId,
-    });
+    };
+    const res = this.creative
+      ? { ok: true, structure: this.structures.place(params), missingText: undefined }
+      : this.structures.buildWithInventory(this.inventory, params);
     if (!res.ok || !res.structure) {
       audio.playEvent('uiDeny');
       hud.flash(`need ${res.missingText ?? 'resources'} to build ${STRUCTURE_DEFS[kind].shortName}`, 2.8);
@@ -295,7 +328,7 @@ export class CoreLoop {
     if (kind === 'eco_dome') {
       const seeded = columns.seedEcosystem(anchorTile, true);
       for (const t of seeded) streamer.rebuildTile(t, false);
-      hud.flash(`planted Eco-Dome · living biome seeded across ${seeded.length} hexes!`, 3.5);
+      hud.flash(`planted Eco-Dome · native growth encouraged across ${seeded.length} hexes`, 3.5);
     } else {
       const slotNum = (res.structure.subSlot ?? 0) + 1;
       hud.flash(`built ${STRUCTURE_DEFS[kind].name} on hex plot slot #${slotNum}`, 3.0);
@@ -303,6 +336,7 @@ export class CoreLoop {
 
     audio.playEvent('structurePlace');
     this.d.onStructurePlaced?.(res.structure);
+    if (this.creative) this.refillCreativeSupplies();
     this.d.changed();
     return res.structure;
   }
@@ -310,7 +344,7 @@ export class CoreLoop {
   /** Deploy an Ecosystem Seed Pod directly onto `tile` to connect ecosystems across worlds. */
   deployEcoPod(tile: number): boolean {
     const { columns, streamer, hud, audio } = this.d;
-    if (!spendItem(this.inventory, 'eco_pod', 1)) {
+    if (!this.creative && !spendItem(this.inventory, 'eco_pod', 1)) {
       audio.playEvent('uiDeny');
       hud.flash('no Ecosystem Seed Pod in inventory (craft or synthesize one)', 2.8);
       return false;
@@ -318,7 +352,8 @@ export class CoreLoop {
     const seeded = columns.seedEcosystem(tile, true);
     for (const t of seeded) streamer.rebuildTile(t, false);
     audio.playEvent('craftConfirm');
-    hud.flash(`ecosystem seeded · ${seeded.length} hexes transformed into a living oasis!`, 3.4);
+    hud.flash(`ecosystem seeded · native growth encouraged across ${seeded.length} hexes`, 3.4);
+    if (this.creative) this.refillCreativeSupplies();
     this.d.changed();
     return true;
   }
@@ -327,6 +362,7 @@ export class CoreLoop {
   tickDrops(dt: number): void {
     const { geo, player } = this.d;
     const planetId = this.currentPlanetId;
+    if (this.creative) this.refillCreativeSupplies();
 
     // Update player safe warmth/shield aura status from placed Campfires, Furnaces, Launch Pads, etc.
     player.inSafeAura = this.structures.isInsideSafeAura(geo, planetId, player.px, player.py, player.pz);
@@ -386,6 +422,8 @@ export class CoreLoop {
   craftingRows(): CraftingRecipeView[] {
     return RECIPES.map((recipe) => {
       const status = recipeStatus(recipe, this.inventory);
+      const stationReady = this.hasRecipeStation(recipe);
+      const station = recipe.station ? STRUCTURE_DEFS[recipe.station].shortName : '';
       const built =
         (recipe.result === 'planeFrame' && this.planeCrafted) ||
         (recipe.result === 'orbital_thruster' && itemCount(this.inventory, 'orbital_thruster') > 0) ||
@@ -398,9 +436,13 @@ export class CoreLoop {
             ? `Sky-Hopper Skiff ready. ${planeKeyLabel(this.d.device())} boards or stows it.`
             : built
               ? `${recipe.name} unlocked.`
-              : recipe.description,
-        canCraft: status.canCraft && !built,
-        requirements: status.requirements.map((req) => ({ name: req.name, need: req.need, have: req.have })),
+              : this.creative ? `${recipe.description} Free in Creative.`
+                : !stationReady ? `${recipe.description} Build or approach a ${station} within 10m on this world.` : recipe.description,
+        canCraft: (this.creative || status.canCraft) && stationReady && !built,
+        requirements: this.creative ? [] : [
+          ...status.requirements.map((req) => ({ name: req.name, need: req.need, have: req.have })),
+          ...(recipe.station ? [{ name: `${station} within 10m`, need: 1, have: stationReady ? 1 : 0 }] : []),
+        ],
       };
     });
   }
@@ -412,7 +454,15 @@ export class CoreLoop {
       hud.flash(`Sky-Hopper already built · ${planeKeyLabel(this.d.device())} boards`, 2.5);
       return false;
     }
-    const result = craftRecipe(recipeId, this.inventory);
+    const recipe = RECIPE_BY_ID.get(recipeId);
+    if (recipe && !this.hasRecipeStation(recipe)) {
+      audio.playEvent('uiDeny');
+      hud.flash(`requires a ${STRUCTURE_DEFS[recipe.station!].shortName} within 10m on this world`, 3);
+      return false;
+    }
+    const result = this.creative && recipe
+      ? { ok: true, recipe, missing: [] }
+      : craftRecipe(recipeId, this.inventory);
     if (!result.ok || !result.recipe) {
       audio.playEvent('uiDeny');
       hud.flash(result.missing.length > 0
@@ -421,6 +471,7 @@ export class CoreLoop {
       return false;
     }
     if (result.recipe.result === 'planeFrame') this.planeCrafted = true;
+    if (this.creative) this.refillCreativeSupplies();
     this.syncPlayerTechUpgrades();
     hud.flash(`crafted ${result.recipe.name.toLowerCase()}`, 4);
     audio.playEvent('craftConfirm');
@@ -432,6 +483,7 @@ export class CoreLoop {
   /** E / vehicle button: stow if flying, else craft-if-needed and board Sky-Hopper or Starfarer Starship. */
   planeButton(): void {
     const { player, hud, audio } = this.d;
+    if (this.creative) this.refillCreativeSupplies();
     if (player.mode === 'plane') {
       player.exitPlane();
       audio.playEvent('uiConfirm');
@@ -458,7 +510,7 @@ export class CoreLoop {
     audio.playEvent('structurePlace');
     hud.flash(
       player.hasOrbitalThruster
-        ? 'boarded Starfarer Interplanetary Starship · pitch up past 260m AGL for orbital cruise!'
+        ? `Boarded Starfarer. Climb above ${Math.round(this.d.columns.terrain.config.karmanAGL)}m AGL for orbital cruise.`
         : boardedHint(this.d.device(), justCrafted),
       justCrafted ? 6 : 3,
     );
@@ -478,7 +530,7 @@ export class CoreLoop {
         speed,
         grounded: player.grounded,
         submerged: player.submerged,
-        sprinting: player.mode === 'walk' && player.grounded && speed > 7.2,
+        sprinting: player.mode === 'walk' && player.grounded && speed > SPRINT_GAIT_SPEED,
       }),
       held: this.preferredHeldTool(),
       actionT: 0,

@@ -54,6 +54,48 @@ describe('audio events', () => {
     expect(state.volumes.ambience).toBe(0.25);
   });
 
+  it('does not open an audio device or fetch assets for muted input, visibility, or preload calls', async () => {
+    const createContext = vi.fn(() => new FakeAudioContext() as unknown as AudioContext);
+    const fetchAsset = vi.fn(); vi.stubGlobal('fetch', fetchAsset);
+    const audio = new GameAudio(AUDIO_ASSETS, createContext);
+    audio.setMuted(true);
+    await expect(audio.unlock()).resolves.toBe(false);
+    await expect(audio.unlock()).resolves.toBe(false);
+    audio.setPageVisible(true);
+    audio.loadAll();
+    await audio.loadAsset('gatherSoft');
+    expect(audio.playEvent('gatherSoft')).toBe(false);
+    expect(createContext).not.toHaveBeenCalled();
+    expect(fetchAsset).not.toHaveBeenCalled();
+    expect(audio.state()).toMatchObject({ muted: true, unlocked: false, contextState: 'unavailable', loading: [], musicStarted: false });
+    audio.dispose();
+  });
+
+  it('opens and resumes audio on unmute itself after muted gestures, without needing another input', async () => {
+    const audioEl = new FakeAudioElement();
+    (globalThis as { Audio?: unknown }).Audio = class { constructor() { return audioEl; } };
+    const fetchAsset = vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }));
+    vi.stubGlobal('fetch', fetchAsset);
+    const context = new FakeAudioContext(); context.state = 'suspended';
+    const resume = vi.spyOn(context, 'resume').mockImplementation(async () => { context.state = 'running'; });
+    const createContext = vi.fn(() => context as unknown as AudioContext);
+    const assets = { gatherSoft: AUDIO_ASSETS.gatherSoft } as Record<AudioAssetId, AudioAssetDef>;
+    const audio = new GameAudio(assets, createContext);
+    audio.setMuted(true);
+    audio.loadAll(); // Must not mark the deferred preload complete.
+    await expect(audio.unlock()).resolves.toBe(false);
+    expect(audio.toggleMuted()).toBe(false);
+    expect(createContext).toHaveBeenCalledTimes(1);
+    expect(resume).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(audio.state().musicPlaying).toBe(true));
+    expect(fetchAsset).toHaveBeenCalledTimes(1);
+    expect(audio.state().unlocked).toBe(true);
+    audio.setMuted(true); expect(audio.state().musicPlaying).toBe(false);
+    audio.toggleMuted(); expect(audio.state().musicPlaying).toBe(true);
+    expect(createContext).toHaveBeenCalledTimes(1);
+    audio.dispose();
+  });
+
   it('keeps the soundtrack as streamed music instead of eager decoded SFX', () => {
     expect(MUSIC_TRACKS).toHaveLength(14);
     for (const track of MUSIC_TRACKS) {

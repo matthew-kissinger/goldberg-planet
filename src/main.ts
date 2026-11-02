@@ -1,5 +1,5 @@
 /**
- * Goldberg Planet — Multi-Planet Survival, Automation & Interplanetary Sandbox.
+ * Goldberg Planet — spherical exploration prototype.
  *
  * Boots a 6-world procedural solar system behind the splash, then runs the frame loop:
  * input -> player -> solarSystem SOI -> camera -> streaming -> out-of-core automation ->
@@ -15,24 +15,34 @@ import type { PlanetConfig } from './world/planetConfig';
 import { FarSphere } from './render/farsphere';
 import { Sky } from './render/sky';
 import { Character } from './render/character';
+import { FootIk } from './render/footIk';
+import { ColumnGroundProbe } from './world/groundContact';
+import { AureliaVegetationRenderer } from './render/aureliaVegetation';
+import { aureliaSites } from './world/aurelia';
+import { worldSites } from './world/expeditionWorlds';
+import { carryAureliaIntoWorldsV3 } from './sim/worldRecipeSave';
+import { parseGameMode } from './sim/gameMode';
+import { createExpeditionHabitat } from './world/expeditionHabitat';
+import { ExpeditionLighting } from './render/expeditionLighting';
 import { ResourceDropRenderer } from './render/resourceDrops';
 import { buildOcean } from './render/ocean';
-import { addStars } from './render/stars';
 import { TileHighlight } from './render/tileHighlight';
 import { createTerrainMaterial } from './render/terrainMaterial';
 import { GpuPlanetEffects } from './render/gpuComputeParticles';
 import { StructureRenderer } from './render/structures';
 import { RemotePlayerRenderer } from './render/remotePlayers';
 import { FallingTreeRenderer } from './render/fallingTrees';
-import { WildlifeManager } from './render/wildlife';
+import { AureliaFauna } from './render/aureliaFauna';
 import { WaterfallRenderer } from './render/waterfalls';
 import { Player } from './player/player';
 import { UxManager } from './player/ux';
 import { FrameStats } from './demo/frameStats';
+import { RenderStats } from './demo/renderStats';
 import { Hud, splash, hideSplash, type StructureBlueprintView } from './demo/hud';
 import { GameAudio } from './audio/gameAudio';
 import {
   applyChoppedTrees,
+  applyPlanetDeltaSave,
   applyPlayerSave,
   applyTreeChopProgress,
   captureWorldSave,
@@ -74,7 +84,10 @@ const SUN = new THREE.Vector3(0.62, 0.55, 0.56).normalize();
 const REACH = 9.5;
 /** beyond this boom length the view is too far out to aim at trees */
 const AIM_MAX_CAM_DIST = 120;
-const saveKey = saveSlotKey(SEED, M);
+// The new terrain/layer recipe gets its own slot; original worlds remain untouched.
+const gameMode = parseGameMode(params.get('mode'));
+const creative = gameMode === 'creative';
+const saveKey = `${saveSlotKey(SEED, M)}:worlds-v3:${gameMode}`;
 const saveEnabled = params.get('nosave') !== '1';
 if (params.get('reset') === '1') clearStoredWorldSave(saveKey);
 
@@ -87,7 +100,7 @@ function yieldFrame(): Promise<void> {
 async function createRenderer(coarsePointer: boolean): Promise<THREE.WebGPURenderer> {
   let renderer: THREE.WebGPURenderer;
   try {
-    renderer = new THREE.WebGPURenderer({ antialias: true, forceWebGL: params.get('gpu') === 'gl' });
+    renderer = new THREE.WebGPURenderer({ antialias: true, forceWebGL: params.get('gpu') === 'gl', trackTimestamp: params.get('profilegpu') === '1' });
     await renderer.init();
   } catch (err) {
     console.warn('WebGPU init failed; falling back to WebGL2', err);
@@ -112,21 +125,21 @@ async function boot(): Promise<void> {
   await yieldFrame();
   const coarsePointer = window.matchMedia('(pointer: coarse)').matches || params.get('touch') === '1';
   const renderer = await createRenderer(coarsePointer);
+  const renderStats = new RenderStats();
   const isWebGPU = !!(renderer.backend as { isWebGPUBackend?: boolean }).isWebGPUBackend;
   app.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x04060c);
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 48000);
-  const sun = new THREE.DirectionalLight(0xfff2e0, 3.0);
-  const sunTarget = new THREE.Object3D();
-  sun.target = sunTarget;
-  scene.add(sun, sunTarget, new THREE.HemisphereLight(0x8fb4dd, 0x2c2418, 0.5), new THREE.AmbientLight(0x404a58, 0.35));
+  const lighting = new ExpeditionLighting(scene, renderer, SUN, coarsePointer, params.get('shadows') !== '0');
 
   splash('forging 6-world solar system…', 0.22);
   await yieldFrame();
   const impostorMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0.04 });
   const solarSystem = new SolarSystem(SEED, geo, scene, impostorMat);
+  const homePlanet = solarSystem.planets[0]!;
+  const expedition = createExpeditionHabitat(geo, homePlanet.config);
   const structureStore = new StructureStore();
 
   const planetConfigMap = new Map<string, PlanetConfig>();
@@ -135,20 +148,18 @@ async function boot(): Promise<void> {
   }
 
   // Restore saved solar-system state across all 6 worlds
-  const save = saveEnabled ? loadStoredWorldSave(saveKey, SEED, M) : null;
+  const currentSave = saveEnabled ? loadStoredWorldSave(saveKey, SEED, M) : null;
+  const priorSave = saveEnabled && !currentSave && params.get('reset') !== '1'
+    ? loadStoredWorldSave(`${saveSlotKey(SEED, M)}:aurelia-v2:${gameMode}`, SEED, M) : null;
+  const carried = priorSave ? carryAureliaIntoWorldsV3(priorSave) : null;
+  const save = currentSave ?? carried?.save ?? null;
   if (save) {
     if (save.structures) structureStore.importAll(save.structures);
     if (save.planetDeltas) {
       for (const p of solarSystem.planets) {
         const delta = save.planetDeltas[p.config.id];
         if (!delta) continue;
-        applyChoppedTrees(p.trees, delta.choppedTrees, geo.count);
-        applyTreeChopProgress(p.trees, delta.treeChopProgress, geo.count);
-        if (delta.columnEdits?.length) p.columns.importEdits(delta.columnEdits);
-        if (delta.seededEcoTiles?.length) {
-          for (const t of delta.seededEcoTiles) p.columns.seededEcoTiles.add(t);
-        }
-        if (delta.drops?.length) p.drops = normalizeResourceDrops(delta.drops, geo.count);
+        applyPlanetDeltaSave(p, delta, geo.count);
       }
     } else {
       // Legacy single-planet save compatibility
@@ -160,7 +171,9 @@ async function boot(): Promise<void> {
   }
 
   const startPlanet = (save?.activePlanetId ? solarSystem.planetById.get(save.activePlanetId) : undefined) ?? solarSystem.planets[0]!;
+  lighting.setPlanet(startPlanet.config);
   const terrainMaterial = createTerrainMaterial(startPlanet.config);
+  await terrainMaterial.loadSurfaceDetail();
   const streamer = new Streamer(geo, startPlanet.layers, startPlanet.columns, scene, terrainMaterial.material, startPlanet.trees);
 
   const farSphere = await FarSphere.build(
@@ -176,7 +189,6 @@ async function boot(): Promise<void> {
     splash(`filling the oceans… ${Math.round(frac * 100)}%`, 0.5 + 0.04 * frac);
     await yieldFrame();
   });
-  addStars(scene);
   const skyQuality = params.get('skyq') === 'high' ? 'high' : params.get('skyq') === 'low' || coarsePointer ? 'low' : 'high';
   const sky = new Sky(scene, SUN, skyQuality, params.get('clouds') !== '0');
   const gpuEffects = new GpuPlanetEffects(scene);
@@ -193,23 +205,58 @@ async function boot(): Promise<void> {
   });
 
   const player = new Player(geo, startPlanet.layers, startPlanet.columns);
+  player.creative = creative;
   if (save?.activePlanetId && save.activePlanetId !== solarSystem.activePlanet.config.id) {
     solarSystem.warpToPlanet(save.activePlanetId, player, 0, false);
+    await solarSystem.whenTravelSettled();
   }
-  if (!save || !applyPlayerSave(player, save.player, geo.count)) {
+  if (!save || carried?.relocate || !applyPlayerSave(player, save.player, geo.count)) {
     player.spawnAt(findSpawnTile(geo, solarSystem.activePlanet.columns, solarSystem.activePlanet.trees));
+    if (solarSystem.activePlanet === homePlanet && expedition) {
+      [player.fwdX, player.fwdY, player.fwdZ] = expedition.heading;
+      player.reorthonormalize();
+    }
   }
 
   const controls = new Controls(renderer.domElement, app, params.get('touch') === '1');
   const ux = new UxManager();
   const hud = new Hud();
+  hud.setGameMode(gameMode);
   const audio = new GameAudio();
   if (params.get('mute') === '1') audio.setMuted(true);
   const character = new Character(scene);
+  await character.ready;
+  character.setAppearance(save?.appearance);
+  hud.setAppearance(character.getAppearance());
+  const groundProbe = new ColumnGroundProbe(geo, solarSystem.activePlanet.columns);
+  const footIk = character.rig ? new FootIk(character.rig) : null;
+  character.setPoseModifier(context => footIk?.update(context, groundProbe));
+  const vegetationByPlanet = new Map<string, AureliaVegetationRenderer>();
+  for (const planet of solarSystem.planets) {
+    vegetationByPlanet.set(planet.config.id, new AureliaVegetationRenderer(scene, geo, planet.columns, planet.trees, planet.terrain));
+    await yieldFrame();
+  }
+  let habitat = vegetationByPlanet.get(solarSystem.activePlanet.config.id)!;
+  const allSites = solarSystem.planets.flatMap(planet => (planet.terrain.aurelia ? aureliaSites(planet.config) : worldSites(planet.config))
+    .map(site => ({ ...site, planetId: planet.config.id })));
+  const sitesByPlanet = new Map(solarSystem.planets.map(planet => [planet.config.id, allSites.filter(site => site.planetId === planet.config.id)]));
+  let sites = sitesByPlanet.get(solarSystem.activePlanet.config.id)!;
+  const visitedSites = new Set<string>(Array.isArray(save?.journal?.visitedSites) ? save.journal.visitedSites.filter((id): id is string => typeof id === 'string' && allSites.some(s => s.id === id)) : []);
+  let courseId: string | null = null;
+  let courseSiteId: string | null = null;
+  let navigationRevision = 0;
   const dropRenderer = new ResourceDropRenderer(scene);
   const structureRenderer = new StructureRenderer(scene);
   const fallingTrees = new FallingTreeRenderer(scene);
-  const wildlife = new WildlifeManager(scene);
+  const faunaByPlanet = new Map<string, AureliaFauna>();
+  for (const planet of solarSystem.planets) {
+    const fauna = new AureliaFauna(scene, geo, planet.columns, planet.terrain);
+    fauna.importState(save?.faunaByPlanet?.[planet.config.id]);
+    fauna.group.visible = false;
+    faunaByPlanet.set(planet.config.id, fauna);
+    await yieldFrame();
+  }
+  let wildlife = faunaByPlanet.get(solarSystem.activePlanet.config.id)!;
   const waterfalls = new WaterfallRenderer(scene);
   const remotePlayerRenderer = new RemotePlayerRenderer(scene);
   const highlight = new TileHighlight(scene);
@@ -229,6 +276,7 @@ async function boot(): Promise<void> {
   let autosave: Autosave | null = null;
 
   const loop = new CoreLoop({
+    creative,
     geo,
     layers: solarSystem.activePlanet.layers,
     columns: solarSystem.activePlanet.columns,
@@ -278,7 +326,7 @@ async function boot(): Promise<void> {
 
   if (ROOM_ID) {
     mpClient = new MultiplayerClient({
-      roomId: ROOM_ID,
+      roomId: `${ROOM_ID}:worlds-v3:${gameMode}`,
       universeSeed: SEED,
       callbacks: {
         onRoomInit: (state) => {
@@ -292,6 +340,7 @@ async function boot(): Promise<void> {
               for (const t of delta.seededEcoTiles) p.columns.seededEcoTiles.add(t);
             }
           }
+          streamer.invalidateAll();
           hud.flash(`connected to co-op room "${ROOM_ID}" (${state.peers.length} peer${state.peers.length === 1 ? '' : 's'})`, 3.5);
         },
         onWorldMutation: (mutation) => {
@@ -327,8 +376,14 @@ async function boot(): Promise<void> {
     mpClient.connect(undefined, params.get('ws') ?? undefined);
   }
 
-  // Keep `CoreLoop`, `CameraRig`, `WildlifeManager`, and `FarSphere` synchronized whenever the active planet changes
+  let loopPlanet = solarSystem.activePlanet;
+  // Keep simulation state and rendering bindings synchronized through both
+  // explicit visits and physical sphere-of-influence flight handoffs.
   solarSystem.onPlanetChange((nextPlanet, dx, dy, dz) => {
+    loopPlanet.drops = loop.drops;
+    loopPlanet = nextPlanet;
+    groundProbe.rebind(nextPlanet.columns);
+    footIk?.reset();
     loop.rebindPlanet(nextPlanet.layers, nextPlanet.columns, nextPlanet.trees, nextPlanet.drops);
     if (dx !== undefined && dy !== undefined && dz !== undefined) {
       rig.rebindPlanet(nextPlanet.layers, nextPlanet.columns, dx, dy, dz, player.up());
@@ -336,8 +391,15 @@ async function boot(): Promise<void> {
       rig.rebindPlanet(nextPlanet.layers, nextPlanet.columns);
       rig.snapTo(player);
     }
-    wildlife.clear();
-    farSphere.setResidentChunks(streamer.residentKeys());
+    wildlife.group.visible = false;
+    wildlife = faunaByPlanet.get(nextPlanet.config.id)!;
+    habitat.group.visible = false;
+    habitat = vegetationByPlanet.get(nextPlanet.config.id)!;
+    sites = sitesByPlanet.get(nextPlanet.config.id)!;
+    lighting.setPlanet(nextPlanet.config);
+    fallingTrees.clear();
+    waterfalls.clear();
+    farSphere.setResidentChunks(streamer.renderedKeys());
     streamer.residencyDirty = false;
     hud.flash(`entered ${nextPlanet.config.name} — ${nextPlanet.config.subtitle}`, 3.8);
     autosave?.markDirty();
@@ -366,8 +428,12 @@ async function boot(): Promise<void> {
       activePlanetId: solarSystem.activePlanet.config.id,
       structures: structureStore.exportAll(),
       planetDeltas,
+      mode: gameMode,
+      journal: { version: 1, visitedSites: [...visitedSites] },
+      appearance: { ...character.getAppearance() },
+      faunaByPlanet: Object.fromEntries([...faunaByPlanet].map(([id, fauna]) => [id, fauna.exportState()])),
     });
-  }, !save);
+  }, !save || !!carried);
 
   const unlockAudio = (): void => {
     void audio.unlock().then((ok) => {
@@ -386,7 +452,7 @@ async function boot(): Promise<void> {
   const structureBlueprints = (): StructureBlueprintView[] =>
     STRUCTURE_KINDS.map((kind) => {
       const def = STRUCTURE_DEFS[kind];
-      const canBuild = structureStore.canAfford(kind, loop.inventory);
+      const canBuild = creative || structureStore.canAfford(kind, loop.inventory);
       return {
         kind,
         name: def.name,
@@ -404,12 +470,16 @@ async function boot(): Promise<void> {
 
   const refreshCrafting = (): void => hud.setCrafting(loop.craftingRows(), craftingOpen, structureBlueprints());
   const toggleCrafting = (): void => {
+    if (!craftingOpen) hud.setMenuOpen(false);
     craftingOpen = !craftingOpen;
     refreshCrafting();
     audio.playEvent(craftingOpen ? 'uiOpen' : 'uiConfirm');
   };
-  controls.input.setWorldInputBlocked(() => craftingOpen);
+  controls.input.setWorldInputBlocked(() => craftingOpen || hud.isMenuOpen() || solarSystem.travelState.pending);
+  hud.onCraftToggle = toggleCrafting;
+  hud.onCraftClose = () => { if (craftingOpen) toggleCrafting(); };
   hud.onCraftSelect = (id) => {
+    if (solarSystem.travelState.pending) return;
     if (loop.craft(id)) refreshCrafting();
   };
 
@@ -426,6 +496,7 @@ async function boot(): Promise<void> {
   let aimedLayer: number | null = null;
 
   const buildSelectedStructureNow = (): void => {
+    if (solarSystem.travelState.pending) return;
     const tile = aimedTile ?? player.tile;
     const targetPlanet = loop.selectedStructureKind === 'mass_driver' ? defaultMassDriverTargetId() : undefined;
     if (loop.placeStructure(loop.selectedStructureKind, tile, undefined, undefined, loop.placementYaw, targetPlanet)) {
@@ -436,27 +507,108 @@ async function boot(): Promise<void> {
   hud.onStructureSelect = (kind) => {
     loop.selectedStructureKind = kind;
     showBuildPreview = true;
-    buildSelectedStructureNow();
+    if (craftingOpen) toggleCrafting();
+    hud.flash(`${STRUCTURE_DEFS[kind].name} selected · choose a spot, then Q or tap the placement prompt`, 3);
     refreshCrafting();
   };
 
   hud.onBuildStripClick = () => {
-    buildSelectedStructureNow();
+    if (showBuildPreview) buildSelectedStructureNow();
+    else toggleCrafting();
   };
 
   const triggerPlanetWarp = (planetId: string): void => {
+    navigationRevision++;
+    if (!solarSystem.planetById.has(planetId)) return;
+    if (!creative) {
+      courseId = planetId;
+      const destination = solarSystem.navTelemetry(player).find(p => p.id === planetId)!;
+      if (player.inSpaceCruise) {
+        const up = player.up();
+        player.pitch = Math.asin(THREE.MathUtils.clamp(destination.dir[0]*up[0]+destination.dir[1]*up[1]+destination.dir[2]*up[2], -.98,.98));
+        [player.fwdX,player.fwdY,player.fwdZ] = destination.dir;
+        player.reorthonormalize();
+      }
+      hud.flash(player.hasOrbitalThruster ? `Course: ${destination.name}. Board with E, climb into orbit, then choose the course again to align.` : 'Build a workbench and furnace. Smelt 2 iron, then craft the Starfarer to leave the planet.', 5);
+      return;
+    }
     if (planetId === solarSystem.activePlanet.config.id) {
+      if (solarSystem.travelState.pending) solarSystem.cancelTravel();
       hud.flash(`already on ${solarSystem.activePlanet.config.name}`, 1.8);
       return;
     }
     solarSystem.activePlanet.drops = loop.drops;
-    if (solarSystem.warpToPlanet(planetId, player, 0, loop.planeCrafted || player.mode !== 'walk')) {
+    const destination = solarSystem.planetById.get(planetId)!;
+    const arrival = sitesByPlanet.get(planetId)?.[0];
+    const landingTile = destination === homePlanet && expedition ? expedition.spawnTile : arrival ? geo.tileOf(...arrival.direction) : findSpawnTile(geo, destination.columns, destination.trees);
+    if (solarSystem.warpToPlanet(planetId, player, landingTile, false)) {
       audio.playEvent('craftConfirm');
     }
   };
 
   hud.onPlanetSelect = (planetId) => {
     triggerPlanetWarp(planetId);
+  };
+  hud.onGameModeSelect = mode => {
+    if (mode === gameMode) return;
+    autosave?.write(true);
+    const url = new URL(location.href); url.searchParams.set('mode', mode);
+    url.searchParams.delete('reset');
+    location.assign(url.href);
+  };
+  hud.onAppearanceChange = patch => {
+    character.setAppearance({ ...character.getAppearance(), ...patch });
+    footIk?.reset();
+    hud.setAppearance(character.getAppearance());
+    autosave?.markDirty();
+  };
+  hud.onSiteSelect = id => {
+    navigationRevision++;
+    const site = allSites.find(s => s.id === id);
+    if (!site) return;
+    if (!creative) {
+      courseSiteId = site.id;
+      if (site.planetId !== solarSystem.activePlanet.config.id) courseId = site.planetId;
+      hud.flash(`Route marked: ${site.name}. Follow the bearing in your field note.`, 4);
+      return;
+    }
+    const land = (): void => {
+      player.mode = 'walk'; player.inSpaceCruise = false;
+      player.vx = 0; player.vy = 0; player.vz = 0;
+      player.grounded = false; player.stepSmooth = 0;
+      player.spawnAt(geo.tileOf(...site.direction));
+      rig.snapTo(player); footIk?.reset();
+      hud.setMenuOpen(false); autosave?.markDirty();
+      hud.flash(`${site.name} · ${site.biome.replace(/[-_]/g, ' ')}`, 3);
+    };
+    if (solarSystem.activePlanet.config.id === site.planetId) {
+      solarSystem.cancelTravel();
+      land();
+    }
+    else {
+      solarSystem.activePlanet.drops = loop.drops;
+      solarSystem.warpToPlanet(site.planetId, player, geo.tileOf(...site.direction), false);
+      const revision = navigationRevision;
+      void solarSystem.whenTravelSettled().then(settled => {
+        if (settled && revision === navigationRevision && solarSystem.activePlanet.config.id === site.planetId) land();
+      });
+    }
+  };
+  hud.onObserve = () => {
+    const observation = wildlife.nearbyObservation(player);
+    if (!observation) { hud.flash('Walk closer to an animal to observe it.', 2); return; }
+    if (wildlife.observe(observation.id)) {
+      autosave?.markDirty(); hud.flash(`${observation.name} recorded in your field notes.`, 3);
+    }
+  };
+  hud.onFeed = () => {
+    const observation = wildlife.nearbyObservation(player);
+    if (!observation) { hud.flash('Approach a grazer slowly before offering forage.', 3); return; }
+    if (!creative && itemCount(loop.inventory, 'fiber') < 1) { hud.flash('Gather 1 fiber to offer forage.', 3); return; }
+    const result = wildlife.feed(observation.id);
+    if (result.accepted && !creative) loop.inventory.fiber = itemCount(loop.inventory, 'fiber') - 1;
+    hud.flash(result.reason, 3);
+    if (result.accepted) autosave?.markDirty();
   };
 
   window.addEventListener('resize', () => {
@@ -478,10 +630,8 @@ async function boot(): Promise<void> {
       await yieldFrame();
     }
   }
-  farSphere.setResidentChunks(streamer.residentKeys());
+  farSphere.setResidentChunks(streamer.renderedKeys());
   streamer.residencyDirty = false;
-  hideSplash();
-  hud.flash(openingHint(device, !!save), 9);
 
   // --- tree + terrain cell targeting & chopping ---
   let chopTimer = 0;
@@ -516,7 +666,7 @@ async function boot(): Promise<void> {
           loop.inventory[d.item] = (loop.inventory[d.item] ?? 0) + d.count;
         }
         const label = huntRes.creature.speciesName;
-        hud.flash(`hunted ${label} · +2 raw venison, +hide & +bone! (build a Campfire to roast)`, 3.2);
+        hud.flash(`hunted ${label} · +2 raw meat, +hide & +bone (roast at a Campfire)`, 3.2);
         autosave?.markDirty();
       } else {
         const label = huntRes.creature.speciesName;
@@ -540,14 +690,25 @@ async function boot(): Promise<void> {
   };
 
   const handleVerbs = (intent: FrameIntent): void => {
+    if (solarSystem.travelState.pending) {
+      if (intent.closePanel) solarSystem.cancelTravel();
+      if (intent.diag) showDiag = !showDiag;
+      return;
+    }
+    const panelWasOpen = craftingOpen || hud.isMenuOpen();
+    if (intent.mute) hud.flash(audio.toggleMuted() ? 'sound muted' : 'sound on', 1.8);
+    if (intent.diag) showDiag = !showDiag;
+    if (intent.help) hud.toggleHelp();
     if (intent.closePanel || (craftingOpen && intent.toggleCrafting)) {
       if (craftingOpen) toggleCrafting();
+      hud.setMenuOpen(false);
     } else if (intent.toggleCrafting) {
       toggleCrafting();
     }
-    if (intent.confirmCraft && loop.craft('plane_frame')) refreshCrafting();
+    if (craftingOpen && intent.confirmCraft && loop.craft('plane_frame')) refreshCrafting();
+    if (panelWasOpen || craftingOpen || hud.isMenuOpen()) return;
     if (intent.plane) loop.planeButton();
-    if (intent.toggleFly) {
+    if (intent.toggleFly && creative) {
       player.toggleFly();
       hud.flash(player.mode === 'fly' ? 'free-flight' : 'walk mode', 2);
     }
@@ -578,12 +739,10 @@ async function boot(): Promise<void> {
       const targetPlanet = solarSystem.planets[intent.warpPlanetIndex]!;
       triggerPlanetWarp(targetPlanet.config.id);
     }
-    if (intent.mute) hud.flash(audio.toggleMuted() ? 'sound muted' : 'sound on', 1.8);
-    if (intent.diag) showDiag = !showDiag;
-    if (intent.help) hud.toggleHelp();
   };
 
   const updateTargeting = (intent: FrameIntent, dt: number): void => {
+    if (solarSystem.travelState.pending) { target = null; highlight.hide(); return; }
     const active = solarSystem.activePlanet;
     const canAim = intent.aiming && rig.dist < AIM_MAX_CAM_DIST && player.mode !== 'plane';
     if (canAim && !controls.touch.enabled) aimAt(rig.dir.x, rig.dir.y, rig.dir.z);
@@ -622,6 +781,20 @@ async function boot(): Promise<void> {
   let hudTimer = 0;
   const updateHud = (): void => {
     const active = solarSystem.activePlanet;
+    const up = player.up();
+    {
+      for (const site of sites) {
+        const distance = active.config.radius * Math.acos(THREE.MathUtils.clamp(up[0]*site.direction[0]+up[1]*site.direction[1]+up[2]*site.direction[2],-1,1));
+        if (distance < 38 && !visitedSites.has(site.id)) {
+          visitedSites.add(site.id); autosave?.markDirty();
+          hud.flash(`Discovered ${site.name}`, 3);
+        }
+      }
+    }
+    hud.setEcology({ world: active.config.name, description: active.config.subtitle,
+      region: active.terrain.aurelia?.biomeAt(...up) ?? active.terrain.expeditionWorld?.biomeAt(...up) ?? active.config.archetype,
+      sites: sites.map(site => ({ ...site, visited: visitedSites.has(site.id) })),
+      observation: wildlife.nearbyObservation(player), observedCount: wildlife.stats().observed });
     const agl = player.altitudeAGL();
     const speed = Math.hypot(player.vx, player.vy, player.vz);
     const grid = structureStore.analyzePlanetGrid(geo, active.config);
@@ -641,59 +814,34 @@ async function boot(): Promise<void> {
       coopCount: mpClient?.connected ? mpClient.peers.size + 1 : undefined,
     });
 
-    const activeStructs = structureStore.list(active.config.id);
-    const hasCampfire = activeStructs.some((s) => s.kind === 'campfire');
-    const hasWorkbench = activeStructs.some((s) => s.kind === 'workbench');
-    const hasFurnace = activeStructs.some((s) => s.kind === 'furnace');
-    const hasTools = itemCount(loop.inventory, 'hatchet') > 0 || itemCount(loop.inventory, 'spear') > 0;
-    const hasCooked = itemCount(loop.inventory, 'cooked_meat') > 0 || hungerPct >= 88;
-    const hasStarship = itemCount(loop.inventory, 'orbital_thruster') > 0;
-
-    if (!hasCampfire && !loop.planeCrafted) {
-      hud.setObjective({
-        stageLabel: 'Phase 1 / 4 · Wilderness Survival',
-        title: 'Gather Timber, Hunt & Build Camp',
-        description: 'Chop multi-tree groves (LMB), mine stone/flint (V), and build a Campfire on a flat hex plot.',
-        steps: [
-          { label: `Gather Wood (${loop.wood}/3) & Stone (${itemCount(loop.inventory, 'stone')}/2)`, done: loop.wood >= 3 && itemCount(loop.inventory, 'stone') >= 2 },
-          { label: 'Forge Flint Hatchet or Hunting Spear [B]', done: hasTools },
-          { label: 'Place Campfire on Hex Plot [Z/X + Q]', done: hasCampfire },
-        ],
-      });
-    } else if (!loop.planeCrafted) {
-      hud.setObjective({
-        stageLabel: 'Phase 2 / 4 · Homestead & Sky-Hopper',
-        title: 'Roast Venison & Craft Sky-Hopper Skiff',
-        description: 'Roast meat at your Campfire and eat (C) for Well-Fed Health Regen, then build a Workbench.',
-        steps: [
-          { label: 'Roast Venison [B] & Eat [C] (Hunger ≥ 70%)', done: hasCooked },
-          { label: 'Build Timber Workbench on Hex Plot [Q]', done: hasWorkbench },
-          { label: `Craft Twin-Rotor Sky-Hopper (${loop.wood}/${PLANE_WOOD_COST} Wood) [B]`, done: loop.planeCrafted },
-        ],
-      });
-    } else if (!hasStarship) {
-      hud.setObjective({
-        stageLabel: 'Phase 3 / 4 · Atmospheric Explorer',
-        title: 'Explore Sky-Islands & Forge Starfarer',
-        description: 'Press E to fly the Sky-Hopper to Floating Sky-Islands & Waterfalls, and smelt Iron for orbital flight.',
-        steps: [
-          { label: 'Fly Sky-Hopper Skiff [E] to Sky-Islands', done: player.mode === 'plane' || agl > 15 },
-          { label: 'Build Stone Smelting Furnace [Z/X + Q]', done: hasFurnace },
-          { label: 'Forge Starfarer Interplanetary Starship [B]', done: hasStarship },
-        ],
-      });
-    } else {
-      hud.setObjective({
-        stageLabel: 'Phase 4 / 4 · Interplanetary Pioneer',
-        title: 'Voyage Across the 6-World Solar System',
-        description: 'Board your Starfarer Starship (E), climb >140m AGL into Space Cruise, or warp with [1–6].',
-        steps: [
-          { label: 'Starfarer Interplanetary Starship Ready', done: true },
-          { label: 'Explore Floating Islands & Abyssal Caverns', done: active.config.id !== 'planet-0' || agl > 30 },
-          { label: `Visit Off-World Planets [1–6] (${active.config.name})`, done: active.config.id !== 'planet-0' },
-        ],
-      });
+    const routes: Record<PlanetConfig['archetype'], [string, string]> = {
+      terran: ['Follow the shoreline', 'Look for a clearing where forest meets water. Gather timber along the way if you want to build a skiff.'],
+      canyon: ['Read the layers of the canyon', 'Follow a terrace, look for a way down, and compare the sheltered ground with the exposed ridges.'],
+      volcanic: ['Find a path through the basalt', 'Watch your suit and keep a return route in mind as you approach the molten lowlands.'],
+      cryo: ['Cross the frozen ridges', 'Study the ice from a high point before choosing a descent. Shelter gives your suit time to recover.'],
+      biolum: ['Walk among the luminous groves', 'Follow the light from the water toward the fungal growth. Look at how the world changes beneath its canopy.'],
+      shattered: ['Read the impact basins', 'Follow the low crater rims toward crystal seams. The exposed ridges open onto a star-filled sky.'],
+    };
+    let [routeTitle, routeDescription] = routes[active.config.archetype];
+    const destination = sites.find(s => s.id === courseSiteId);
+    if (destination) {
+      const dot = up[0]*destination.direction[0]+up[1]*destination.direction[1]+up[2]*destination.direction[2];
+      const distance = active.config.radius*Math.acos(THREE.MathUtils.clamp(dot,-1,1));
+      const east = [player.fwdY*up[2]-player.fwdZ*up[1], player.fwdZ*up[0]-player.fwdX*up[2], player.fwdX*up[1]-player.fwdY*up[0]];
+      const bearing = Math.atan2(east[0]*destination.direction[0]+east[1]*destination.direction[1]+east[2]*destination.direction[2],player.fwdX*destination.direction[0]+player.fwdY*destination.direction[1]+player.fwdZ*destination.direction[2])*180/Math.PI;
+      const heading = Math.abs(bearing)<12 ? 'Ahead' : `${Math.round(Math.abs(bearing))}° ${bearing>0?'right':'left'}`;
+      routeTitle = distance < 38 ? `Arrived at ${destination.name}` : `${destination.name} · ${Math.round(distance)} m · ${heading}`;
+      routeDescription = `${heading} · ${destination.description}`;
     }
+    hud.setObjective({
+      stageLabel: 'Field note',
+      title: wonder.ringLevel >= 0 ? 'A five-sided landmark' : routeTitle,
+      description: wonder.ringLevel >= 0 ? 'You are near one of this world’s twelve pentagonal formations. Explore the terraces around it.' : routeDescription,
+      steps: [
+        { label: loop.planeCrafted ? `${player.hasOrbitalThruster ? 'Starfarer' : 'Skiff'} packed. Board when you want another perspective.` : `Optional: gather ${PLANE_WOOD_COST} timber for a skiff (${loop.wood} packed).`, done: loop.planeCrafted },
+        { label: creative ? 'All gear supplied. Field guide → Worlds offers free travel.' : 'Workbench → Furnace → 2 iron ingots → Starfarer. Board with E and climb into orbit.', done: player.hasOrbitalThruster },
+      ],
+    });
 
     const navTargets = solarSystem.navTelemetry(player);
     const hazardLabel =
@@ -703,20 +851,23 @@ async function boot(): Promise<void> {
     const wonderLabel = wonder.ringLevel >= 0 ? ` · ★ Pentagon Ruin #${wonder.pentagonId + 1}` : '';
     hud.setPlanetBar(
       navTargets,
-      `${active.config.subtitle} · ${hazardLabel} · ${grid.structureCount} station${grid.structureCount === 1 ? '' : 's'}${wonderLabel}`,
+      `${courseId ? `Course: ${solarSystem.planetById.get(courseId)?.config.name} · ` : ''}${active.config.subtitle} · ${hazardLabel} · ${grid.structureCount} station${grid.structureCount === 1 ? '' : 's'}${wonderLabel}`,
     );
 
     const selDef = STRUCTURE_DEFS[loop.selectedStructureKind];
     const costStr = (Object.entries(selDef.cost) as [ItemId, number][])
       .map(([k, n]) => `${itemCount(loop.inventory, k)}/${n} ${ITEM_DEFS[k].name.toLowerCase()}`)
       .join(' · ');
-    hud.setBuildStrip(`[Z/X] ${selDef.shortName} (${costStr}) · [Q] Build · [V] Mine · [C] Eat Meat`);
+    hud.setBuildStrip(showBuildPreview
+      ? `${selDef.shortName} · ${costStr} · Q / tap to place · R rotate`
+      : target ? `${device === 'touch' ? 'Tap' : device === 'gamepad' ? 'X' : 'LMB'} Gather timber · ${craftKeyLabel(device)} Satchel`
+        : `${craftKeyLabel(device)} Satchel · ${device === 'keyboard' ? 'M Field guide' : 'Field guide for destinations'}`, showBuildPreview);
 
     hud.setFlight(
       player.inSpaceCruise
-        ? `🚀 INTERPLANETARY CRUISE · ${speed.toFixed(0)} m/s · ${(agl / 1000).toFixed(2)} km AGL (aim at a planet or press 1-6)`
+        ? `🚀 INTERPLANETARY CRUISE · ${speed.toFixed(0)} m/s · ${(agl / 1000).toFixed(2)} km AGL (aim at a planet)`
         : player.mode === 'plane'
-          ? `✈ ${speed.toFixed(0)} m/s · ${agl.toFixed(0)} m AGL (climb >${active.config.karmanAGL}m for orbit)`
+          ? `${player.hasOrbitalThruster ? 'Starfarer' : 'Skiff'} · ${speed.toFixed(0)} m/s · ${agl.toFixed(0)} m AGL · ${player.hasOrbitalThruster ? `climb above ${active.config.karmanAGL} m for orbit` : 'atmospheric flight; upgrade for orbit'}`
           : player.mode === 'fly'
             ? `fly · ${agl.toFixed(0)} m`
             : null,
@@ -729,10 +880,10 @@ async function boot(): Promise<void> {
         count: loop.wood,
         goal: loop.planeCrafted ? undefined : `${loop.wood}/${PLANE_WOOD_COST}`,
       },
-      ...(loop.planeCrafted ? [{ name: 'Skiff', css: ITEM_DEFS.planeFrame.css, count: 1 }] : []),
+      ...(loop.planeCrafted ? [{ name: player.hasOrbitalThruster ? 'Starfarer' : 'Skiff', css: ITEM_DEFS[player.hasOrbitalThruster ? 'orbital_thruster' : 'planeFrame'].css, count: 1 }] : []),
     ];
     for (const id of ALL_ITEM_IDS) {
-      if (id === 'wood' || id === 'planeFrame') continue;
+      if (id === 'wood' || id === 'planeFrame' || (id === 'orbital_thruster' && loop.planeCrafted)) continue;
       const cnt = itemCount(loop.inventory, id);
       if (cnt > 0) {
         slots.push({
@@ -755,8 +906,11 @@ async function boot(): Promise<void> {
       return;
     }
     const s = streamer.stats();
+    const timings = stats.snapshot();
     hud.setDiag([
       `${isWebGPU ? 'WebGPU' : 'WebGL2'} · ${stats.frameMsEma.toFixed(1)} ms · seed ${SEED} · planet ${active.config.id}`,
+      `frame p95 ${timings.frameMs.p95.toFixed(1)} / p99 ${timings.frameMs.p99.toFixed(1)} / max ${timings.frameMs.max.toFixed(1)} ms · >50 ms ${timings.frameMs.over50}/${timings.frameMs.count}`,
+      `CPU stream p95 ${timings.cpuMs.streaming?.p95.toFixed(1) ?? '0'} · render submit ${timings.cpuMs.renderSubmit?.p95.toFixed(1) ?? '0'} ms · draws ${renderStats.snapshot().drawCalls}`,
       `mode ${player.mode}${player.inSpaceCruise ? ' (orbital cruise)' : player.submerged > 0.4 ? ' (swimming)' : player.grounded ? ' (grounded)' : ''} · ${speed.toFixed(1)} m/s`,
       player.mode === 'plane' ? `throttle ${player.throttle.toFixed(0)} · holding ${player.holdAGL.toFixed(0)} m` : '',
       `alt ${agl.toFixed(1)} AGL · h ${(player.radius() - active.config.radius).toFixed(1)} · zoom ${rig.dist.toFixed(0)}`,
@@ -802,6 +956,7 @@ async function boot(): Promise<void> {
     const active = solarSystem.activePlanet;
     return JSON.stringify({
       mode: player.mode,
+      gameMode,
       activePlanet: active.config.id,
       activePlanetName: active.config.name,
       inSpaceCruise: player.inSpaceCruise,
@@ -815,7 +970,10 @@ async function boot(): Promise<void> {
       planeCrafted: loop.planeCrafted,
       selectedStructure: loop.selectedStructureKind,
       structuresCount: structureStore.byId.size,
-      wildlifeCount: wildlife.creatures.length,
+      wildlifeCount: wildlife.population.active.length,
+      fauna: wildlife.stats(),
+      appearance: character.getAppearance(),
+      journal: [...visitedSites],
       fallingTreesCount: fallingTrees.active.length,
       drops: loop.drops.length,
       target: target ? { tile: target.tile, damage: active.trees.damageOf(target.tile) } : null,
@@ -827,6 +985,14 @@ async function boot(): Promise<void> {
       solarSystemPlanets: solarSystem.planets.map((p) => p.config.id),
       multiplayerRoom: ROOM_ID ?? null,
       renderer: isWebGPU ? 'webgpu' : 'webgl2',
+      recipe: active.config.expeditionRecipe ?? 'legacy',
+      character: character.stats(),
+      footIk: footIk?.stats(),
+      habitat: habitat?.stats(),
+      travel: solarSystem.travelState,
+      drawingPipeline: 'standard',
+      surfaceRepresentation: streamer.detailedRendering ? 'detailed' : 'orbital',
+      performance: { ...stats.snapshot(), autosave: autosave?.timings(), streaming: streamer.stats(), ...renderStats.snapshot() },
     });
   };
 
@@ -836,35 +1002,110 @@ async function boot(): Promise<void> {
     solarSystem,
     rig,
     structureStore,
-    wildlife,
+    get wildlife() { return wildlife; },
+    faunaByPlanet,
+    gameMode,
+    get sites() { return sites; },
+    allSites,
+    sitesByPlanet,
+    expedition,
+    triggerPlanetWarp,
     waterfalls,
     fallingTrees,
     controls,
     hud,
     streamer,
     geo,
+    character,
+    footIk,
+    get habitat() { return habitat; },
+    vegetationByPlanet,
+    renderer,
+    scene,
   };
 
   // --- frame loop ---
   let last = performance.now();
   let streamTimer = 0;
   let lastFarRefresh = 0;
+  let maskedReleaseCount = streamer.releases;
+  let simulationTime = 0;
+  let reportedTravelError: string | null = null;
   const camVec = new THREE.Vector3();
+
+  // Compile the actual starting view while the splash is still visible. Compute
+  // precompilation alone does not prepare terrain, water, sky or character shaders.
+  rig.snapTo(player);
+  rig.update(0, player, 0, false);
+  const origin = rig.world;
+  const initialViewDistance = Math.max(rig.dist, Math.hypot(origin.x, origin.y, origin.z) - solarSystem.activePlanet.config.radius);
+  if (streamer.updateRenderDistance(initialViewDistance)) {
+    farSphere.setResidentChunks(streamer.renderedKeys());
+    streamer.residencyDirty = false;
+  }
+  water.setViewDistance(initialViewDistance);
+  streamer.updateTransforms(origin.x, origin.y, origin.z);
+  farSphere.mesh.position.set(-origin.x, -origin.y, -origin.z);
+  water.position.set(-origin.x, -origin.y, -origin.z);
+  terrainMaterial.setCameraOrigin(origin.x, origin.y, origin.z);
+  sky.update(origin.x, origin.y, origin.z, camera);
+  solarSystem.update(player, origin.x, origin.y, origin.z);
+  lighting.update(player, origin, player.altitudeAGL(), rig.dist);
+  habitat.update(0, 0, player, origin, streamer.detailedRendering);
+  while (habitat.stats().pending) {
+    await yieldFrame();
+    habitat.update(0, 0, player, origin, streamer.detailedRendering);
+  }
+  wildlife.update(0, 0, player, origin, streamer.detailedRendering);
+  character.update(player, origin, rig.dist, 0, loop.characterVisualState());
+  updateHud();
+  splash('preparing the view…', 0.97);
+  await yieldFrame();
+  const restoreVegetation = [...vegetationByPlanet.values()].map(vegetation => vegetation.prepareWarmup());
+  const restoreFauna = wildlife.prepareWarmup();
+  const restoreEffects = gpuEffects.prepareWarmup();
+  const restoreSky = sky.prepareWarmup();
+  const waterWasVisible = water.visible;
+  const waterWasCulled = water.frustumCulled;
+  water.visible = true;
+  water.frustumCulled = false;
+  try { await character.warmup(renderer, scene, camera); }
+  finally {
+    for (const restore of restoreVegetation) restore();
+    restoreFauna(); restoreEffects(); restoreSky();
+    water.visible = waterWasVisible; water.frustumCulled = waterWasCulled;
+  }
+  // Warmup already compiled this scene. Recompiling after its covered render
+  // would copy viewport depth from the default framebuffer on the GL backend.
+  renderer.render(scene, camera);
+  renderStats.capture(renderer.info);
+  hideSplash();
+  hud.flash(openingHint(device, !!save), 8);
+  last = performance.now();
 
   renderer.setAnimationLoop(() => {
     const now = performance.now();
+    // A background playtest tab should not consume a second game's GPU budget.
+    if (document.hidden) { last = now; return; }
     const dtMs = now - last;
     last = now;
     const dt = Math.min(0.05, dtMs / 1000);
     const timeSec = now / 1000;
+    stats.begin(now);
 
-    const intent = controls.read(dt, craftingOpen);
+    const intent = controls.read(dt, craftingOpen || hud.isMenuOpen() || solarSystem.travelState.pending);
     handleVerbs(intent);
+    const simDt = solarSystem.travelState.pending || (!mpClient && (craftingOpen || hud.isMenuOpen())) ? 0 : dt;
+    simulationTime += simDt;
+    const transit = solarSystem.travelState;
+    hud.setTravelStatus(transit.pending ? solarSystem.planetById.get(transit.targetId!)?.config.name ?? 'another world' : null, transit.progress);
+    if (transit.error && transit.error !== reportedTravelError) hud.flash('Passage could not be prepared. Choose the destination again to retry.', 5);
+    reportedTravelError = transit.error;
     const notice = controls.gamepad.consumeNotice();
     if (notice) hud.flash(notice === 'gamepad disconnected' ? notice : 'gamepad ready', 2.4);
 
-    if (intent.aiming) player.applyLook(intent.lookX, intent.lookY);
-    player.update(dt, {
+    if (intent.aiming && !transit.pending) player.applyLook(intent.lookX, intent.lookY);
+    player.update(simDt, {
       forward: intent.forward,
       strafe: intent.strafe,
       upDown: player.mode !== 'walk' ? (intent.jump ? 1 : 0) - (intent.down ? 1 : 0) : 0,
@@ -879,6 +1120,7 @@ async function boot(): Promise<void> {
     const w = rig.world;
     solarSystem.update(player, w.x, w.y, w.z);
     const active = solarSystem.activePlanet;
+    stats.mark('playerAndTravel');
 
     // Streaming: refresh the wanted set a few times a second, build within budget
     streamTimer -= dt;
@@ -886,23 +1128,30 @@ async function boot(): Promise<void> {
       streamTimer = 0.18;
       streamer.refreshDesired(...player.up(), player.altitudeAGL());
     }
-    const built = streamer.pump();
-    if (streamer.residencyDirty && built === 0 && now - lastFarRefresh > 250) {
-      farSphere.setResidentChunks(streamer.residentKeys());
+    const surfaceViewDistance = Math.max(rig.dist, Math.hypot(w.x, w.y, w.z) - active.config.radius);
+    const surfaceOwnershipChanged = streamer.updateRenderDistance(surfaceViewDistance);
+    streamer.pump();
+    water.setViewDistance(surfaceViewDistance);
+    // An added chunk can overlap the sunk proxy briefly. A released chunk must
+    // restore its far coverage before this draw, or rapid travel exposes a hole.
+    if (surfaceOwnershipChanged || (streamer.residencyDirty && (streamer.releases !== maskedReleaseCount || now - lastFarRefresh > 250))) {
+      farSphere.setResidentChunks(streamer.renderedKeys());
       streamer.residencyDirty = false;
       lastFarRefresh = now;
+      maskedReleaseCount = streamer.releases;
     }
+    stats.mark('streaming');
 
     // Camera-relative transforms (floating origin: camera stays at 0,0,0)
     streamer.updateTransforms(w.x, w.y, w.z);
     farSphere.mesh.position.set(-w.x, -w.y, -w.z);
     water.position.set(-w.x, -w.y, -w.z);
+    terrainMaterial.setCameraOrigin(w.x, w.y, w.z);
     sky.update(w.x, w.y, w.z, camera);
-    sun.position.set(SUN.x * 11000 - w.x, SUN.y * 11000 - w.y, SUN.z * 11000 - w.z);
-    sunTarget.position.set(-w.x, -w.y, -w.z);
+    lighting.update(player, w, player.altitudeAGL(), rig.dist);
 
     // Out-of-core background automation tick across all 6 planets + active planet structure meshes
-    structureStore.tickAutomation(dt, geo, planetConfigMap, surfaceMatLookup);
+    structureStore.tickAutomation(simDt, geo, planetConfigMap, surfaceMatLookup);
     const activeStructures = structureStore.list(active.config.id);
     const activeGrid = structureStore.analyzePlanetGrid(geo, active.config);
     structureRenderer.update(geo, activeStructures, activeGrid.links, w.x, w.y, w.z, timeSec);
@@ -949,18 +1198,24 @@ async function boot(): Promise<void> {
       camVec.set(w.x, w.y, w.z);
       remotePlayerRenderer.update(mpClient.getInterpolatedPeers(now), active.config.id, camVec, dt, timeSec);
     }
+    stats.mark('sceneAndStructures');
 
-    loop.tickDrops(dt);
-    fallingTrees.update(dt, w.x, w.y, w.z);
-    waterfalls.update(dt, geo, active.layers, active.columns, player, w.x, w.y, w.z);
-    const wildlifeStep = wildlife.update(dt, geo, active.layers, active.columns, player, w.x, w.y, w.z);
-    if (wildlifeStep.playerDamage > 0) {
-      player.takeDamage(wildlifeStep.playerDamage);
+    loop.tickDrops(simDt);
+    fallingTrees.update(simDt, w.x, w.y, w.z);
+    waterfalls.update(simDt, geo, active.layers, active.columns, player, w.x, w.y, w.z);
+    const animalDamage = wildlife.update(simDt, simulationTime, player, w, streamer.detailedRendering);
+    if (animalDamage > 0 && !creative) {
+      player.takeDamage(animalDamage);
       audio.playEvent('uiDeny');
-      hud.flash(`bitten by ${wildlifeStep.attackerName ?? 'predator'}! -${wildlifeStep.playerDamage} HP (eat roasted meat or rest by a Campfire)`, 2.4);
+      hud.flash(`Duskprowler bite · ${animalDamage} health. Keep your distance or retreat to camp.`, 2.4);
     }
-    character.update(player, w, rig.dist, dt, loop.characterVisualState());
+    stats.mark('worldActors');
+    character.update(player, w, rig.dist, simDt, loop.characterVisualState());
+    stats.mark('characterAndIk');
+    habitat.update(simDt, simulationTime, player, w, streamer.detailedRendering);
+    stats.mark('habitat');
     dropRenderer.update(loop.drops, geo, active.layers, active.columns, w, timeSec);
+    stats.mark('resourceDrops');
     updateTargeting(intent, dt);
     autosave!.tick(dt);
 
@@ -972,7 +1227,10 @@ async function boot(): Promise<void> {
       syncDevice();
       updateHud();
     }
+    stats.mark('interactionAndHud');
     renderer.render(scene, camera);
+    renderStats.capture(renderer.info);
+    stats.mark('renderSubmit');
   });
 }
 

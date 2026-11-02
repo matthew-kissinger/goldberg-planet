@@ -1,19 +1,9 @@
-/**
- * Whole-Tree Felling Physics & Animation Renderer (`FallingTreeRenderer`).
- *
- * When a tree is chopped (`trees.strike(tile)` returns `felled: true`), the chunk mesher
- * removes the static tree geometry and `FallingTreeRenderer.spawnFelledTree(...)` spawns
- * an animated 3D tree at the exact base hinge (`Y = 0` on the hex surface).
- *
- * Physics curve:
- *  - Accelerates under gravity from `0°` to `88°` around the tangent axis perpendicular
- *    to the chop direction (`0.0 s -> 0.88 s`).
- *  - Hits the ground at `t = 0.88 s` with a slight damped bounce (`88° -> 82° -> 88°`)
- *    and bursts into harvestable wood logs (`0.88 s -> 1.15 s`).
- */
-
+/** Whole-tree felling keeps the authored canopy and releases transient merged geometry. */
 import * as THREE from 'three/webgpu';
 import { treeTangentFrame, type TreeParams } from '../world/trees';
+import { HABITAT_FORWARD, habitatDirection } from '../world/expeditionHabitat';
+import { GeometryKit } from './campKit';
+import { bakeAureliaTree, treeCutColor } from './vegetationKit';
 import {
   BROADLEAF_COLOR,
   CACTUS_COLOR,
@@ -39,6 +29,7 @@ export interface ActiveFallingTree {
   durationSec: number;
   meshGroup: THREE.Group;
   stumpGroup: THREE.Group;
+  baseQuaternion: THREE.Quaternion;
 }
 
 const frameScratch = new Float64Array(6);
@@ -46,6 +37,8 @@ const frameScratch = new Float64Array(6);
 export class FallingTreeRenderer {
   readonly group = new THREE.Group();
   readonly active: ActiveFallingTree[] = [];
+  private readonly material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.86, metalness: 0 });
+  private disposed = false;
 
   constructor(scene: THREE.Scene) {
     this.group.name = 'fallingTrees';
@@ -66,6 +59,10 @@ export class FallingTreeRenderer {
     fallDirY?: number,
     fallDirZ?: number,
   ): void {
+    if (params.habitat) {
+      [ux, uy, uz] = habitatDirection(params.habitat.x, params.habitat.z, params.planetRadius ?? rG);
+      rG += 0.025;
+    }
     treeTangentFrame(ux, uy, uz, frameScratch);
     const t1x = frameScratch[0], t1y = frameScratch[1], t1z = frameScratch[2];
     const t2x = frameScratch[3], t2y = frameScratch[4], t2z = frameScratch[5];
@@ -83,102 +80,87 @@ export class FallingTreeRenderer {
     fdx -= dotU * ux;
     fdy -= dotU * uy;
     fdz -= dotU * uz;
-    const fl = Math.hypot(fdx, fdy, fdz) || 1;
-    fdx /= fl; fdy /= fl; fdz /= fl;
+    const fl = Math.hypot(fdx, fdy, fdz);
+    if (fl < 1e-8) { fdx = t1x; fdy = t1y; fdz = t1z; }
+    else { fdx /= fl; fdy /= fl; fdz /= fl; }
 
     const axisX = uy * fdz - uz * fdy;
     const axisY = uz * fdx - ux * fdz;
     const axisZ = ux * fdy - uy * fdx;
 
-    const kind = params.kind ?? 'conifer';
-    const trunkBase =
-      kind === 'cactus'
-        ? CACTUS_COLOR
-        : kind === 'fungal'
-          ? FUNGAL_STEM_COLOR
-          : kind === 'crystal_spire'
-            ? CRYSTAL_FLORA_COLOR
-            : TRUNK_COLOR;
-    const canopyBase =
-      kind === 'broadleaf'
-        ? BROADLEAF_COLOR
-        : kind === 'cactus'
-          ? CACTUS_COLOR
-          : kind === 'fungal'
-            ? FUNGAL_CAP_COLOR
-            : kind === 'crystal_spire'
-              ? CRYSTAL_FLORA_COLOR
-              : LEAF_COLOR;
-
-    const trunkColor = new THREE.Color(
-      Math.min(1, trunkBase[0] * params.tint),
-      Math.min(1, trunkBase[1] * params.tint),
-      Math.min(1, trunkBase[2] * params.tint),
-    );
-    const canopyColor = new THREE.Color(
-      Math.min(1, canopyBase[0] * (0.75 + params.tint * 0.35)),
-      Math.min(1, canopyBase[1] * (0.75 + params.tint * 0.35)),
-      Math.min(1, canopyBase[2] * (0.75 + params.tint * 0.35)),
-    );
-
-    const trunkMat = new THREE.MeshStandardMaterial({ color: trunkColor, roughness: 0.85, metalness: 0.04 });
-    const cutWoodMat = new THREE.MeshStandardMaterial({ color: 0xd8a868, roughness: 0.75, metalness: 0.02 });
-    const canopyMat = new THREE.MeshStandardMaterial({ color: canopyColor, roughness: 0.78, metalness: 0.05 });
-
-    // 1. Cut Stump left on the ground during the fall
-    const stumpGroup = new THREE.Group();
     const stumpH = 0.36;
-    const stumpMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(params.girth * 0.96, params.girth * 1.12, stumpH, 6),
-      trunkMat,
-    );
-    stumpMesh.position.y = stumpH * 0.5;
-    const stumpTop = new THREE.Mesh(
-      new THREE.CylinderGeometry(params.girth * 0.9, params.girth * 0.9, 0.04, 6),
-      cutWoodMat,
-    );
-    stumpTop.position.y = stumpH + 0.01;
-    stumpGroup.add(stumpMesh, stumpTop);
+    const stumpGroup = new THREE.Group(), meshGroup = new THREE.Group();
+    const stump = new GeometryKit(), upper = new GeometryKit();
+    const kind = params.kind ?? 'conifer';
+    const broadleaf = kind === 'broadleaf';
+    const trunkBase = kind === 'cactus' ? CACTUS_COLOR : kind === 'fungal' || kind === 'spore_bulb' ? FUNGAL_STEM_COLOR : kind === 'crystal_spire' || kind === 'ice_willow' ? CRYSTAL_FLORA_COLOR : TRUNK_COLOR;
+    const canopyBase = broadleaf ? BROADLEAF_COLOR : kind === 'cactus' ? CACTUS_COLOR : kind === 'fungal' || kind === 'spore_bulb' ? FUNGAL_CAP_COLOR : kind === 'crystal_spire' || kind === 'ice_willow' ? CRYSTAL_FLORA_COLOR : LEAF_COLOR;
+    const trunkColor = params.aurelia || params.growth
+      ? new THREE.Color(treeCutColor(params)).multiplyScalar(params.tint)
+      : params.habitat ? new THREE.Color(0x665446) : new THREE.Color(...trunkBase).multiplyScalar(params.tint);
+    const canopyColor = new THREE.Color(...canopyBase).multiplyScalar(0.75 + params.tint * 0.35);
+    stump.cylinder(trunkColor, [0, stumpH * 0.5, 0], params.girth, params.girth * 1.08, stumpH, 7);
+    stump.cylinder(params.growth ? trunkColor.clone().multiplyScalar(1.2) : 0xc4a77b, [0, stumpH + 0.006, 0], params.girth * 0.92, params.girth * 0.92, 0.012, 7);
 
-    // 2. Hinged Upper Tree Group (pivots around Y = stumpH)
-    const meshGroup = new THREE.Group();
-    const upperTrunkH = Math.max(0.8, params.trunk - stumpH);
-    const trunkMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(params.girth * 0.82, params.girth * 0.98, upperTrunkH, 6),
-      trunkMat,
-    );
-    trunkMesh.position.y = upperTrunkH * 0.5;
-    meshGroup.add(trunkMesh);
+    if (params.aurelia || params.growth) {
+      // Shared kit is baked below, preserving every living branch and crown.
+    } else if (broadleaf) {
+      const sx = params.spread / 5.3, sy = (params.trunk + params.canopy) / 8;
+      const point = (x: number, y: number, z: number): [number, number, number] => [x * sx, y * sy, z * sx];
+      const width = params.girth / 0.48;
+      upper.beam(trunkColor, [0, stumpH, 0], point(0.15, 2.5, 0.1), 0.51 * width);
+      upper.beam(trunkColor, point(0.15, 2.3, 0.1), point(0.45, 4.3, -0.1), 0.36 * width);
+      upper.beam(trunkColor, point(0.45, 4.1, -0.1), point(0.1, 5.7, 0.3), 0.24 * width);
+      for (let i = 0; i < 5; i++) {
+        const a = i * Math.PI * 0.4 + 0.2;
+        upper.beam(trunkColor, point(0.25, 3.2 + (i % 2) * 0.4, 0), point(Math.cos(a) * 3.1, 5.1 + (i % 2) * 0.55, Math.sin(a) * 3.1), 0.17 * width);
+      }
+      const palette = params.habitat?.community === 'shore' ? [0x839d59, 0x96ac62, 0x6e914f] : [0x5e8650, 0x789a59, 0x8aa764];
+      upper.crown(palette[1], point(0, 6.3, 0), [3.1 * sx, 1.5 * sy, 2.9 * sx], 1);
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI * 0.25;
+        upper.crown(palette[i % 3], point(Math.cos(a) * 2.9, 5.65 + (i % 3) * 0.35, Math.sin(a) * 2.8), [2.25 * sx, (1.05 + (i % 2) * 0.22) * sy, 2.1 * sx], 1);
+      }
+    } else if (kind === 'cactus') {
+      upper.cylinder(trunkColor, [0, (stumpH + params.trunk + params.canopy * 0.55) * 0.5, 0], params.girth * 0.75, params.girth * 1.2, params.trunk + params.canopy * 0.55 - stumpH, 7);
+      for (const side of [-1, 1]) {
+        upper.beam(trunkColor, [0, params.trunk * 0.7, 0], [side * params.spread * 0.5, params.trunk * 0.85, 0], params.girth * 0.65);
+        upper.beam(canopyColor, [side * params.spread * 0.5, params.trunk * 0.85, 0], [side * params.spread * 0.5, params.trunk + params.canopy * 0.3, 0], params.girth * 0.6);
+      }
+    } else if (kind === 'crystal_spire') {
+      upper.cylinder(canopyColor, [0, (stumpH + params.trunk + params.canopy) * 0.5, 0], 0, params.spread * 0.6, params.trunk + params.canopy - stumpH, 5);
+      for (const side of [-1, 1]) upper.cylinder(canopyColor.clone().multiplyScalar(0.8), [side * params.spread * 0.46, params.trunk * 0.8, 0], 0, params.spread * 0.3, params.trunk * 1.25, 5, [0, 0, side * -0.22]);
+    } else {
+      upper.cylinder(trunkColor, [0, (stumpH + params.trunk) * 0.5, 0], params.girth * 0.72, params.girth, Math.max(0.1, params.trunk - stumpH), 7);
+      if (kind === 'fungal' || kind === 'spore_bulb') {
+        upper.crown(canopyColor, [0, params.trunk + params.canopy * 0.17, 0], [params.spread * 1.3, params.canopy * 0.3, params.spread * 1.3], 1);
+        upper.cylinder(0xdbd1b5, [0, params.trunk + 0.02, 0], params.spread * 0.92, params.spread * 0.92, 0.08, 9);
+      } else if (kind === 'palm' || kind === 'weeping_willow' || kind === 'ice_willow') {
+        for (let i = 0; i < 7; i++) {
+          const a = i * Math.PI * 2 / 7;
+          upper.add(new THREE.IcosahedronGeometry(1, 0), canopyColor, [Math.cos(a) * params.spread * 0.52, params.trunk + params.canopy * 0.2, Math.sin(a) * params.spread * 0.52], [params.spread * 0.67, params.canopy * 0.25, params.spread * 0.23], [0, -a, -0.15]);
+        }
+      } else {
+        for (let i = 0; i < 3; i++) upper.cylinder(canopyColor.clone().multiplyScalar(0.86 + i * 0.08), [0, params.trunk + params.canopy * (0.12 + i * 0.28), 0], 0.08, params.spread * (1 - i * 0.25), params.canopy * 0.63, 8);
+      }
+    }
+    const stumpGeometry = stump.finish(), upperGeometry = params.aurelia || params.growth ? bakeAureliaTree(params, stumpH) : upper.finish();
+    if (!params.aurelia && !params.growth) upperGeometry.translate(0, -stumpH, 0);
+    upperGeometry.computeBoundingSphere();
+    const stumpMesh = new THREE.Mesh(stumpGeometry, this.material), treeMesh = new THREE.Mesh(upperGeometry, this.material);
+    stumpMesh.castShadow = treeMesh.castShadow = true;
+    stumpMesh.receiveShadow = treeMesh.receiveShadow = true;
+    stumpGroup.add(stumpMesh); meshGroup.add(treeMesh);
 
-    const ringR =
-      kind === 'cactus'
-        ? params.spread * 0.45
-        : kind === 'fungal'
-          ? params.spread * 1.35
-          : kind === 'crystal_spire'
-            ? params.spread * 0.65
-            : params.spread;
-    const canopyH =
-      kind === 'fungal'
-        ? params.canopy * 0.42
-        : kind === 'cactus'
-          ? params.canopy * 0.5
-          : params.canopy;
-    const canopyMesh = new THREE.Mesh(
-      new THREE.ConeGeometry(ringR, canopyH, 6),
-      canopyMat,
-    );
-    canopyMesh.position.y = upperTrunkH + canopyH * 0.45;
-    meshGroup.add(canopyMesh);
-
-    // Orient initial local +Y along surface normal `u` with a strict right-handed basis (det = +1)
+    // Preserve the exact habitat heading; generic trees use the shared tree tangent frame.
     const upVec = new THREE.Vector3(ux, uy, uz).normalize();
-    const t2Vec = new THREE.Vector3(t2x, t2y, t2z).normalize();
-    const rightVec = new THREE.Vector3().crossVectors(upVec, t2Vec).normalize();
-    t2Vec.crossVectors(rightVec, upVec).normalize();
-    const basis = new THREE.Matrix4().makeBasis(rightVec, upVec, t2Vec);
-    stumpGroup.quaternion.setFromRotationMatrix(basis);
-    meshGroup.quaternion.setFromRotationMatrix(basis);
+    const forward = params.habitat ? new THREE.Vector3(...HABITAT_FORWARD) : new THREE.Vector3(t2x, t2y, t2z);
+    forward.addScaledVector(upVec, -forward.dot(upVec)).normalize();
+    const right = new THREE.Vector3().crossVectors(upVec, forward).normalize();
+    forward.crossVectors(right, upVec).normalize();
+    const baseQuaternion = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, upVec, forward));
+    if (params.habitat) baseQuaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), params.habitat.yaw));
+    stumpGroup.quaternion.copy(baseQuaternion); meshGroup.quaternion.copy(baseQuaternion);
 
     this.group.add(stumpGroup, meshGroup);
     this.active.push({
@@ -196,7 +178,27 @@ export class FallingTreeRenderer {
       durationSec: 2.2,
       meshGroup,
       stumpGroup,
+      baseQuaternion,
     });
+  }
+
+  private release(item: ActiveFallingTree): void {
+    this.group.remove(item.meshGroup, item.stumpGroup);
+    for (const root of [item.meshGroup, item.stumpGroup]) root.traverse((node) => {
+      if ((node as THREE.Mesh).isMesh) (node as THREE.Mesh).geometry.dispose();
+    });
+  }
+
+  /** Also used on planet changes; a falling tree belongs to its original world. */
+  clear(): void {
+    for (const item of this.active) this.release(item);
+    this.active.length = 0;
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.clear(); this.group.removeFromParent(); this.material.dispose();
   }
 
   /**
@@ -205,19 +207,15 @@ export class FallingTreeRenderer {
   update(dt: number, camX: number, camY: number, camZ: number): void {
     if (this.active.length === 0) return;
 
-    const upVec = new THREE.Vector3();
-    const rightVec = new THREE.Vector3();
-    const t2Vec = new THREE.Vector3();
     const axisVec = new THREE.Vector3();
     const baseQuat = new THREE.Quaternion();
     const tiltQuat = new THREE.Quaternion();
-    const basisMat = new THREE.Matrix4();
 
     for (let i = this.active.length - 1; i >= 0; i--) {
       const item = this.active[i]!;
       item.ageSec += dt;
       if (item.ageSec >= item.durationSec) {
-        this.group.remove(item.meshGroup, item.stumpGroup);
+        this.release(item);
         this.active.splice(i, 1);
         continue;
       }
@@ -239,13 +237,7 @@ export class FallingTreeRenderer {
         }
       }
 
-      treeTangentFrame(item.ux, item.uy, item.uz, frameScratch);
-      upVec.set(item.ux, item.uy, item.uz).normalize();
-      t2Vec.set(frameScratch[3], frameScratch[4], frameScratch[5]).normalize();
-      rightVec.crossVectors(upVec, t2Vec).normalize();
-      t2Vec.crossVectors(rightVec, upVec).normalize();
-      basisMat.makeBasis(rightVec, upVec, t2Vec);
-      baseQuat.setFromRotationMatrix(basisMat);
+      baseQuat.copy(item.baseQuaternion);
 
       axisVec.set(item.fallAxisX, item.fallAxisY, item.fallAxisZ).normalize();
       tiltQuat.setFromAxisAngle(axisVec, angleRad);

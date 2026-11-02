@@ -72,7 +72,8 @@ describe('SolarSystem multi-planet state & Sphere of Influence (SOI) handoff', (
     const sys = new SolarSystem('flight-seed', geo);
     const p1 = sys.planets[1]; // Vespera Shard (vacuum hazard, requiredSuitTier = 1, karmanAGL = 130)
     const player = new Player(geo, p1.layers, p1.columns);
-    player.spawnAt(0); // Tile 0 is a Pentagon Wonder
+    player.spawnAt(0); // New expedition worlds no longer add Pentagon Wonders.
+    player.hasOrbitalThruster = true;
     player.enterPlane();
 
     // Climb above karmanAGL (130m)
@@ -91,7 +92,7 @@ describe('SolarSystem multi-planet state & Sphere of Influence (SOI) handoff', (
     });
 
     expect(player.inSpaceCruise).toBe(true);
-    expect(player.onPentagonWonder).toBe(true);
+    expect(player.onPentagonWonder).toBe(false);
     // Unshielded on vacuum moon drains suitShield
     expect(player.suitShield).toBeLessThan(100);
 
@@ -106,5 +107,24 @@ describe('SolarSystem multi-planet state & Sphere of Influence (SOI) handoff', (
       swimUp: false,
     });
     expect(player.suitShield).toBe(100);
+  });
+
+  it('keeps an atmospheric skiff below the cruise transition until the Starfarer is crafted', () => {
+    const sys = new SolarSystem('skiff-limit', geo), planet = sys.planets[0];
+    const player = new Player(geo, planet.layers, planet.columns);
+    player.spawnAt(0); player.enterPlane();
+    // Even a high-altitude initial state cannot grant an uncrafted orbital mode.
+    const [x, y, z] = player.up();
+    player.px += x * (planet.config.karmanAGL + 50);
+    player.py += y * (planet.config.karmanAGL + 50);
+    player.pz += z * (planet.config.karmanAGL + 50);
+    player.holdAGL = 1500; player.pitch = 1;
+    const input = { forward: 1, strafe: 0, upDown: 1, sprint: true, jump: false, swimUp: false };
+    player.update(.1, input);
+    expect(player.inSpaceCruise).toBe(false);
+    expect(player.holdAGL).toBeLessThanOrEqual(planet.config.karmanAGL * .6);
+    player.hasOrbitalThruster = true;
+    player.update(.1, input);
+    expect(player.inSpaceCruise).toBe(true);
   });
 });

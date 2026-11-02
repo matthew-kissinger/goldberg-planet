@@ -126,9 +126,11 @@ describe('multi-planet archetypes, 12 Pentagon Wonders, and ecosystem seeding', 
     const columns = new Columns(geo, layers, terrain);
 
     const targetTile = 42;
+    const nativeSurface = columns.materialAt(targetTile, columns.topLayerOf(targetTile));
     const seeded = columns.seedEcosystem(targetTile, true);
     expect(seeded.length).toBeGreaterThan(1);
-    expect(columns.materialAt(targetTile, columns.topLayerOf(targetTile))).toBe(MAT.MYCELIUM);
+    // worlds-v3 planting retains the planet's surface and grows its native kit.
+    expect(columns.materialAt(targetTile, columns.topLayerOf(targetTile))).toBe(nativeSurface);
 
     // Edit column and verify export/import round-trip
     const top = columns.topLayerOf(targetTile);
@@ -146,6 +148,29 @@ describe('multi-planet archetypes, 12 Pentagon Wonders, and ecosystem seeding', 
     expect(mesh).not.toBeNull();
     expect(mesh!.packedMat.length).toBe(mesh!.positions.length / 3);
     pool.dispose();
+  });
+
+  it('densifies native growth without changing new-world surfaces, while retaining legacy planted mycelium', () => {
+    for (const cfg of configs.slice(1)) {
+      const terrain = new Terrain(cfg), columns = new Columns(geo, buildLayers(cfg), terrain);
+      const trees = new Trees(geo, columns, terrain, cfg.seed);
+      let naturalCount = 0, plantedCount = 0;
+      for (let tile = 0; tile < geo.count; tile++) {
+        const top = columns.topLayerOf(tile), surface = columns.materialAt(tile, top);
+        const species = trees.paramsFor(tile).growth!.species;
+        if (trees.hasTree(tile)) naturalCount++;
+        columns.seedEcosystem(tile, false);
+        if (trees.hasTree(tile)) plantedCount++;
+        expect(columns.materialAt(tile, top)).toBe(surface);
+        expect(trees.paramsFor(tile).growth!.species).toBe(species);
+      }
+      expect(plantedCount).toBeGreaterThan(naturalCount);
+    }
+
+    const legacyConfig = { ...configs[1], expeditionRecipe: undefined };
+    const legacy = new Columns(geo, buildLayers(legacyConfig), new Terrain(legacyConfig));
+    legacy.seedEcosystem(42, false);
+    expect(legacy.materialAt(42, legacy.topLayerOf(42))).toBe(MAT.MYCELIUM);
   });
 
   it('synthesizes deterministic procedural creature DNA across quadruped, biped, avian, and aquatic guilds', () => {

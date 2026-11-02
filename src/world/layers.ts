@@ -17,7 +17,7 @@ export const WATER_SURFACE = SEA_RADIUS - 0.35;
 /** thickness of a near-surface cell, meters */
 export const CELL_H = 1.25;
 /** uniform fine cells from the build ceiling down: covers +130 (peaks+headroom) to -55 (below seabed) */
-const UNIFORM_LAYERS = 148;
+const UNIFORM_BAND_METERS = 185;
 /** build headroom above the highest possible terrain */
 export const BUILD_CEILING = PLANET_RADIUS + 130;
 const DEPTH_GROWTH = 1.5;
@@ -43,6 +43,8 @@ export function buildLayers(
 ): Layers {
   const planetRadius = config?.radius ?? PLANET_RADIUS;
   const cellH = config?.layerH ?? CELL_H;
+  if (!Number.isFinite(cellH) || cellH <= 0) throw new Error('layerH must be positive');
+  const uniformLayers = Math.ceil(UNIFORM_BAND_METERS / cellH);
   const waterSurfaceOffset = config?.waterSurfaceOffset ?? -0.35;
   const waterSurface = planetRadius + waterSurfaceOffset;
   const buildCeiling = planetRadius + 130;
@@ -50,7 +52,7 @@ export function buildLayers(
 
   const b: number[] = [buildCeiling];
   let r = buildCeiling;
-  for (let k = 0; k < UNIFORM_LAYERS; k++) {
+  for (let k = 0; k < uniformLayers; k++) {
     r -= cellH;
     b.push(r);
   }
@@ -63,17 +65,17 @@ export function buildLayers(
   b.push(coreRadius); // final bedrock cell (unmineable)
   const bounds = new Float64Array(b);
   const L = bounds.length - 1;
-  const uniformBottom = bounds[UNIFORM_LAYERS];
+  const uniformBottom = bounds[uniformLayers];
 
   const layerOfRadius = (radius: number): number => {
     if (radius >= bounds[0]) return -1; // above build ceiling
     if (radius <= bounds[L]) return L - 1;
     if (radius >= uniformBottom) {
       const k = Math.floor((bounds[0] - radius) / cellH);
-      return Math.min(k, UNIFORM_LAYERS - 1);
+      return Math.min(k, uniformLayers - 1);
     }
     // few coarse layers: linear scan
-    for (let k = UNIFORM_LAYERS; k < L; k++) {
+    for (let k = uniformLayers; k < L; k++) {
       if (radius >= bounds[k + 1]) return k;
     }
     return L - 1;
@@ -82,7 +84,7 @@ export function buildLayers(
   return {
     bounds,
     L,
-    uniformLayers: UNIFORM_LAYERS,
+    uniformLayers,
     planetRadius,
     waterSurface,
     buildCeiling,

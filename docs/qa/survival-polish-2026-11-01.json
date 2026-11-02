@@ -1,0 +1,308 @@
+{
+  "version": 1,
+  "date": "2026-11-01",
+  "bundle": "index-BoJ8WI4Y.js",
+  "precedingFunctionalChecksBundle": "index-CgB-Ykep.js",
+  "stylesheet": "index-DMR-J42o.css",
+  "unitTests": {
+    "files": 47,
+    "passed": 274
+  },
+  "environment": {
+    "browser": "Chrome 156.0.8078.74",
+    "cpu": "Ryzen 7 3700X",
+    "gpu": "RTX 3070",
+    "topology": 192,
+    "viewport": [
+      1440,
+      900
+    ],
+    "dpr": 1
+  },
+  "longSurvival": {
+    "sourceBundle": "index-DG1RR8mt.js",
+    "minutes": 16.254516666666667,
+    "checks": 18,
+    "passed": true,
+    "scope": "Automated Survival with steering assistance; real world physics, SOI transitions, mined/collected resources and recipe costs. Actions call gameplay methods at checked nearby tiles. No inventory grants, god mode, warps or position changes.",
+    "surfaceWindows": [
+      {
+        "name": "world-2-minute",
+        "frames": {
+          "n": 8643,
+          "p95": 7.099999999998545,
+          "p99": 7.100000000005821,
+          "max": 8.200000000004366,
+          "over50": 0
+        }
+      },
+      {
+        "name": "world-0-minute",
+        "frames": {
+          "n": 8645,
+          "p95": 7.100000000005821,
+          "p99": 7.199999999982538,
+          "max": 7.600000000005821,
+          "over50": 0
+        }
+      },
+      {
+        "name": "world-1-minute",
+        "frames": {
+          "n": 8642,
+          "p95": 7.099999999976717,
+          "p99": 7.100000000034925,
+          "max": 8.599999999976717,
+          "over50": 0
+        }
+      },
+      {
+        "name": "world-3-minute",
+        "frames": {
+          "n": 8643,
+          "p95": 7.099999999976717,
+          "p99": 7.100000000093132,
+          "max": 7.5,
+          "over50": 0
+        }
+      },
+      {
+        "name": "world-4-minute",
+        "frames": {
+          "n": 8643,
+          "p95": 7.099999999976717,
+          "p99": 7.100000000093132,
+          "max": 7.599999999976717,
+          "over50": 0
+        }
+      },
+      {
+        "name": "world-5-minute",
+        "frames": {
+          "n": 8645,
+          "p95": 7.099999999976717,
+          "p99": 7.100000000093132,
+          "max": 7.5,
+          "over50": 0
+        }
+      },
+      {
+        "name": "world-2-minute",
+        "frames": {
+          "n": 8642,
+          "p95": 7.099999999976717,
+          "p99": 7.100000000093132,
+          "max": 7.400000000023283,
+          "over50": 0
+        }
+      }
+    ],
+    "flightFramesOver50": 7,
+    "worstFrameMs": 104.20000000001164,
+    "errors": [],
+    "warnings": [],
+    "note": "Pre-fix journey exposed the first-draw buffer initialization stalls. Real earned save resumed; no supply or position grants."
+  },
+  "finalPhysicalFlightRepeats": [
+    {
+      "passed": true,
+      "bundle": "index-CgB-Ykep.js",
+      "frames": {
+        "n": 15301,
+        "p95": 7.100000000000364,
+        "p99": 7.100000000005821,
+        "max": 20.89999999999418,
+        "over50": 0
+      },
+      "longTasks": {
+        "n": 0,
+        "p95": 0,
+        "p99": 0,
+        "max": 0,
+        "over50": 0
+      },
+      "cpuWorstMs": {
+        "playerAndTravel": 1,
+        "streaming": 12.800000011920929,
+        "sceneAndStructures": 1.0999999642372131,
+        "worldActors": 0.6000000238418579,
+        "characterAndIk": 0.6000000238418579,
+        "habitat": 1.899999976158142,
+        "resourceDrops": 0.10000002384185791,
+        "interactionAndHud": 9.399999976158142,
+        "renderSubmit": 13.200000047683716
+      },
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "passed": true,
+      "bundle": "index-CgB-Ykep.js",
+      "frames": {
+        "n": 15312,
+        "p95": 7.100000000000364,
+        "p99": 7.19999999999709,
+        "max": 20.80000000000291,
+        "over50": 0
+      },
+      "longTasks": {
+        "n": 0,
+        "p95": 0,
+        "p99": 0,
+        "max": 0,
+        "over50": 0
+      },
+      "cpuWorstMs": {
+        "playerAndTravel": 2,
+        "streaming": 11.299999952316284,
+        "sceneAndStructures": 1.0999999642372131,
+        "worldActors": 0.6000000238418579,
+        "characterAndIk": 1,
+        "habitat": 1.600000023841858,
+        "resourceDrops": 0.10000002384185791,
+        "interactionAndHud": 7.5,
+        "renderSubmit": 12.099999964237213
+      },
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "passed": true,
+      "bundle": "index-BoJ8WI4Y.js",
+      "frames": {
+        "n": 15313,
+        "p95": 7.100000000000364,
+        "p99": 7.100000000005821,
+        "max": 20.69999999999709,
+        "over50": 0
+      },
+      "longTasks": {
+        "n": 0,
+        "p95": 0,
+        "p99": 0,
+        "max": 0,
+        "over50": 0
+      },
+      "cpuWorstMs": {
+        "playerAndTravel": 1,
+        "streaming": 11.300000011920929,
+        "sceneAndStructures": 1.100000023841858,
+        "worldActors": 0.6000000238418579,
+        "characterAndIk": 0.7000000476837158,
+        "habitat": 1.699999988079071,
+        "resourceDrops": 0.10000002384185791,
+        "interactionAndHud": 7.600000023841858,
+        "renderSubmit": 11.800000011920929
+      },
+      "errors": [],
+      "warnings": []
+    }
+  ],
+  "nativeUI": {
+    "checks": 30,
+    "passed": true,
+    "errors": [],
+    "warnings": []
+  },
+  "navigation": {
+    "checks": 8,
+    "passed": true,
+    "errors": [],
+    "warnings": []
+  },
+  "webGLWorlds": {
+    "checks": 86,
+    "passed": true,
+    "errors": [],
+    "warnings": []
+  },
+  "homeDistanceBackends": [
+    {
+      "backend": "gpu",
+      "passed": true,
+      "scales": [
+        {
+          "name": "coast",
+          "cameraDistance": 107.84642041797784,
+          "farTriangles": 166971,
+          "detailedRendering": true,
+          "residentChunks": 167,
+          "renderedChunks": 167,
+          "draws": 151
+        },
+        {
+          "name": "high",
+          "cameraDistance": 1135.4450545811158,
+          "farTriangles": 184320,
+          "detailedRendering": false,
+          "residentChunks": 167,
+          "renderedChunks": 0,
+          "draws": 18
+        },
+        {
+          "name": "orbit",
+          "cameraDistance": 4191.987831898692,
+          "farTriangles": 184320,
+          "detailedRendering": false,
+          "residentChunks": 167,
+          "renderedChunks": 0,
+          "draws": 18
+        }
+      ],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "backend": "gl",
+      "passed": true,
+      "scales": [
+        {
+          "name": "coast",
+          "cameraDistance": 107.93347834550501,
+          "farTriangles": 166971,
+          "detailedRendering": true,
+          "residentChunks": 167,
+          "renderedChunks": 167,
+          "draws": 151
+        },
+        {
+          "name": "high",
+          "cameraDistance": 1136.096655193028,
+          "farTriangles": 184320,
+          "detailedRendering": false,
+          "residentChunks": 167,
+          "renderedChunks": 0,
+          "draws": 18
+        },
+        {
+          "name": "orbit",
+          "cameraDistance": 4193.421600359129,
+          "farTriangles": 184320,
+          "detailedRendering": false,
+          "residentChunks": 167,
+          "renderedChunks": 0,
+          "draws": 18
+        }
+      ],
+      "errors": [],
+      "warnings": []
+    }
+  ],
+  "finalCloudValidation": {
+    "bundle": "index-BoJ8WI4Y.js",
+    "webGPUWorldChecks": 17,
+    "webGPUWorldFrameMaxMs": 27.9,
+    "webGPUWorldFramesOver50": 0,
+    "webGLLayerIsolationStages": 8,
+    "passed": true,
+    "errors": [],
+    "warnings": [],
+    "scope": "Final two-lobe cloud integration adjustment: native Pyraxis arrival, three regions, walking and orbit on WebGPU; fixed-clock landscape layer isolation on WebGL."
+  },
+  "limits": [
+    "Frame intervals and CPU submission measurements, not GPU timer queries.",
+    "System/driver caches and other user applications uncontrolled.",
+    "Final fix has three bounded fresh-browser physical flight repeats, the last on the release bundle; the full 16-minute journey predates that fix.",
+    "No general guarantee for every seed, hardware configuration or prolonged building session."
+  ]
+}

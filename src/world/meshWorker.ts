@@ -46,11 +46,14 @@ export type MeshWorkerRequest =
   | WorkerUpdatePlanetMsg
   | WorkerBuildChunkMsg;
 
-export interface MeshWorkerResponse {
+export interface ChunkBuiltResponse {
   type: 'chunk_built';
   reqId: number;
   mesh: ChunkMeshData | null;
+  buildMs: number;
 }
+
+export type MeshWorkerResponse = ChunkBuiltResponse | { type: 'worker_error'; message: string };
 
 interface CachedTopology {
   geo: Goldberg;
@@ -66,76 +69,83 @@ interface WorkerPlanetState {
   trees: Trees;
 }
 
-const topologies = new Map<number, CachedTopology>();
-const planets = new Map<string, WorkerPlanetState>();
+/** Isolated fallback state per pool, and one bounded active planet per browser worker. */
+export function createMeshWorkerHandler(): (msg: MeshWorkerRequest) => ChunkBuiltResponse | null {
+  const topologies = new Map<number, CachedTopology>();
+  const planets = new Map<string, WorkerPlanetState>();
 
-function getTopology(m: number): CachedTopology {
-  let cached = topologies.get(m);
-  if (!cached) {
-    const geo = new Goldberg(m);
-    const chunks = enumerateChunks(geo);
-    cached = { geo, chunks };
-    topologies.set(m, cached);
-  }
-  return cached;
-}
-
-function applyDeltas(
-  state: WorkerPlanetState,
-  msg: Pick<WorkerInitPlanetMsg, 'edits' | 'choppedTrees' | 'treeDamage' | 'seededEcoTiles'>,
-): void {
-  if (msg.edits) {
-    state.columns.importEdits(msg.edits);
-  }
-  if (msg.seededEcoTiles) {
-    state.columns.seededEcoTiles.clear();
-    for (const t of msg.seededEcoTiles) state.columns.seededEcoTiles.add(t);
-  }
-  if (msg.choppedTrees) {
-    state.trees.chopped.clear();
-    for (const t of msg.choppedTrees) state.trees.chopped.add(t);
-  }
-  if (msg.treeDamage) {
-    state.trees.chopProgress.clear();
-    for (const [t, dmg] of msg.treeDamage) state.trees.chopProgress.set(t, dmg);
-  }
-}
-
-export function handleWorkerMessage(msg: MeshWorkerRequest): MeshWorkerResponse | null {
-  if (msg.type === 'init_planet') {
-    const { geo } = getTopology(msg.m);
-    const layers = buildLayers(msg.config);
-    const terrain = new Terrain(msg.config);
-    const columns = new Columns(geo, layers, terrain);
-    const trees = new Trees(geo, columns, terrain, msg.config.seed);
-    const state: WorkerPlanetState = { m: msg.m, config: msg.config, layers, terrain, columns, trees };
-    applyDeltas(state, msg);
-    planets.set(msg.planetId, state);
-    return null;
-  }
-
-  if (msg.type === 'update_planet') {
-    const state = planets.get(msg.planetId);
-    if (state) applyDeltas(state, msg);
-    return null;
-  }
-
-  if (msg.type === 'build_chunk') {
-    const state = planets.get(msg.planetId);
-    if (!state) {
-      return { type: 'chunk_built', reqId: msg.reqId, mesh: null };
+  function getTopology(m: number): CachedTopology {
+    let cached = topologies.get(m);
+    if (!cached) {
+      const geo = new Goldberg(m);
+      const chunks = enumerateChunks(geo);
+      cached = { geo, chunks };
+      topologies.set(m, cached);
     }
-    const { geo, chunks } = getTopology(state.m);
-    const chunk = chunks.get(msg.chunkKey);
-    if (!chunk) {
-      return { type: 'chunk_built', reqId: msg.reqId, mesh: null };
-    }
-    const mesh = buildChunkMesh(chunk, geo, state.layers, state.columns, state.trees);
-    return { type: 'chunk_built', reqId: msg.reqId, mesh };
+    return cached;
   }
 
-  return null;
+  function applyDeltas(
+    state: WorkerPlanetState,
+    msg: Pick<WorkerInitPlanetMsg, 'edits' | 'choppedTrees' | 'treeDamage' | 'seededEcoTiles'>,
+  ): void {
+    if (msg.edits) {
+      state.columns.importEdits(msg.edits);
+    }
+    if (msg.seededEcoTiles) {
+      state.columns.seededEcoTiles.clear();
+      for (const t of msg.seededEcoTiles) state.columns.seededEcoTiles.add(t);
+    }
+    if (msg.choppedTrees) {
+      state.trees.chopped.clear();
+      for (const t of msg.choppedTrees) state.trees.chopped.add(t);
+    }
+    if (msg.treeDamage) {
+      state.trees.chopProgress.clear();
+      for (const [t, dmg] of msg.treeDamage) state.trees.chopProgress.set(t, dmg);
+    }
+  }
+
+  return function handleWorkerMessage(msg: MeshWorkerRequest): ChunkBuiltResponse | null {
+    if (msg.type === 'init_planet') {
+      const { geo } = getTopology(msg.m);
+      const layers = buildLayers(msg.config);
+      const terrain = new Terrain(msg.config);
+      const columns = new Columns(geo, layers, terrain);
+      const trees = new Trees(geo, columns, terrain, msg.config.seed);
+      const state: WorkerPlanetState = { m: msg.m, config: msg.config, layers, terrain, columns, trees };
+      applyDeltas(state, msg);
+      planets.clear();
+      planets.set(msg.planetId, state);
+      return null;
+    }
+
+    if (msg.type === 'update_planet') {
+      const state = planets.get(msg.planetId);
+      if (state) applyDeltas(state, msg);
+      return null;
+    }
+
+    if (msg.type === 'build_chunk') {
+      const start = performance.now();
+      const state = planets.get(msg.planetId);
+      if (!state) {
+        return { type: 'chunk_built', reqId: msg.reqId, mesh: null, buildMs: 0 };
+      }
+      const { geo, chunks } = getTopology(state.m);
+      const chunk = chunks.get(msg.chunkKey);
+      if (!chunk) {
+        return { type: 'chunk_built', reqId: msg.reqId, mesh: null, buildMs: 0 };
+      }
+      const mesh = buildChunkMesh(chunk, geo, state.layers, state.columns, state.trees);
+      return { type: 'chunk_built', reqId: msg.reqId, mesh, buildMs: performance.now() - start };
+    }
+
+    return null;
+  };
 }
+
+export const handleWorkerMessage = createMeshWorkerHandler();
 
 // Bind to Web Worker global scope if running inside a browser Worker
 if (typeof self !== 'undefined' && typeof (self as unknown as { postMessage?: unknown }).postMessage === 'function' && typeof window === 'undefined') {
@@ -144,17 +154,21 @@ if (typeof self !== 'undefined' && typeof (self as unknown as { postMessage?: un
     postMessage: (message: MeshWorkerResponse, transfer?: Transferable[]) => void;
   };
   workerSelf.onmessage = (ev: MessageEvent<MeshWorkerRequest>) => {
-    const res = handleWorkerMessage(ev.data);
-    if (!res) return;
-    if (res.mesh) {
-      workerSelf.postMessage(res, [
-        res.mesh.positions.buffer,
-        res.mesh.normals.buffer,
-        res.mesh.colors.buffer,
-        res.mesh.packedMat.buffer,
-      ]);
-    } else {
-      workerSelf.postMessage(res);
+    try {
+      const res = handleWorkerMessage(ev.data);
+      if (!res) return;
+      if (res.mesh) {
+        workerSelf.postMessage(res, [
+          res.mesh.positions.buffer,
+          res.mesh.normals.buffer,
+          res.mesh.colors.buffer,
+          res.mesh.packedMat.buffer,
+        ]);
+      } else {
+        workerSelf.postMessage(res);
+      }
+    } catch (error) {
+      workerSelf.postMessage({ type: 'worker_error', message: error instanceof Error ? error.message : String(error) });
     }
   };
 }

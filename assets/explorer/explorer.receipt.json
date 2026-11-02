@@ -1,0 +1,95 @@
+{
+  "asset": "Field explorer",
+  "version": 2,
+  "source": "scripts/build-explorer.mjs",
+  "sourceSha256": "ae78aad34908de37974b1a7dc395c4ae71d2130e5d7d91e7427e1d4783bbc725",
+  "pipeline": "offline direct Three GLTFExporter",
+  "three": "187",
+  "sha256": "30cd3efd66cc47bd1df45e30ac86c21df0c68e6d13ba340833619fb7ab772918",
+  "bytes": 1246084,
+  "bones": 17,
+  "clips": [
+    {
+      "name": "idle",
+      "duration": 3.2
+    },
+    {
+      "name": "move",
+      "duration": 0.62
+    },
+    {
+      "name": "sprint",
+      "duration": 0.5
+    },
+    {
+      "name": "jump",
+      "duration": 1
+    },
+    {
+      "name": "swim",
+      "duration": 1.2
+    },
+    {
+      "name": "plane",
+      "duration": 1
+    },
+    {
+      "name": "chop",
+      "duration": 0.8
+    },
+    {
+      "name": "pickup",
+      "duration": 0.85
+    },
+    {
+      "name": "craft",
+      "duration": 1
+    }
+  ],
+  "skinVertices": 8086,
+  "skinTriangles": 11952,
+  "skinDraws": 1,
+  "totalAssetMeshes": 18,
+  "totalAssetVertices": 17273,
+  "totalAssetTriangles": 24568,
+  "authoredScale": 1.13,
+  "defaultVisibleSkinDraws": 4,
+  "skinModules": [
+    {
+      "name": "explorerModule_hair",
+      "vertices": 870,
+      "triangles": 1392
+    },
+    {
+      "name": "explorerModule_bun",
+      "vertices": 374,
+      "triangles": 576
+    },
+    {
+      "name": "explorerModule_braid",
+      "vertices": 1122,
+      "triangles": 1728
+    },
+    {
+      "name": "explorerModule_pack",
+      "vertices": 809,
+      "triangles": 852
+    },
+    {
+      "name": "explorerModule_satchel",
+      "vertices": 90,
+      "triangles": 140
+    },
+    {
+      "name": "explorerModule_hat",
+      "vertices": 174,
+      "triangles": 336
+    },
+    {
+      "name": "explorerModule_hood",
+      "vertices": 144,
+      "triangles": 280
+    }
+  ],
+  "totalSkins": 8
+}

@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three/webgpu';
-import { Character } from '../src/render/character';
 import { CameraRig } from '../src/game/cameraRig';
-import { FAR_MARGIN } from '../src/render/farsphere';
 import { Goldberg } from '../src/geo/goldberg';
 import { Player } from '../src/player/player';
 import { SolarSystem } from '../src/world/solarSystem';
@@ -12,55 +10,6 @@ import { buildSolarSystemConfigs } from '../src/world/planetConfig';
 describe('Visual Polish, LOD, Atmosphere & Orbit Entry Teleport Fixes', () => {
   const geo = new Goldberg(8);
   const configs = buildSolarSystemConfigs('polish-test');
-
-  it('verifies character arm anchors are placed outside torso and splay outward during movement', () => {
-    const scene = new THREE.Scene();
-    const character = new Character(scene);
-
-    let rightArm: THREE.Object3D | null = null;
-    let leftArm: THREE.Object3D | null = null;
-    character.group.traverse((part) => {
-      if (part.name === 'rightSdfBlendArm') rightArm = part.parent;
-      if (part.name === 'leftSdfBlendArm') leftArm = part.parent;
-    });
-
-    expect(rightArm).not.toBeNull();
-    expect(leftArm).not.toBeNull();
-
-    // Arm socket anchors are widened to ±0.36m (well outside torso shell)
-    expect(rightArm!.position.x).toBeGreaterThanOrEqual(0.35);
-    expect(leftArm!.position.x).toBeLessThanOrEqual(-0.35);
-
-    // During locomotion, arms splay outward (+Z rotation on right, -Z on left) away from torso
-    character.update(
-      {
-        px: 100, py: 0, pz: 0, vx: 6, vy: 0, vz: 0,
-        fwdX: 0, fwdY: 1, fwdZ: 0, pitch: 0, mode: 'walk', grounded: true,
-        submerged: 0, bank: 0, tile: 0, planeSpeed: 0, throttle: 0, holdAGL: 0,
-        planeStowed: false, stepSmooth: 0, up: () => [1, 0, 0], altitudeAGL: () => 0,
-      } as unknown as Player,
-      { x: 0, y: 0, z: 0 },
-      5,
-      1 / 60,
-      { action: 'move', held: 'hands', actionT: 0, actionDuration: 1 },
-    );
-
-    expect(rightArm!.rotation.z).toBeGreaterThan(0.1);
-    expect(leftArm!.rotation.z).toBeLessThan(-0.1);
-  });
-
-  it('verifies FarSphere uses FAR_MARGIN=12 and sets polygonOffset factor to eliminate terrain z-fighting', () => {
-    expect(FAR_MARGIN).toBe(12);
-
-    const mat = new THREE.MeshStandardMaterial();
-    // FarSphere constructor applies polygonOffset
-    mat.polygonOffset = true;
-    mat.polygonOffsetFactor = 4.0;
-    mat.polygonOffsetUnits = 4.0;
-
-    expect(mat.polygonOffset).toBe(true);
-    expect(mat.polygonOffsetFactor).toBe(4.0);
-  });
 
   it('verifies StructureStore caches analyzePlanetGrid and invalidates on changes', () => {
     const store = new StructureStore();

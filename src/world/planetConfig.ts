@@ -91,6 +91,8 @@ export interface PlanetSurvivalConfig {
 }
 
 export interface PlanetConfig {
+  /** Explicit terrain/art recipe version; old saves must retain their original layer grid. */
+  expeditionRecipe?: 'aurelia-v1' | 'aurelia-v2' | 'worlds-v3';
   id: string;
   name: string;
   subtitle: string;
@@ -174,8 +176,12 @@ export function makeDefaultPlanetConfig(seed = 'planet-one'): PlanetConfig {
 /** Generate a complete, deterministic multi-planet solar system from a universe seed. */
 export function buildSolarSystemConfigs(universeSeed: string): PlanetConfig[] {
   const starter = makeDefaultPlanetConfig(universeSeed);
-  starter.hasFloatingIslands = true;
-  starter.hasFlowingRivers = true;
+  starter.expeditionRecipe = 'aurelia-v2';
+  starter.subtitle = 'Living Shores and Six Wild Regions';
+  starter.layerH = 0.625;
+  starter.hasFloatingIslands = false;
+  starter.hasFlowingRivers = false;
+  starter.primaryFlora = 'broadleaf';
 
   const shatteredMoon: PlanetConfig = {
     id: 'planet-1',
@@ -429,5 +435,28 @@ export function buildSolarSystemConfigs(universeSeed: string): PlanetConfig[] {
     },
   };
 
+  // Explicitly version only the rebuilt worlds; makeDefaultPlanetConfig and
+  // externally supplied unversioned configs retain their legacy terrain/grid.
+  for (const world of [shatteredMoon, ringedCanyon, cryoSpire, volcanicCaldera, biolumAtoll]) {
+    world.expeditionRecipe = 'worlds-v3';
+    world.layerH = .625;
+    world.hasFloatingIslands = false;
+    world.hasFlowingRivers = false;
+  }
+  shatteredMoon.subtitle = 'Silver Impact Basins and Glass Rifts';
+  shatteredMoon.atmosphere.density = 0;
+  shatteredMoon.floraDensity = .13;
+  ringedCanyon.subtitle = 'Windcut Mesas, Dunes and Jade Oases';
+  Object.assign(ringedCanyon.atmosphere, { density:.58, cloudCoverage:.22,
+    zenithColor:[.37,.31,.24], horizonColor:[.81,.67,.48], cloudTint:[.90,.81,.67] });
+  cryoSpire.subtitle = 'Blue Shelves, Still Fjords and Ice Crowns';
+  Object.assign(cryoSpire.atmosphere, { density:.82, cloudCoverage:.42,
+    zenithColor:[.22,.39,.58], horizonColor:[.76,.89,.94], cloudTint:[.90,.95,.98] });
+  volcanicCaldera.subtitle = 'Basalt Flows, Ember Calderas and Ash Gardens';
+  Object.assign(volcanicCaldera.atmosphere, { density:.72, cloudCoverage:.32,
+    zenithColor:[.28,.22,.21], horizonColor:[.67,.43,.29], cloudTint:[.54,.47,.41] });
+  biolumAtoll.subtitle = 'Lantern Groves, Mirror Lagoons and Pearl Atolls';
+  Object.assign(biolumAtoll.atmosphere, { density:.90, cloudCoverage:.38,
+    zenithColor:[.24,.23,.39], horizonColor:[.47,.70,.66], cloudTint:[.74,.84,.80] });
   return [starter, shatteredMoon, ringedCanyon, cryoSpire, volcanicCaldera, biolumAtoll];
 }

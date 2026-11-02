@@ -9,6 +9,7 @@ import type { Goldberg } from '../geo/goldberg';
 import type { Layers } from './layers';
 import type { Columns } from './columns';
 import { treeTangentFrame, type Trees } from './trees';
+import { pickAureliaTree } from '../render/vegetationKit';
 
 export interface PickResult {
   hitTile: number;
@@ -27,6 +28,8 @@ export interface TreePick {
 }
 
 const treeFrame = new Float64Array(6);
+const treeCandidates = new Int32Array(128);
+const candidateSeen = new Set<number>();
 
 /**
  * Ray test against live trees: march the ray to discover candidate tiles (sample tile +
@@ -48,9 +51,20 @@ export function pickTree(
     const r = Math.hypot(px, py, pz);
     if (r < layers.bounds[layers.L] || r > layers.bounds[0] + 12) continue;
     const tile = geo.tileOf(px, py, pz);
-    const deg = geo.degreeOf(tile);
-    for (let k = -1; k < deg; k++) {
-      const id = k < 0 ? tile : geo.neighbor(tile, k);
+    // Wide new crowns can extend beyond the ray tile's immediate neighbors.
+    // Expand a bounded local ring set at fine topology; never enumerate trees.
+    const rings = columns.terrain.aurelia || columns.terrain.expeditionWorld ? Math.min(5, Math.max(1, Math.ceil(12 * geo.m / layers.planetRadius))) : 1;
+    let count = 1, start = 0, end = 1;
+    treeCandidates[0] = tile; candidateSeen.clear(); candidateSeen.add(tile);
+    for (let ring = 0; ring < rings; ring++) {
+      for (let i = start; i < end; i++) for (let k = 0; k < geo.degreeOf(treeCandidates[i]); k++) {
+        const id = geo.neighbor(treeCandidates[i], k);
+        if (count < treeCandidates.length && !candidateSeen.has(id)) { candidateSeen.add(id); treeCandidates[count++] = id; }
+      }
+      start = end; end = count;
+    }
+    for (let k = 0; k < count; k++) {
+      const id = treeCandidates[k];
       if (tested.has(id)) continue;
       tested.add(id);
       if (!trees.hasTree(id)) continue;
@@ -59,6 +73,11 @@ export function pickTree(
       treeTangentFrame(ux, uy, uz, treeFrame);
       const grove = typeof trees.groveTreesFor === 'function' ? trees.groveTreesFor(id) : [trees.paramsFor(id)];
       for (const p of grove) {
+        if (p.aurelia || p.growth) {
+          const distance = pickAureliaTree(p, ux, uy, uz, rG, ox, oy, oz, dx, dy, dz, maxDist);
+          if (distance !== null && (!best || distance < best.dist)) best = { tile: id, dist: distance };
+          continue;
+        }
         const bx = ux * (rG - 0.2) + treeFrame[0] * p.offA + treeFrame[3] * p.offB;
         const by = uy * (rG - 0.2) + treeFrame[1] * p.offA + treeFrame[4] * p.offB;
         const bz = uz * (rG - 0.2) + treeFrame[2] * p.offA + treeFrame[5] * p.offB;

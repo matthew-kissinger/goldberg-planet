@@ -1,4 +1,5 @@
 import type { ItemId } from './crafting';
+import { SPRINT_GAIT_SPEED } from '../player/locomotion';
 
 export type CharacterAction =
   | 'idle'
@@ -44,6 +45,6 @@ export function characterActionForLocomotion(input: CharacterLocomotionInput): C
   if (input.submerged > 0.45) return 'swim';
   if (input.mode === 'fly') return 'jump';
   if (!input.grounded) return 'jump';
-  if (input.speed > 0.45) return input.sprinting || input.speed > 7.2 ? 'sprint' : 'move';
+  if (input.speed > 0.45) return input.sprinting || input.speed > SPRINT_GAIT_SPEED ? 'sprint' : 'move';
   return 'idle';
 }

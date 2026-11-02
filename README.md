@@ -1,5 +1,71 @@
 # Goldberg Planet
 
+Exploration rebuild, 2026-11-01: walking and exploration lead the design, with crafting
+supporting the journey. Aurelia now uses a complete spherical landscape with six named
+habitats, five modular tree families and eight understory/flower modules. The other
+five worlds now use their own full-sphere terrain and climate recipes, with fifteen
+named regions, eleven new tall-growth families and fifteen groundcover modules:
+crystal impact basins, eroded desert mesas, glacial shelves, basalt calderas and fungal
+atolls. Six modular creature types replace the old animals in suitable habitats.
+Residents persist, with habitat behavior and articulated foot contacts. Airless
+Vespera has mineral growth and no native animals. A larger baked explorer uses nine authored clips,
+runtime blending and step-aware foot IK, plus configurable clothes, hair, headwear,
+packs, colors and stature. Lighting, surface materials, vehicles, equipment, camp kits,
+resource bundles and falling trees have also been rebuilt.
+
+Survival and Creative have separate versioned saves. Open **M → Explorer** to switch
+mode or customize the character. Creative supplies every tool and vehicle, free building
+and destination travel through **M → Worlds / Regions**. Regions follows the current
+planet. Survival uses gathered resources,
+nearby cooking/crafting stations and physical travel; atlas buttons mark a course.
+
+For food, **B → Camp → Campfire** costs **3 wood + 2 stone**; select it and place with Q.
+Within 10 m of that fire, **B → Make → Roast Meat** uses **1 raw meat + 1 wood**. To leave
+the planet, build a Workbench and Furnace, mine stone for iron ore and smelt two ingots.
+Craft the **Starfarer** at the Workbench with **8 wood + 4 stone + 2 iron ingots**, board
+with E and climb above the displayed orbital height. The 12-wood skiff stays atmospheric.
+
+The `worlds-v3` save namespace keeps old foreign-world layer edits separate. On first
+load, compatible Aurelia progress, inventory and appearance carry forward from the
+prior mode's `aurelia-v2` slot; the original slot is preserved. An explorer saved on
+an old foreign world returns safely to Aurelia. Old foreign outposts/edits remain in
+the old slot because their terrain and layer grid changed.
+
+Selected simulation systems remain. Named-region discoveries and animal
+observations/feeding persist; landmarks are currently decorative and the population
+model is bounded habitat behavior, not a simulated food web.
+See [the exploration direction](docs/exploration-direction.md), [concept art](docs/concepts/prompts.md),
+[performance evidence](docs/performance-review.md), and [meshlet evaluation](docs/meshlet-evaluation.md).
+The Surveyor interface uses etched brass, enamel instruments and a route atlas.
+Cloud sampling and terrain transitions are refined; Survival vitals persist across
+reloads, and stowing a craft brakes its dismount momentum. A longer Survival run
+found a first-draw terrain-buffer burst, now handled through bounded GPU priming.
+The [validation receipt](docs/qa/survival-polish-2026-11-01.json) distinguishes the
+pre-fix 16-minute journey from the three subsequent physical-flight repeats.
+See [the game interface](docs/concepts/surveyor-ui-v2.png).
+
+The older single-world description
+and screenshots below are historical, not the current feature specification.
+
+For repeatable diagnostics, `node scripts/profile-game.mjs LABEL PORT gpu` captures
+an unchanged local build, and `node scripts/smoke-streaming.mjs http://127.0.0.1:PORT/`
+checks asynchronous edits, rapid planet changes, and worker recovery in a disposable
+no-save browser. `scripts/smoke-ui.mjs` and `scripts/smoke-rendering.mjs` accept the same origin
+argument and check interface flows and both rendering backends. Set `CHROME_PATH` if
+Chrome is not in the default Windows location.
+
+`npm run assets:build` regenerates the explorer GLB and surface-detail texture from
+their editable sources. `npm run assets:kits` exports the shared fauna and vegetation
+parts as portable GLB review kits; the game builds those small shared profiles once
+and animates/varies them at runtime. `scripts/smoke-expedition.mjs` checks real-input movement,
+foot contact, pausing and travel; `scripts/smoke-expedition-ui.mjs` checks modes,
+stations, customization and save isolation. `scripts/measure-travel.mjs` separately measures
+cold and cached travel in fresh browsers without motion recording overhead. Add
+`--all-worlds` after its run-count and output label to visit all five new worlds and
+return through cached destinations. `scripts/smoke-worlds.mjs ORIGIN OUTPUT` checks
+native region travel, walking, surface traversal and orbital representation; add
+`--no-screenshots` for an independent timing pass or `--gl` for WebGL2.
+
 **Play it: <https://matthew-kissinger.github.io/goldberg-planet/>**
 
 A small browser game on a spherical planet whose surface is a true Goldberg polyhedron
@@ -31,7 +97,7 @@ npm test         # topology, world, trees, crafting, drops, save, input, charact
 npm run build    # typecheck + production bundle (deployed to Pages by CI)
 ```
 
-URL params: `?seed=anything` (world seed), `?m=192` (Goldberg frequency), `?gpu=gl` (force
+URL params: `?mode=survival|creative` (defaults Survival), `?seed=anything` (world seed), `?m=192` (Goldberg frequency), `?gpu=gl` (force
 the WebGL2 fallback), `?touch=1` (force the touch UI), `?clouds=0` (no cloud layer),
 `?skyq=low|high` (sky march quality; defaults low on coarse-pointer devices), `?debug=1`
 (start with F3 diagnostics open), `?nosave=1` (no local save), `?reset=1` (clear this
@@ -63,7 +129,7 @@ seed and frequency.
 | Chop | left click (hold to keep swinging) | tap the tree | X or RT |
 | Crafting panel | B (Esc closes) | craft button | Y (A crafts, B closes) |
 | Craft + board / stow plane | E | plane button | Start |
-| Free-flight (dev) | F | | |
+| Free-flight (Creative) | F | | |
 | Mute, stats, help | N, F3, H | | Back+LB, R3+LB, R3 |
 
 ## The plane

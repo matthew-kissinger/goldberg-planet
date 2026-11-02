@@ -73,9 +73,25 @@ export class WildlifeManager {
   /** Clear all active creatures (e.g. when switching planets). */
   clear(): void {
     for (const c of this.creatures) {
-      this.group.remove(c.meshGroup);
+      this.releaseCreature(c);
     }
     this.creatures.length = 0;
+  }
+
+  /** Each creature owns its mesh resources; materials are shared only within that creature. */
+  private releaseCreature(creature: WildlifeCreature): void {
+    this.group.remove(creature.meshGroup);
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+    creature.meshGroup.traverse((part) => {
+      if (!(part instanceof THREE.Mesh)) return;
+      geometries.add(part.geometry);
+      for (const material of Array.isArray(part.material) ? part.material : [part.material]) {
+        materials.add(material);
+      }
+    });
+    for (const geometry of geometries) geometry.dispose();
+    for (const material of materials) material.dispose();
   }
 
   /**
@@ -559,7 +575,7 @@ export class WildlifeManager {
       const c = this.creatures[i]!;
       const d = Math.hypot(c.px - player.px, c.py - player.py, c.pz - player.pz);
       if (d > 95) {
-        this.group.remove(c.meshGroup);
+        this.releaseCreature(c);
         this.creatures.splice(i, 1);
       }
     }
@@ -666,7 +682,7 @@ export class WildlifeManager {
     if (best.hp <= 0) {
       const idx = this.creatures.indexOf(best);
       if (idx >= 0) this.creatures.splice(idx, 1);
-      this.group.remove(best.meshGroup);
+      this.releaseCreature(best);
       const drops: Array<{ item: ItemId; count: number }> =
         best.diet === 'predator'
           ? [

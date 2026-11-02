@@ -12,6 +12,10 @@ export class Autosave {
   private dirty: boolean;
   private timer = 0;
   private lastMs = 0;
+  private captureWorstMs = 0;
+  private storageWorstMs = 0;
+
+  timings() { return { captureWorstMs: this.captureWorstMs, storageWorstMs: this.storageWorstMs }; }
 
   constructor(
     private readonly key: string,
@@ -43,7 +47,12 @@ export class Autosave {
 
   write(force = false): boolean {
     if (!this.enabled || (!force && !this.dirty)) return false;
-    const ok = storeWorldSave(this.key, this.capture());
+    const start = performance.now();
+    const snapshot = this.capture();
+    const captured = performance.now();
+    const ok = storeWorldSave(this.key, snapshot);
+    this.captureWorstMs = Math.max(this.captureWorstMs, captured - start);
+    this.storageWorstMs = Math.max(this.storageWorstMs, performance.now() - captured);
     if (ok) {
       this.dirty = false;
       this.lastMs = performance.now();

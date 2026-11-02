@@ -82,6 +82,9 @@ export class GameAudio {
   }
 
   async unlock(): Promise<boolean> {
+    // Muted play must not open the hardware device on its first movement/click.
+    // Returning false keeps the host's gesture-unlock listener available.
+    if (this.muted) return false;
     const ctx = this.ensureContext();
     if (!ctx) return false;
     try {
@@ -272,9 +275,14 @@ export class GameAudio {
   }
 
   setMuted(muted: boolean): void {
+    const wasMuted = this.muted;
     this.muted = muted;
     this.applyVolumes();
     if (muted) this.pauseMusic();
+    // The unmute action itself supplies activation. The host may process its
+    // key intent after the original unlock listener, so do not require another
+    // movement or click before creating/resuming the context.
+    else if (wasMuted) void this.unlock();
     else this.startUnlockedAudio();
   }
 
@@ -292,7 +300,7 @@ export class GameAudio {
   }
 
   loadAll(): void {
-    if (this.loadAllStarted) return;
+    if (this.muted || this.loadAllStarted) return;
     this.loadAllStarted = true;
     for (const id of Object.keys(this.assets) as AudioAssetId[]) void this.loadAsset(id);
   }
@@ -359,6 +367,7 @@ export class GameAudio {
   }
 
   private ensureContext(): AudioContext | null {
+    if (this.muted) return null;
     if (this.ctx) return this.ctx;
     const make = this.contextFactory();
     if (!make) return null;

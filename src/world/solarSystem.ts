@@ -24,6 +24,7 @@ import type { Sky } from '../render/sky';
 import type { TerrainMaterialHandle } from '../render/terrainMaterial';
 import type { GpuPlanetEffects } from '../render/gpuComputeParticles';
 import type { Player } from '../player/player';
+import type { PreparationOptions } from './preparation';
 
 export interface PlanetState {
   index: number;
@@ -60,6 +61,18 @@ export interface SolarSystemRenderBindings {
   gpuEffects?: GpuPlanetEffects;
 }
 
+export interface TravelState {
+  pending: boolean;
+  targetId: string | null;
+  kind: 'warp' | 'handoff' | null;
+  progress: number;
+  error: string | null;
+  cached: boolean;
+  preparationMs: number;
+  maxSliceMs: number;
+  commitMs: number;
+}
+
 export class SolarSystem {
   readonly universeSeed: string;
   readonly fineGeo: Goldberg;
@@ -69,6 +82,13 @@ export class SolarSystem {
   private activeIndex = 0;
   private bindings: SolarSystemRenderBindings | null = null;
   private readonly changeListeners: Array<(planet: PlanetState, dx?: number, dy?: number, dz?: number) => void> = [];
+  private travelSequence = 0;
+  private travelAbort: AbortController | null = null;
+  private travelCompletion: Promise<boolean> = Promise.resolve(true);
+  travelState: Readonly<TravelState> = {
+    pending: false, targetId: null, kind: null, progress: 1, error: null,
+    cached: true, preparationMs: 0, maxSliceMs: 0, commitMs: 0,
+  };
 
   constructor(
     universeSeed: string,
@@ -116,12 +136,81 @@ export class SolarSystem {
   }
 
   bindRenderers(bindings: SolarSystemRenderBindings): void {
+    this.cancelTravel();
     this.bindings = bindings;
     this.syncBindingsToActive();
   }
 
   onPlanetChange(listener: (planet: PlanetState, dx?: number, dy?: number, dz?: number) => void): void {
     this.changeListeners.push(listener);
+  }
+
+  /** Resolves false if superseded, cancelled, or preparation failed. Never rejects. */
+  whenTravelSettled(): Promise<boolean> { return this.travelCompletion; }
+
+  cancelTravel(): void {
+    this.travelSequence++;
+    this.travelAbort?.abort();
+    this.travelAbort = null;
+    this.travelState = { ...this.travelState, pending: false, targetId: null, kind: null, error: null };
+    this.travelCompletion = Promise.resolve(false);
+  }
+
+  private requestTravel(target: PlanetState, kind: 'warp' | 'handoff', commit: () => void): boolean {
+    this.cancelTravel();
+    const sequence = this.travelSequence;
+    const bindings = this.bindings;
+    const cached = !bindings || (bindings.farSphere.hasPreparedTerrain(target.terrain, target.config.radius) &&
+      bindings.ocean.hasPreparedPlanet(target.terrain, target.layers));
+    this.travelState = {
+      pending: !cached, targetId: target.config.id, kind, progress: cached ? 1 : 0,
+      error: null, cached, preparationMs: 0, maxSliceMs: 0, commitMs: 0,
+    };
+    const apply = (): boolean => {
+      if (sequence !== this.travelSequence) return false;
+      const start = performance.now();
+      commit();
+      this.travelState = { ...this.travelState, pending: false, progress: 1, commitMs: performance.now() - start };
+      this.travelAbort = null;
+      return true;
+    };
+    if (cached || !bindings) {
+      this.travelCompletion = Promise.resolve(apply());
+      return true;
+    }
+    const controller = new AbortController();
+    this.travelAbort = controller;
+    const start = performance.now();
+    const options = (offset: number): PreparationOptions => ({
+      signal: controller.signal,
+      onProgress: fraction => {
+        if (sequence === this.travelSequence) this.travelState = { ...this.travelState, progress: offset + fraction * 0.5 };
+      },
+      onSlice: milliseconds => {
+        if (sequence === this.travelSequence) this.travelState = {
+          ...this.travelState, maxSliceMs: Math.max(this.travelState.maxSliceMs, milliseconds),
+        };
+      },
+    });
+    this.travelCompletion = (async () => {
+      try {
+        await bindings.farSphere.prepareTerrain(target.terrain, target.config.radius, options(0));
+        if (sequence !== this.travelSequence) return false;
+        await bindings.ocean.preparePlanet(target.terrain, target.layers, options(0.5));
+        if (sequence !== this.travelSequence || controller.signal.aborted) return false;
+        this.travelState = { ...this.travelState, preparationMs: performance.now() - start };
+        return apply();
+      } catch (error) {
+        if (sequence !== this.travelSequence) return false;
+        this.travelAbort = null;
+        this.travelState = {
+          ...this.travelState, pending: false, preparationMs: performance.now() - start,
+          error: error instanceof Error ? error.message : String(error),
+        };
+        return false;
+      }
+    })();
+    return true;
   }
 
   private syncBindingsToActive(): void {
@@ -148,6 +237,11 @@ export class SolarSystem {
   handoffToPlanet(targetId: string, player: Player): boolean {
     const target = this.planetById.get(targetId);
     if (!target || target.index === this.activeIndex) return false;
+
+    return this.requestTravel(target, 'handoff', () => this.commitHandoff(target, player));
+  }
+
+  private commitHandoff(target: PlanetState, player: Player): void {
 
     const prev = this.activePlanet;
     const dx = prev.config.solarPosition[0] - target.config.solarPosition[0];
@@ -180,7 +274,6 @@ export class SolarSystem {
     this.syncBindingsToActive();
 
     for (const cb of this.changeListeners) cb(target, dx, dy, dz);
-    return true;
   }
 
   /**
@@ -189,9 +282,30 @@ export class SolarSystem {
   warpToPlanet(targetId: string, player: Player, landingTile = 0, enterFlight = true): boolean {
     const target = this.planetById.get(targetId);
     if (!target) return false;
+    return this.requestTravel(target, 'warp', () => this.commitWarp(target, player, landingTile, enterFlight));
+  }
+
+  private commitWarp(target: PlanetState, player: Player, landingTile: number, enterFlight: boolean): void {
     this.activeIndex = target.index;
     player.rebindPlanet(target.layers, target.columns);
     player.spawnAt(landingTile);
+    // A deliberate visit starts a new local arrival. SOI handoffs retain momentum
+    // in commitHandoff; a warp must not carry cruise speed, swimming state, or
+    // free-flight mode into the destination's ground spawn or launch.
+    player.vx = player.vy = player.vz = 0;
+    player.mode = 'walk';
+    player.pitch = 0;
+    player.inSpaceCruise = false;
+    player.planeSpeed = 0;
+    player.throttle = 0;
+    player.holdAGL = 0;
+    player.grounded = false;
+    player.submerged = 0;
+    player.bank = 0;
+    player.planeStowed = false;
+    player.stepSmooth = 0;
+    player.inSafeAura = false;
+    player.onPentagonWonder = false;
     if (enterFlight) {
       const [ux, uy, uz] = player.up();
       player.px += ux * 65;
@@ -203,7 +317,6 @@ export class SolarSystem {
     }
     this.syncBindingsToActive();
     for (const cb of this.changeListeners) cb(target);
-    return true;
   }
 
   /**
@@ -223,6 +336,7 @@ export class SolarSystem {
 
     let switchedTo: PlanetState | null = null;
     for (let i = 0; i < this.planets.length; i++) {
+      if (this.travelState.pending) break;
       if (i === this.activeIndex) continue;
       const cand = this.planets[i];
       const cx = cand.config.solarPosition[0];
@@ -232,7 +346,14 @@ export class SolarSystem {
       const soiRadius = cand.config.radius * 2.15;
       if (dist < soiRadius) {
         this.handoffToPlanet(cand.config.id, player);
-        switchedTo = cand;
+        // An uncached crossing begins preparation; old-world simulation remains authoritative
+        // until the ready swap. The caller freezes movement while travelState.pending.
+        if (this.activeIndex === cand.index) {
+          switchedTo = cand;
+          camX += ax - cand.config.solarPosition[0];
+          camY += ay - cand.config.solarPosition[1];
+          camZ += az - cand.config.solarPosition[2];
+        }
         break;
       }
     }

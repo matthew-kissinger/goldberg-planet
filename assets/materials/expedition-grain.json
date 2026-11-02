@@ -1,0 +1,12 @@
+{
+  "source": "scripts/bake-surface-detail.mjs",
+  "size": 256,
+  "bytes": 203414,
+  "sha256": "6cb7977ad11032943e552b93497fe8ce063f4da2c744bbd2067129abec585821",
+  "channels": [
+    "broad grain",
+    "fine grain",
+    "strata"
+  ],
+  "colorSpace": "linear data"
+}

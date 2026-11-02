@@ -28,6 +28,8 @@ import {
 } from 'three/tsl';
 import type { PlanetConfig } from '../world/planetConfig';
 import { mulberry32 } from '../util/prng';
+import { hasAtmosphere } from './planetVisualProfile';
+import { createPlanetRing } from './planetRing';
 
 export const RING_INSTANCE_COUNT = 2048;
 export const WEATHER_INSTANCE_COUNT = 512;
@@ -36,6 +38,7 @@ export const WEATHER_INSTANCE_COUNT = 512;
 
 export class GpuPlanetEffects {
   readonly ringMesh: THREE.InstancedMesh;
+  readonly ringBand = createPlanetRing();
   readonly weatherMesh: THREE.InstancedMesh;
   private readonly computeRingsNode: any;
   private readonly computeWeatherNode: any;
@@ -54,6 +57,14 @@ export class GpuPlanetEffects {
   private readonly uWeatherColor = uniform(new THREE.Vector3(0.95, 0.98, 1.0));
   private readonly uWeatherDrift = uniform(new THREE.Vector3(0.5, -3.5, 0.5));
   private readonly uWeatherEmissive = uniform(0.2);
+  private weatherEnabled = false;
+  private planetRadius = 900;
+  private weatherCeiling = 150;
+  private waterLevel = -.35;
+  private readonly weatherUp = new THREE.Vector3(0, 1, 0);
+  private readonly weatherRight = new THREE.Vector3(1, 0, 0);
+  private readonly weatherForward = new THREE.Vector3(0, 0, 1);
+  private readonly weatherBasis = new THREE.Matrix4();
 
   constructor(scene: THREE.Scene) {
     const rng = mulberry32(0x7fc391a5);
@@ -64,7 +75,7 @@ export class GpuPlanetEffects {
       ringSeedData[i * 4] = rng();                       // radial fraction [0, 1]
       ringSeedData[i * 4 + 1] = rng() * Math.PI * 2;     // initial orbital angle
       ringSeedData[i * 4 + 2] = (rng() - 0.5) * 28.0;    // vertical belt thickness (m)
-      ringSeedData[i * 4 + 3] = 2.0 + Math.pow(rng(), 2) * 6.5; // asteroid scale (m)
+      ringSeedData[i * 4 + 3] = 0.18 + Math.pow(rng(), 2) * 0.85; // small debris; belt supplies the distant silhouette
     }
     const ringSeedStorage = instancedArray(ringSeedData, 'vec4');
     const ringOutStorage = instancedArray(RING_INSTANCE_COUNT, 'vec4');
@@ -115,6 +126,7 @@ export class GpuPlanetEffects {
     this.ringMesh.frustumCulled = false;
     this.ringMesh.visible = false;
     scene.add(this.ringMesh);
+    scene.add(this.ringBand.mesh);
 
     // --- 2. Subtle Spherical Biome Weather Motes (WebGPU Compute + instancedArray) ---
     const weatherSeedData = new Float32Array(WEATHER_INSTANCE_COUNT * 4);
@@ -153,19 +165,30 @@ export class GpuPlanetEffects {
     scene.add(this.weatherMesh);
   }
 
-  /** Pre-compile WebGPU compute pipelines using Three.js r186+ `compileComputeAsync`. */
+  /** Compile and initialize both bounded storage layouts while startup is covered. */
   async precompile(renderer: THREE.WebGPURenderer): Promise<void> {
-    const r = renderer as unknown as { compileComputeAsync?: (node: any) => Promise<void> };
+    const r = renderer as unknown as { compileComputeAsync?: (node: any) => Promise<void>; compute?: (node: any) => void };
     if (typeof r.compileComputeAsync === 'function') {
       await Promise.all([
         r.compileComputeAsync(this.computeRingsNode),
         r.compileComputeAsync(this.computeWeatherNode),
       ]);
     }
+    r.compute?.(this.computeRingsNode);
+    r.compute?.(this.computeWeatherNode);
+  }
+
+  /** Include initially hidden layouts in the caller's single covered scene warmup. */
+  prepareWarmup(): () => void {
+    const ringVisible = this.ringMesh.visible, weatherVisible = this.weatherMesh.visible, bandVisible = this.ringBand.mesh.visible;
+    this.ringMesh.visible = this.weatherMesh.visible = true;
+    this.ringBand.mesh.visible = true;
+    return () => { this.ringMesh.visible = ringVisible; this.weatherMesh.visible = weatherVisible; this.ringBand.mesh.visible = bandVisible; };
   }
 
   /** Reconfigure ring belt and biome weather particles when entering a planet. */
   applyPlanetConfig(config: PlanetConfig): void {
+    this.ringBand.apply(config.rings);
     if (config.rings) {
       this.ringMesh.visible = true;
       this.uRingInner.value = config.rings.innerRadius;
@@ -185,25 +208,29 @@ export class GpuPlanetEffects {
     }
 
     const wk = config.atmosphere.weatherKind;
-    if (wk === 'none') {
+    this.planetRadius = config.radius;
+    this.weatherCeiling = config.atmosphere.thickness * .85;
+    this.waterLevel = config.ocean.hasOcean ? config.waterSurfaceOffset : -Infinity;
+    this.weatherEnabled = wk !== 'none' && hasAtmosphere(config);
+    if (!this.weatherEnabled) {
       this.weatherMesh.visible = false;
     } else {
       this.weatherMesh.visible = true;
       if (wk === 'snow') {
         this.uWeatherColor.value.set(0.92, 0.97, 1.0);
-        this.uWeatherDrift.value.set(1.8, -4.2, 1.2);
+        this.uWeatherDrift.value.set(.65, -1.8, .3);
         this.uWeatherEmissive.value = 0.05;
       } else if (wk === 'embers') {
         this.uWeatherColor.value.set(1.0, 0.45, 0.12);
-        this.uWeatherDrift.value.set(1.4, 4.5, -1.1);
-        this.uWeatherEmissive.value = 0.85;
+        this.uWeatherDrift.value.set(.45, 1.4, -.35);
+        this.uWeatherEmissive.value = 0.35;
       } else if (wk === 'spores') {
-        this.uWeatherColor.value.set(0.24, 0.96, 0.82);
-        this.uWeatherDrift.value.set(0.8, 1.2, -0.9);
-        this.uWeatherEmissive.value = 0.65;
+        this.uWeatherColor.value.set(0.55, 0.76, 0.72);
+        this.uWeatherDrift.value.set(.2, .35, -.25);
+        this.uWeatherEmissive.value = 0.18;
       } else {
         this.uWeatherColor.value.set(0.92, 0.68, 0.46);
-        this.uWeatherDrift.value.set(6.5, -0.8, 3.2);
+        this.uWeatherDrift.value.set(2.4, -.25, 1.1);
         this.uWeatherEmissive.value = 0.0;
       }
     }
@@ -221,7 +248,24 @@ export class GpuPlanetEffects {
   ): void {
     this.uPlayerPlanetPos.value.set(playerX, playerY, playerZ);
     this.ringMesh.position.set(-camX, -camY, -camZ);
-    this.weatherMesh.position.set(0, 0, 0);
+    this.ringBand.mesh.position.copy(this.ringMesh.position);
+    this.weatherMesh.position.set(playerX - camX, playerY - camY, playerZ - camZ);
+    const radius = Math.hypot(playerX, playerY, playerZ);
+    const altitude = radius - this.planetRadius;
+    this.weatherMesh.visible = this.weatherEnabled && altitude < this.weatherCeiling && altitude > this.waterLevel;
+    if (radius > 0) {
+      this.weatherUp.set(playerX / radius, playerY / radius, playerZ / radius);
+      // Parallel-transport the tangent frame, avoiding a sudden pole-axis flip.
+      this.weatherRight.addScaledVector(this.weatherUp, -this.weatherRight.dot(this.weatherUp));
+      if (this.weatherRight.lengthSq() < 1e-8) {
+        this.weatherRight.set(Math.abs(this.weatherUp.x) < .9 ? 1 : 0, Math.abs(this.weatherUp.x) < .9 ? 0 : 1, 0);
+        this.weatherRight.addScaledVector(this.weatherUp, -this.weatherRight.dot(this.weatherUp));
+      }
+      this.weatherRight.normalize();
+      this.weatherForward.crossVectors(this.weatherRight, this.weatherUp).normalize();
+      this.weatherBasis.makeBasis(this.weatherRight, this.weatherUp, this.weatherForward);
+      this.weatherMesh.quaternion.setFromRotationMatrix(this.weatherBasis);
+    }
 
     const r = renderer as unknown as { compute?: (node: any) => void };
     if (typeof r.compute === 'function') {

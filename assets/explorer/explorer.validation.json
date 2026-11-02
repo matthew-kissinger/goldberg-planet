@@ -1,0 +1,39 @@
+{
+  "uri": "explorer.glb",
+  "mimeType": "model/gltf-binary",
+  "validatorVersion": "2.0.0-dev.3.10",
+  "validatedAt": "2026-11-01T22:48:04.471Z",
+  "issues": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 0,
+    "numHints": 0,
+    "messages": [],
+    "truncated": false
+  },
+  "info": {
+    "version": "2.0",
+    "generator": "THREE.GLTFExporter r187",
+    "resources": [
+      {
+        "pointer": "/buffers/0",
+        "mimeType": "application/gltf-buffer",
+        "storage": "glb",
+        "byteLength": 1141328
+      }
+    ],
+    "animationCount": 9,
+    "materialCount": 1,
+    "hasMorphTargets": false,
+    "hasSkins": true,
+    "hasTextures": false,
+    "hasDefaultScene": true,
+    "drawCallCount": 18,
+    "totalVertexCount": 17273,
+    "totalTriangleCount": 24568,
+    "maxUVs": 0,
+    "maxInfluences": 4,
+    "maxAttributes": 6
+  },
+  "assetSha256": "30cd3efd66cc47bd1df45e30ac86c21df0c68e6d13ba340833619fb7ab772918"
+}

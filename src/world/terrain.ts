@@ -12,6 +12,9 @@
 
 import { createNoise3D, type NoiseFunction3D } from 'simplex-noise';
 import { hashString, mulberry32 } from '../util/prng';
+import { habitatPathDistance, habitatX, habitatZ, hasExpeditionHabitat, isExpeditionInterior } from './expeditionHabitat';
+import { AureliaWorld } from './aurelia';
+import { ExpeditionWorld } from './expeditionWorlds';
 import {
   billowFbm3D,
   craterProfile,
@@ -43,6 +46,7 @@ export const MAT = {
   CRYSTAL: 12,
   MAGMA: 13,
   MYCELIUM: 14,
+  LIMESTONE: 15,
 } as const;
 export type MaterialId = (typeof MAT)[keyof typeof MAT];
 
@@ -61,6 +65,8 @@ export class Terrain {
   readonly seed: string;
   readonly archetype: PlanetArchetype;
   readonly config: PlanetConfig;
+  readonly aurelia: AureliaWorld | null;
+  readonly expeditionWorld: ExpeditionWorld | null;
   private readonly seedHash: number;
   private readonly n1: NoiseFunction3D;
   private readonly n2: NoiseFunction3D;
@@ -80,6 +86,8 @@ export class Terrain {
       this.seed = seedOrConfig.seed;
       this.archetype = archetypeOverride ?? seedOrConfig.archetype;
     }
+    this.aurelia = this.archetype === 'terran' && hasExpeditionHabitat(this.config) ? new AureliaWorld(this.config) : null;
+    this.expeditionWorld = this.archetype !== 'terran' && this.config.expeditionRecipe === 'worlds-v3' ? new ExpeditionWorld(this.config) : null;
     const h = hashString(this.seed);
     this.seedHash = h;
     this.n1 = createNoise3D(mulberry32(h ^ 0x9e3779b9));
@@ -101,6 +109,8 @@ export class Terrain {
 
   /** Height in meters relative to sea level, for unit direction (x,y,z). Deterministic. */
   heightAt(x: number, y: number, z: number): number {
+    if (this.aurelia) return this.aurelia.heightAt(x, y, z);
+    if (this.expeditionWorld) return this.expeditionWorld.heightAt(x, y, z);
     switch (this.archetype) {
       case 'canyon':
         return this.heightCanyon(x, y, z);
@@ -243,6 +253,8 @@ export class Terrain {
    * Moisture field in [0, 1] for biome variation and shader micro-patterns.
    */
   moistureAt(x: number, y: number, z: number): number {
+    if (this.aurelia) return this.aurelia.moistureAt(x, y, z);
+    if (this.expeditionWorld) return this.expeditionWorld.moistureAt(x, y, z);
     const m = fbm3D(this.n3, x * 2.8 + 5.1, y * 2.8 - 8.3, z * 2.8 + 2.7, 3);
     return sm01((m + 0.45) / 0.9);
   }
@@ -262,6 +274,8 @@ export class Terrain {
    * and glades rather than a uniform sprinkle. Same determinism contract as heightAt.
    */
   forestAt(x: number, y: number, z: number): number {
+    if (this.aurelia) return this.aurelia.forestAt(x, y, z);
+    if (this.expeditionWorld) return this.expeditionWorld.forestAt(x, y, z);
     const f = this.fbm(this.n2, x * 4.3 - 17.1, y * 4.3 + 9.4, z * 4.3 + 3.2, 3);
     return sm01((f + 0.05) / 0.55);
   }
@@ -272,6 +286,31 @@ export class Terrain {
    * single-argument `surfaceMaterial(h)` backward compatibility.
    */
   surfaceMaterial(h: number, x = 0, y = 0, z = 1): MaterialId {
+    if (this.expeditionWorld) {
+      const biome = this.expeditionWorld.biomeAt(x,y,z), shore = h - this.config.waterSurfaceOffset;
+      if (this.config.ocean.hasOcean && shore < -1.5) return this.archetype === 'volcanic' ? MAT.BASALT : MAT.SEABED;
+      switch (this.archetype) {
+        case 'shattered': return biome === 'rift' && h < 10 ? MAT.CRYSTAL : biome === 'regolith' ? MAT.LIMESTONE : MAT.ROCK;
+        case 'canyon': return shore < 1.6 || biome === 'dune' ? MAT.SAND : biome === 'oasis' ? MAT.GRASS : MAT.TERRACOTTA;
+        case 'cryo': return biome === 'spire' && h > 42 ? MAT.CRYSTAL : shore < 2 || biome === 'spire' ? MAT.ICE : MAT.SNOW;
+        case 'volcanic': return shore < .7 ? MAT.MAGMA : biome === 'ash_refuge' ? MAT.ROCK : MAT.BASALT;
+        case 'biolum': return shore < 1.7 ? MAT.SAND : h > 18.5 ? MAT.CRYSTAL : biome === 'fungal_forest' ? MAT.MYCELIUM : MAT.LIMESTONE;
+      }
+    }
+    if (isExpeditionInterior(this.config, x, y, z) && h > 2.2) {
+      const a = habitatX(x, y, z, this.config.radius), b = habitatZ(x, y, z, this.config.radius);
+      if (habitatPathDistance(a, b) < 3.6) return MAT.LIMESTONE;
+    }
+    if (this.aurelia) {
+      if (h < -2.2) return MAT.SEABED;
+      if (h < 2.2) return MAT.SAND;
+      const biome = this.aurelia.biomeAt(x, y, z);
+      if (biome === 'coast') return h < 5.2 ? MAT.SAND : MAT.GRASS;
+      if (biome === 'wetland') return h < 2.8 ? MAT.DIRT : MAT.GRASS;
+      if (biome === 'dryland') return h > 24 ? MAT.LIMESTONE : MAT.SAND;
+      if (biome === 'highland') return h > 35 ? MAT.ROCK : MAT.GRASS;
+      return MAT.GRASS;
+    }
     switch (this.archetype) {
       case 'canyon': {
         if (h < -16) return MAT.SEABED;

@@ -1,3 +1,4 @@
+/** Recognizable field bundles with a bounded shared geometry/material cache. */
 import * as THREE from 'three/webgpu';
 import type { Goldberg } from '../geo/goldberg';
 import type { Columns } from '../world/columns';
@@ -6,81 +7,101 @@ import type { ResourceDropSave } from '../sim/resourceDrops';
 import { RESOURCE_DROP_PICKUP_DELAY } from '../sim/resourceDrops';
 import { ITEM_DEFS } from '../sim/crafting';
 import { makeSurfaceBasisFromYaw } from './surfaceFrame';
+import { CAMP_COLORS, GeometryKit } from './campKit';
 
-function mat(color: number, roughness = 0.76, metalness = 0.02, emissive = 0x000000): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color, roughness, metalness, emissive, emissiveIntensity: emissive === 0 ? 0 : 0.25 });
+type DropFamily = 'wood' | 'mineral' | 'crystal' | 'fiber' | 'ration' | 'bone' | 'ingot' | 'tool' | 'pack';
+function family(item: ResourceDropSave['item']): DropFamily {
+  if (item === 'wood') return 'wood';
+  if (['stone', 'flint', 'iron_ore', 'alloy_ore'].includes(item)) return 'mineral';
+  if (['crystal', 'star_shard', 'cryo_core', 'magma_core', 'mycelium_spore'].includes(item)) return 'crystal';
+  if (item === 'fiber') return 'fiber';
+  if (['raw_meat', 'cooked_meat', 'hide'].includes(item)) return 'ration';
+  if (item === 'bone') return 'bone';
+  if (item === 'iron_ingot') return 'ingot';
+  if (['hatchet', 'pickaxe', 'spear'].includes(item)) return 'tool';
+  return 'pack';
 }
+function pieceCount(count: number): number { return Math.max(1, Math.min(3, Math.trunc(count))); }
 
-const materials = {
-  wood: mat(0xa56d3a),
-  woodDark: mat(0x5b3822),
-  glow: mat(0xf1d076, 0.44, 0.08, 0xe9a63d),
-};
+class DropAssetKit {
+  private readonly geometry = new Map<string, { body: THREE.BufferGeometry; binding: THREE.BufferGeometry }>();
+  private readonly materials = new Map<ResourceDropSave['item'], THREE.MeshStandardMaterial>();
+  private readonly surface = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0 });
+  private readonly marker = new THREE.MeshStandardMaterial({ color: CAMP_COLORS.ochre, emissive: CAMP_COLORS.ochre, emissiveIntensity: 0.18, roughness: 0.75 });
+  private readonly markerGeometry = new THREE.OctahedronGeometry(0.5, 0);
 
-// Non-wood drops are tinted with the item's catalog color (ITEM_DEFS[item].css).
-const itemMaterials = new Map<ResourceDropSave['item'], THREE.MeshStandardMaterial>();
-function itemMaterial(item: ResourceDropSave['item']): THREE.MeshStandardMaterial {
-  let m = itemMaterials.get(item);
-  if (!m) {
-    const css = ITEM_DEFS[item].css;
-    m = mat(new THREE.Color(css).getHex(), 0.72, 0.03);
-    itemMaterials.set(item, m);
+  private asset(item: ResourceDropSave['item'], count: number): { body: THREE.BufferGeometry; binding: THREE.BufferGeometry } {
+    const kind = family(item), pieces = pieceCount(count), key = `${kind}:${pieces}`;
+    const cached = this.geometry.get(key); if (cached) return cached;
+    const body = new GeometryKit(), binding = new GeometryKit(), c = CAMP_COLORS;
+    for (let i = 0; i < pieces; i++) {
+      const x = (i - (pieces - 1) * 0.5) * 0.13;
+      if (kind === 'wood') {
+        body.cylinder(0x665446, [x, 0.1, 0], 0.06, 0.07, 0.49 - (i % 2) * 0.05, 7, [Math.PI / 2, 0, 0]);
+        for (const side of [-1, 1]) body.cylinder(0xc4a77b, [x, 0.1, side * (0.246 - (i % 2) * 0.025)], 0.053, 0.053, 0.006, 7, [Math.PI / 2, 0, 0]);
+      } else if (kind === 'mineral') {
+        body.crown(0xffffff, [x, 0.12 + (i % 2) * 0.025, i % 2 ? 0.045 : -0.035], [0.13, 0.12 + i * 0.015, 0.15]);
+      } else if (kind === 'crystal') {
+        body.cylinder(0xffffff, [x, 0.15 + i * 0.015, 0], 0.025, 0.085, 0.3 + i * 0.03, 5, [0, i * 0.5, (i - 1) * 0.16]);
+      } else if (kind === 'fiber') {
+        for (let j = 0; j < 4; j++) body.beam(0xffffff, [x - 0.025 + j * 0.016, 0.045, -0.18], [x - 0.015 + j * 0.02, 0.09, 0.2], 0.018, 5);
+      } else if (kind === 'ration') {
+        body.crown(0xffffff, [x, 0.1, 0], [0.12, 0.07, 0.19]);
+      } else if (kind === 'bone') {
+        body.beam(0xffffff, [x, 0.08, -0.17], [x, 0.08, 0.17], 0.035, 6);
+        for (const z of [-0.16, 0.16]) body.crown(0xffffff, [x, 0.08, z], [0.06, 0.045, 0.06]);
+      } else if (kind === 'ingot') {
+        body.box(0xffffff, [x, 0.07 + i * 0.018, 0], [0.115, 0.1, 0.26], [0, i * 0.08, 0]);
+      } else if (kind === 'tool') {
+        body.beam(0xffffff, [x, 0.08, -0.21], [x, 0.08, 0.22], 0.025);
+        body.crown(0xffffff, [x, 0.09, 0.17], [0.12, 0.055, 0.09]);
+      } else {
+        body.box(0xffffff, [x, 0.11, 0], [0.12, 0.19, 0.28]);
+        binding.box(c.cream, [x, 0.212, 0], [0.12, 0.025, 0.29]);
+      }
+    }
+    const width = pieces * 0.13 + 0.025;
+    if (kind === 'wood' || kind === 'fiber' || kind === 'bone' || kind === 'pack') {
+      const top = kind === 'pack' ? 0.24 : kind === 'fiber' ? 0.12 : kind === 'bone' ? 0.13 : 0.17;
+      for (const z of [-0.1, 0.1]) binding.box(c.cream, [0, top, z], [width, 0.025, 0.035]);
+      binding.box(c.ochre, [width * 0.5 - 0.04, top + 0.025, 0], [0.07, 0.045, 0.09]);
+    } else {
+      binding.box(c.cream, [0, 0.025, 0], [width + 0.08, 0.035, 0.36]);
+      binding.box(c.ochre, [width * 0.5, 0.055, 0.12], [0.07, 0.03, 0.075]);
+    }
+    const asset = { body: body.finish(), binding: binding.finish() };
+    this.geometry.set(key, asset); return asset;
   }
-  return m;
-}
 
-const box = new THREE.BoxGeometry(1, 1, 1);
-const cyl8 = new THREE.CylinderGeometry(0.5, 0.5, 1, 8);
-const sphere8 = new THREE.SphereGeometry(0.5, 8, 6);
-
-function mesh(geom: THREE.BufferGeometry, material: THREE.Material, pos: [number, number, number], scale: [number, number, number], name: string): THREE.Mesh {
-  const m = new THREE.Mesh(geom, material);
-  m.name = name;
-  m.position.set(...pos);
-  m.scale.set(...scale);
-  m.receiveShadow = true;
-  return m;
-}
-
-function makeWoodDrop(drop: ResourceDropSave): THREE.Group {
-  const g = new THREE.Group();
-  g.name = `resource-drop-wood-${drop.id}`;
-  const pieces = Math.max(1, Math.min(3, Math.trunc(drop.count)));
-  for (let i = 0; i < pieces; i++) {
-    const log = mesh(cyl8, materials.wood, [-0.18 + i * 0.18, 0.12 + i * 0.025, (i - 1) * 0.07], [0.08, 0.42, 0.08], 'dropWoodLog');
-    log.rotation.z = Math.PI / 2;
-    log.rotation.y = i * 0.72;
-    g.add(log);
-    const cap = mesh(cyl8, materials.woodDark, [-0.18 + i * 0.18, 0.12 + i * 0.025, (i - 1) * 0.07], [0.083, 0.014, 0.083], 'dropWoodCap');
-    cap.rotation.z = Math.PI / 2;
-    cap.rotation.y = log.rotation.y;
-    cap.position.x -= 0.22;
-    g.add(cap);
+  make(drop: ResourceDropSave): THREE.Group {
+    const asset = this.asset(drop.item, drop.count);
+    let material = this.materials.get(drop.item);
+    if (!material) {
+      material = new THREE.MeshStandardMaterial({ color: ITEM_DEFS[drop.item].css, vertexColors: true, roughness: 0.82, metalness: 0.02 });
+      this.materials.set(drop.item, material);
+    }
+    const group = new THREE.Group(); group.name = `resource-drop-${drop.item}-${drop.id}`;
+    const body = new THREE.Mesh(asset.body, drop.item === 'wood' ? this.surface : material);
+    body.name = drop.item === 'wood' ? 'dropWoodLog' : 'dropChip'; body.receiveShadow = true;
+    const binding = new THREE.Mesh(asset.binding, this.surface); binding.name = 'fieldBinding'; binding.receiveShadow = true;
+    const glint = new THREE.Mesh(this.markerGeometry, this.marker); glint.name = 'dropGlint';
+    glint.position.set(0.04, 0.37, 0.02); glint.scale.setScalar(0.045);
+    group.add(body, binding, glint); return group;
   }
-  g.add(mesh(sphere8, materials.glow, [0.04, 0.34, 0.02], [0.045, 0.045, 0.045], 'dropGlint'));
-  return g;
-}
 
-function makeGenericDrop(drop: ResourceDropSave): THREE.Group {
-  const g = new THREE.Group();
-  g.name = `resource-drop-${drop.item}-${drop.id}`;
-  const material = itemMaterial(drop.item);
-  for (let i = 0; i < Math.max(1, Math.min(3, drop.count)); i++) {
-    const chip = mesh(box, material, [-0.1 + i * 0.1, 0.12 + i * 0.035, (i % 2) * 0.08], [0.16, 0.12, 0.14], 'dropChip');
-    chip.rotation.set(i * 0.4, i * 0.7, i * 0.22);
-    g.add(chip);
+  dispose(): void {
+    for (const asset of this.geometry.values()) { asset.body.dispose(); asset.binding.dispose(); }
+    this.geometry.clear(); this.markerGeometry.dispose(); this.surface.dispose(); this.marker.dispose();
+    for (const material of this.materials.values()) material.dispose();
+    this.materials.clear();
   }
-  g.add(mesh(sphere8, materials.glow, [0.04, 0.32, 0.02], [0.04, 0.04, 0.04], 'dropGlint'));
-  return g;
-}
-
-function makeDrop(drop: ResourceDropSave): THREE.Group {
-  return drop.item === 'wood' ? makeWoodDrop(drop) : makeGenericDrop(drop);
 }
 
 export class ResourceDropRenderer {
   readonly group = new THREE.Group();
   private readonly objects = new Map<number, THREE.Group>();
+  private readonly kit = new DropAssetKit();
+  private disposed = false;
 
   constructor(scene: THREE.Scene) {
     this.group.name = 'resource-drops';
@@ -96,11 +117,14 @@ export class ResourceDropRenderer {
       }
     }
     for (const drop of drops) {
-      if (this.objects.has(drop.id)) continue;
-      const obj = makeDrop(drop);
+      const previous = this.objects.get(drop.id);
+      if (previous && previous.userData.item === drop.item && previous.userData.pieces === pieceCount(drop.count)) continue;
+      if (previous) this.group.remove(previous);
+      const obj = this.kit.make(drop);
       obj.userData.resourceDropId = drop.id;
       obj.userData.item = drop.item;
       obj.userData.tile = drop.tile;
+      obj.userData.pieces = pieceCount(drop.count);
       this.objects.set(drop.id, obj);
       this.group.add(obj);
     }
@@ -156,6 +180,12 @@ export class ResourceDropRenderer {
         }
       });
     }
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.group.removeFromParent(); this.group.clear(); this.objects.clear(); this.kit.dispose();
   }
 
   stats(): {

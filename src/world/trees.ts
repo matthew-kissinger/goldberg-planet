@@ -16,8 +16,18 @@ import type { Terrain } from './terrain';
 import { MAT } from './terrain';
 import type { FloraArchetype } from './planetConfig';
 import { hashString } from '../util/prng';
+import type { AureliaTreeSpecies } from './aurelia';
+import { GROWTH_SPECIES, type WorldGrowthSpecies } from './growthSpecies';
+import { createExpeditionHabitat, habitatX, habitatZ, isExpeditionInterior, type ExpeditionHabitat, type HabitatTree } from './expeditionHabitat';
 
 export interface TreeParams {
+  /** Complete Aurelia family; normalized age: sapling <.25, dead >.9. */
+  aurelia?: { species: AureliaTreeSpecies; age: number; seed: number };
+  /** New-world modular growth, including mineral formations. */
+  growth?: { species: WorldGrowthSpecies; age: number; seed: number };
+  /** Authored resident art placement, shared with its falling-tree representation. */
+  habitat?: HabitatTree;
+  planetRadius?: number;
   /** flora silhouette archetype */
   kind: FloraArchetype;
   /** trunk height (m) */
@@ -66,6 +76,9 @@ export class Trees {
   readonly chopped = new Set<number>();
   readonly chopProgress = new Map<number, number>();
   private readonly seedHash: number;
+  private readonly habitat: ExpeditionHabitat | null;
+  /** Immutable natural placement is sampled lazily once; edits/seeds stay sparse. */
+  private readonly growthEligibility: Uint8Array | null;
 
   constructor(
     private readonly geo: Goldberg,
@@ -74,6 +87,8 @@ export class Trees {
     seed: string,
   ) {
     this.seedHash = hashString(seed + ':trees');
+    this.habitat = createExpeditionHabitat(geo, terrain.config);
+    this.growthEligibility = terrain.expeditionWorld ? new Uint8Array(geo.count) : null;
   }
 
   private hash01(id: number, salt: number): number {
@@ -86,15 +101,48 @@ export class Trees {
 
   /** would this tile grow a tree from seed? (ignores chopping/edits) */
   private seededTree(id: number): boolean {
+    // Planting an ecosystem must never replace or erase the designed grove.
+    if (this.habitat?.treeByTile.has(id)) return true;
     // Player-seeded cross-planet ecosystem oasis grows lush flora on any land tile
     if (this.columns.seededEcoTiles.has(id)) {
       const h = this.columns.heightOf(id);
-      return h > -1.0 && this.hash01(id, 1) < 0.65;
+      const floor = this.terrain.expeditionWorld
+        ? this.terrain.config.ocean.hasOcean ? this.terrain.config.waterSurfaceOffset + 0.6 : this.terrain.config.heightMin - 1
+        : -1;
+      return h > floor && this.hash01(id, 1) < 0.65;
     }
 
     const h = this.columns.heightOf(id);
     const c = this.geo.centers;
     const cx = c[id * 3], cy = c[id * 3 + 1], cz = c[id * 3 + 2];
+    if (this.habitat && isExpeditionInterior(this.terrain.config, cx, cy, cz)) return this.habitat.treeByTile.has(id);
+    if (this.terrain.aurelia) {
+      if (h < 1.4) return false;
+      const forest = this.terrain.aurelia.forestAt(cx, cy, cz);
+      if (forest < 0.1) return false;
+      return this.hash01(id, 1) < forest * forest * 0.62;
+    }
+    if (this.terrain.expeditionWorld) {
+      const cached = this.growthEligibility![id];
+      if (cached) return cached === 2;
+      const sampler = this.terrain.expeditionWorld, config = this.terrain.config;
+      let eligible = false;
+      if ((!config.ocean.hasOcean || h > config.waterSurfaceOffset + 0.65) && sampler.clearingAt(cx, cy, cz) < 0.8) {
+        const forest = sampler.forestAt(cx, cy, cz), moisture = sampler.moistureAt(cx, cy, cz);
+        const mat = this.terrain.surfaceMaterial(h, cx, cy, cz);
+        const density = config.archetype === 'biolum' ? forest * forest * 0.66
+          : config.archetype === 'shattered' ? forest * 0.32 : forest * 0.4;
+        if (mat !== MAT.MAGMA && mat !== MAT.SEABED && this.hash01(id, 1) < density
+          && (config.archetype !== 'biolum' || moisture > 0.22)) {
+          let step = 0;
+          for (let k = 0; k < this.geo.degreeOf(id); k++) step = Math.max(step, Math.abs(h - this.columns.heightOf(this.geo.neighbor(id, k))));
+          const limit = config.archetype === 'shattered' ? 4 : config.archetype === 'cryo' ? 3 : 2.5;
+          eligible = step <= limit;
+        }
+      }
+      this.growthEligibility![id] = eligible ? 2 : 1;
+      return eligible;
+    }
     const arch = this.terrain.archetype;
 
     if (arch === 'terran') {
@@ -184,6 +232,55 @@ export class Trees {
   }
 
   paramsFor(id: number): TreeParams {
+    const authored = this.habitatTreeFor(id);
+    if (authored) return {
+      aurelia: { species: 'umbrella', age: this.columns.seededEcoTiles.has(id) && !this.habitat?.treeByTile.has(id) ? 0.18 : 0.65, seed: Math.floor(this.hash01(id, 43) * 0xffffffff) },
+      habitat: authored,
+      planetRadius: this.columns.layers.planetRadius,
+      kind: 'broadleaf', trunk: 4.5 * authored.scale, canopy: 3.5 * authored.scale,
+      spread: 5.3 * authored.scale, girth: 0.48 * authored.scale,
+      offA: 0, offB: 0, tint: 1,
+    };
+    if (this.terrain.aurelia) {
+      const c = this.geo.centers, o = id * 3;
+      const biome = this.terrain.aurelia.biomeAt(c[o], c[o + 1], c[o + 2]);
+      const variation = this.hash01(id, 44);
+      const species: AureliaTreeSpecies = biome === 'wetland' ? 'cypress' : biome === 'highland' ? 'pine'
+        : biome === 'dryland' ? 'scrub' : biome === 'woodland' ? (variation < 0.78 ? 'umbrella' : 'birch')
+          : biome === 'meadow' ? (variation < 0.8 ? 'birch' : 'umbrella') : 'umbrella';
+      const age = this.columns.seededEcoTiles.has(id) ? 0.12 + this.hash01(id, 42) * 0.15 : this.hash01(id, 42);
+      const growth = age < 0.25 ? 0.34 + age * 1.6 : 0.8 + Math.min(0.9, age) * 0.45;
+      const size = growth * (0.85 + this.hash01(id, 2) * 0.3);
+      const trunk = species === 'umbrella' ? 4.4 : species === 'cypress' ? 5.4 : species === 'birch' ? 4.9 : species === 'pine' ? 5.2 : 1.6;
+      const canopy = species === 'umbrella' ? 3.8 : species === 'cypress' ? 4.2 : species === 'birch' ? 3.6 : species === 'pine' ? 5.1 : 2.3;
+      const spread = species === 'umbrella' ? 4.8 : species === 'cypress' ? 1.8 : species === 'birch' ? 2.5 : species === 'pine' ? 2.8 : 2.7;
+      const girth = species === 'umbrella' ? 0.43 : species === 'cypress' ? 0.34 : species === 'birch' ? 0.23 : species === 'pine' ? 0.34 : 0.19;
+      return {
+        aurelia: { species, age, seed: Math.floor(this.hash01(id, 43) * 0xffffffff) },
+        planetRadius: this.columns.layers.planetRadius,
+        kind: species === 'pine' || species === 'cypress' ? 'conifer' : 'broadleaf',
+        trunk: trunk * size, canopy: canopy * size, spread: spread * size, girth: girth * size,
+        offA: (this.hash01(id, 4) - 0.5) * 1.7, offB: (this.hash01(id, 5) - 0.5) * 1.7,
+        tint: 0.9 + this.hash01(id, 6) * 0.2,
+      };
+    }
+    if (this.terrain.expeditionWorld) {
+      const c = this.geo.centers, o = id * 3, world = this.terrain.expeditionWorld;
+      const biome = world.biomeAt(c[o], c[o + 1], c[o + 2]), moisture = world.moistureAt(c[o], c[o + 1], c[o + 2]);
+      const roll = this.hash01(id, 44), arch = this.terrain.archetype;
+      const species: WorldGrowthSpecies = arch === 'shattered' ? biome === 'rift' && roll > 0.62 ? 'mineralSpire' : 'crystalFan'
+        : arch === 'canyon' ? biome === 'oasis' && moisture > 0.45 ? roll < 0.7 ? 'desertPalm' : 'yucca' : roll < 0.62 ? 'cactus' : 'yucca'
+          : arch === 'cryo' ? biome === 'fjord' && roll < 0.72 ? 'frostwillow' : 'iceFan'
+            : arch === 'volcanic' ? biome === 'ash_refuge' && roll < 0.6 ? 'heatStalk' : 'charCoral'
+              : biome === 'lagoon' || roll > 0.7 ? 'sporeFan' : 'fungalParasol';
+      const profile = GROWTH_SPECIES[species];
+      const age = this.columns.seededEcoTiles.has(id) ? 0.12 + this.hash01(id, 42) * 0.13 : this.hash01(id, 42);
+      const growth = age < 0.25 ? 0.35 + age * 1.8 : 0.8 + Math.min(age, 0.9) * 0.4;
+      const size = growth * (0.84 + this.hash01(id, 2) * 0.32);
+      return { growth: { species, age, seed: Math.floor(this.hash01(id, 43) * 0xffffffff) }, planetRadius: this.columns.layers.planetRadius,
+        kind: profile.kind, trunk: profile.trunk * size, canopy: profile.canopy * size, spread: profile.spread * size, girth: profile.girth * size,
+        offA: (this.hash01(id, 4) - 0.5) * 1.2, offB: (this.hash01(id, 5) - 0.5) * 1.2, tint: 0.92 + this.hash01(id, 6) * 0.16 };
+    }
     const size = 0.75 + this.hash01(id, 2) * 0.6;
     let kind: FloraArchetype = 'conifer';
 
@@ -222,6 +319,7 @@ export class Trees {
    */
   groveTreesFor(id: number): TreeParams[] {
     const primary = this.paramsFor(id);
+    if (primary.habitat || primary.aurelia || primary.growth) return [primary];
     const roll = this.hash01(id, 11);
     const count = roll < 0.28 ? 1 : roll < 0.72 ? 2 : 3;
     if (count === 1) return [primary];
@@ -247,5 +345,17 @@ export class Trees {
       });
     }
     return out;
+  }
+
+  /** Both designed and player-seeded trees in the new region share its art family. */
+  habitatTreeFor(id: number): HabitatTree | undefined {
+    const authored = this.habitat?.treeByTile.get(id);
+    if (authored) return authored;
+    if (!this.habitat || !this.columns.seededEcoTiles.has(id)) return undefined;
+    const c = this.geo.centers, o = id * 3, config = this.terrain.config;
+    if (!isExpeditionInterior(config, c[o], c[o + 1], c[o + 2])) return undefined;
+    const x = habitatX(c[o], c[o + 1], c[o + 2], config.radius);
+    const z = habitatZ(c[o], c[o + 1], c[o + 2], config.radius);
+    return { tile: id, x, z, scale: 0.55 + this.hash01(id, 31) * 0.3, yaw: this.hash01(id, 32) * Math.PI * 2, community: z < 40 ? 'shore' : 'grove' };
   }
 }

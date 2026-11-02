@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "source": "src/render/faunaKit.ts",
+  "sourceSha256": "3631588b4c56403d9a685fcb2c7e80f43b0992cc39b889d74410f1d13c87f6f2",
+  "exporter": "Three GLTFExporter",
+  "three": "187",
+  "bytes": 246772,
+  "sha256": "a49c649cdd5d8b5d5d550cb7c3fa2d78aac495fed4c480c4c070e282809db400",
+  "purpose": "portable rest-pose art kit; game uses the same source profiles in fixed instance pools",
+  "bakedAnimationClips": 0,
+  "species": [
+    {
+      "species": "mantleback",
+      "bodyPlan": "quadruped",
+      "legs": 4,
+      "meshes": 15,
+      "vertices": 1196,
+      "triangles": 2296
+    },
+    {
+      "species": "reedrunner",
+      "bodyPlan": "wader",
+      "legs": 2,
+      "meshes": 9,
+      "vertices": 893,
+      "triangles": 1710
+    },
+    {
+      "species": "ridgehook",
+      "bodyPlan": "quadruped",
+      "legs": 4,
+      "meshes": 15,
+      "vertices": 1156,
+      "triangles": 2200
+    },
+    {
+      "species": "sailwing",
+      "bodyPlan": "glider",
+      "legs": 0,
+      "meshes": 5,
+      "vertices": 603,
+      "triangles": 1154
+    },
+    {
+      "species": "duskprowler",
+      "bodyPlan": "quadruped",
+      "legs": 4,
+      "meshes": 15,
+      "vertices": 1220,
+      "triangles": 2332
+    },
+    {
+      "species": "ribbonfin",
+      "bodyPlan": "fish",
+      "legs": 0,
+      "meshes": 5,
+      "vertices": 636,
+      "triangles": 1224
+    }
+  ]
+}

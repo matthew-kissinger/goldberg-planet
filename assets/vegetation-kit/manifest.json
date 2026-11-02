@@ -1,0 +1,1460 @@
+{
+  "version": 2,
+  "authoring": "Repository-authored geometry; exported directly with three GLTFExporter. Kiln was evaluated but is not used by this adapter.",
+  "modules": {
+    "stem": {
+      "label": "Tapered branch",
+      "ports": {
+        "root": [
+          0,
+          -0.5,
+          0
+        ],
+        "tip": [
+          0,
+          0.5,
+          0
+        ]
+      },
+      "parameters": [
+        "length",
+        "radius",
+        "barkColor"
+      ]
+    },
+    "crown": {
+      "label": "Leaf lobe",
+      "ports": {
+        "branch": [
+          0,
+          -1,
+          0
+        ]
+      },
+      "parameters": [
+        "width",
+        "height",
+        "depth",
+        "leafColor",
+        "windPhase"
+      ]
+    },
+    "spire": {
+      "label": "Needle tier",
+      "ports": {
+        "branch": [
+          0,
+          -0.5,
+          0
+        ]
+      },
+      "parameters": [
+        "width",
+        "height",
+        "leafColor",
+        "windPhase"
+      ]
+    },
+    "crystal": {
+      "label": "Faceted mineral",
+      "ports": {
+        "root": [
+          0,
+          -0.5,
+          0
+        ],
+        "tip": [
+          0,
+          0.5,
+          0
+        ]
+      },
+      "parameters": [
+        "width",
+        "height",
+        "depth",
+        "mineralColor"
+      ]
+    },
+    "succulent": {
+      "label": "Ribbed water stem",
+      "ports": {
+        "root": [
+          0,
+          -0.5,
+          0
+        ],
+        "tip": [
+          0,
+          0.5,
+          0
+        ]
+      },
+      "parameters": [
+        "radius",
+        "height",
+        "stemColor"
+      ]
+    },
+    "frond": {
+      "label": "Arched solid frond",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ],
+        "tip": [
+          0,
+          1,
+          -0.35
+        ]
+      },
+      "parameters": [
+        "length",
+        "width",
+        "leafColor",
+        "windPhase"
+      ]
+    },
+    "parasol": {
+      "label": "Fungal umbrella",
+      "ports": {
+        "stem": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "spread",
+        "height",
+        "capColor"
+      ]
+    },
+    "fan": {
+      "label": "Radial fan",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "width",
+        "height",
+        "depth",
+        "fanColor"
+      ]
+    },
+    "gill": {
+      "label": "Parasol gills",
+      "ports": {
+        "stem": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "spread",
+        "depth",
+        "gillColor"
+      ]
+    },
+    "understory": {
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ]
+    }
+  },
+  "assets": [
+    {
+      "file": "tree-umbrella.glb",
+      "bytes": 60872,
+      "sha256": "55d77d97250a93cf1a13765f68fb7f61a3025369ddf372a13341f3f9d161728f",
+      "triangles": 728,
+      "meshes": 13,
+      "materials": 4,
+      "category": "tall-growth",
+      "world": "terran",
+      "species": "umbrella",
+      "stage": "mature",
+      "parameters": {
+        "kind": "broadleaf",
+        "trunk": 4.4,
+        "canopy": 3.8,
+        "spread": 4.8,
+        "girth": 0.43,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "aurelia": {
+          "species": "umbrella",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "bark": 7823949,
+        "leaves": [
+          6587984,
+          8559451,
+          10201704
+        ],
+        "branches": 5,
+        "crown": "umbrella"
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "tree-cypress.glb",
+      "bytes": 45532,
+      "sha256": "3a6b1819d2198f903add6260907da6c4a06ff343604771a3337807ea8db519f5",
+      "triangles": 540,
+      "meshes": 10,
+      "materials": 4,
+      "category": "tall-growth",
+      "world": "terran",
+      "species": "cypress",
+      "stage": "mature",
+      "parameters": {
+        "kind": "broadleaf",
+        "trunk": 5.4,
+        "canopy": 4.2,
+        "spread": 1.8,
+        "girth": 0.34,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "aurelia": {
+          "species": "cypress",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "bark": 7826773,
+        "leaves": [
+          4487788,
+          6001024,
+          8170125
+        ],
+        "branches": 4,
+        "crown": "column"
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "tree-birch.glb",
+      "bytes": 45608,
+      "sha256": "d07d6fdffc0756bfcd19a39a2cd6243035318ffb0bdac40d906c5cb4fd717f50",
+      "triangles": 540,
+      "meshes": 10,
+      "materials": 4,
+      "category": "tall-growth",
+      "world": "terran",
+      "species": "birch",
+      "stage": "mature",
+      "parameters": {
+        "kind": "broadleaf",
+        "trunk": 4.9,
+        "canopy": 3.6,
+        "spread": 2.5,
+        "girth": 0.23,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "aurelia": {
+          "species": "birch",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "bark": 14012596,
+        "leaves": [
+          9150289,
+          11188334,
+          12961664
+        ],
+        "branches": 4,
+        "crown": "clusters"
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "tree-pine.glb",
+      "bytes": 22832,
+      "sha256": "191242a665b0b8cf56e862f3ed5a668a508d326c2715cad8d75fa0d0b4f315ba",
+      "triangles": 224,
+      "meshes": 10,
+      "materials": 4,
+      "category": "tall-growth",
+      "world": "terran",
+      "species": "pine",
+      "stage": "mature",
+      "parameters": {
+        "kind": "broadleaf",
+        "trunk": 5.2,
+        "canopy": 5.1,
+        "spread": 2.8,
+        "girth": 0.34,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "aurelia": {
+          "species": "pine",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "bark": 7889236,
+        "leaves": [
+          4746848,
+          6128496,
+          7967867
+        ],
+        "branches": 5,
+        "crown": "tiers"
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "tree-scrub.glb",
+      "bytes": 43164,
+      "sha256": "847b626cadbfd152dc3715aef04ec20748d16d73b56caada8eb0ae561dceb915",
+      "triangles": 512,
+      "meshes": 9,
+      "materials": 4,
+      "category": "tall-growth",
+      "world": "terran",
+      "species": "scrub",
+      "stage": "mature",
+      "parameters": {
+        "kind": "broadleaf",
+        "trunk": 1.6,
+        "canopy": 2.3,
+        "spread": 2.7,
+        "girth": 0.19,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "aurelia": {
+          "species": "scrub",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "bark": 9138772,
+        "leaves": [
+          9410404,
+          10724464,
+          12103288
+        ],
+        "branches": 3,
+        "crown": "scrub"
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "tree-crystalFan.glb",
+      "bytes": 15776,
+      "sha256": "e5d082c2f6523a7790b10a82d5ad94dd03c04ec02c28722cef58c9629861e980",
+      "triangles": 120,
+      "meshes": 6,
+      "materials": 3,
+      "category": "tall-growth",
+      "world": "shattered",
+      "species": "crystalFan",
+      "stage": "mature",
+      "parameters": {
+        "kind": "crystal_spire",
+        "trunk": 0.6,
+        "canopy": 3.2,
+        "spread": 2.2,
+        "girth": 0.34,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "growth": {
+          "species": "crystalFan",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "world": "shattered",
+        "kind": "crystal_spire",
+        "trunk": 0.6,
+        "canopy": 3.2,
+        "spread": 2.2,
+        "girth": 0.34,
+        "wind": 0,
+        "colors": [
+          7830417,
+          10725314,
+          12763098
+        ]
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "tree-mineralSpire.glb",
+      "bytes": 10940,
+      "sha256": "9b67233add60e8ab34a1e4e5dfe801c5d885ee70640ce77630da27b2042f8a2e",
+      "triangles": 80,
+      "meshes": 4,
+      "materials": 3,
+      "category": "tall-growth",
+      "world": "shattered",
+      "species": "mineralSpire",
+      "stage": "mature",
+      "parameters": {
+        "kind": "crystal_spire",
+        "trunk": 0.4,
+        "canopy": 4.6,
+        "spread": 1.3,
+        "girth": 0.45,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "growth": {
+          "species": "mineralSpire",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "world": "shattered",
+        "kind": "crystal_spire",
+        "trunk": 0.4,
+        "canopy": 4.6,
+        "spread": 1.3,
+        "girth": 0.45,
+        "wind": 0,
+        "colors": [
+          6648965,
+          9149869,
+          12372436
+        ]
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "tree-cactus.glb",
+      "bytes": 31696,
+      "sha256": "a0e691d9703c76ce6461c65f9d55c122c860befc7fa14dc3eb5becae26436a97",
+      "triangles": 922,
+      "meshes": 10,
+      "materials": 3,
+      "category": "tall-growth",
+      "world": "canyon",
+      "species": "cactus",
+      "stage": "mature",
+      "parameters": {
+        "kind": "cactus",
+        "trunk": 2.7,
+        "canopy": 1.8,
+        "spread": 1.65,
+        "girth": 0.42,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "growth": {
+          "species": "cactus",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "world": "canyon",
+        "kind": "cactus",
+        "trunk": 2.7,
+        "canopy": 1.8,
+        "spread": 1.65,
+        "girth": 0.42,
+        "wind": 0,
+        "colors": [
+          7701843,
+          9413738,
+          13805941
+        ]
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "tree-yucca.glb",
+      "bytes": 20732,
+      "sha256": "1b7b11cced24bd034d6496154c2a1f4cdbc69a06c26dd41b33cd77628f30e5a1",
+      "triangles": 168,
+      "meshes": 9,
+      "materials": 3,
+      "category": "tall-growth",
+      "world": "canyon",
+      "species": "yucca",
+      "stage": "mature",
+      "parameters": {
+        "kind": "palm",
+        "trunk": 1.8,
+        "canopy": 1.7,
+        "spread": 1.9,
+        "girth": 0.24,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "growth": {
+          "species": "yucca",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "world": "canyon",
+        "kind": "palm",
+        "trunk": 1.8,
+        "canopy": 1.7,
+        "spread": 1.9,
+        "girth": 0.24,
+        "wind": 0.65,
+        "colors": [
+          8942167,
+          8755035,
+          11843197
+        ]
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "tree-desertPalm.glb",
+      "bytes": 22684,
+      "sha256": "2e6fc1d343ea00d498c004f835c53dd4cb8fe55879dd3106ea809026ce24ed50",
+      "triangles": 184,
+      "meshes": 10,
+      "materials": 3,
+      "category": "tall-growth",
+      "world": "canyon",
+      "species": "desertPalm",
+      "stage": "mature",
+      "parameters": {
+        "kind": "palm",
+        "trunk": 5.3,
+        "canopy": 2.4,
+        "spread": 3.5,
+        "girth": 0.32,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "growth": {
+          "species": "desertPalm",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "world": "canyon",
+        "kind": "palm",
+        "trunk": 5.3,
+        "canopy": 2.4,
+        "spread": 3.5,
+        "girth": 0.32,
+        "wind": 0.8,
+        "colors": [
+          9992282,
+          8887388,
+          11778933
+        ]
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "tree-frostwillow.glb",
+      "bytes": 28636,
+      "sha256": "b415197124aee88f4bf8f8ed79a3dee349069b31ec3a1814b25fa8ee8248c89f",
+      "triangles": 276,
+      "meshes": 12,
+      "materials": 3,
+      "category": "tall-growth",
+      "world": "cryo",
+      "species": "frostwillow",
+      "stage": "mature",
+      "parameters": {
+        "kind": "ice_willow",
+        "trunk": 3.6,
+        "canopy": 2.6,
+        "spread": 2.8,
+        "girth": 0.26,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "growth": {
+          "species": "frostwillow",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "world": "cryo",
+        "kind": "ice_willow",
+        "trunk": 3.6,
+        "canopy": 2.6,
+        "spread": 2.8,
+        "girth": 0.26,
+        "wind": 0.12,
+        "colors": [
+          8888228,
+          11587793,
+          14018018
+        ]
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "tree-iceFan.glb",
+      "bytes": 18716,
+      "sha256": "850e02efb96ba0f534e7296ef236c0bd22febe1257065046afad60d5b21813c5",
+      "triangles": 180,
+      "meshes": 5,
+      "materials": 3,
+      "category": "tall-growth",
+      "world": "cryo",
+      "species": "iceFan",
+      "stage": "mature",
+      "parameters": {
+        "kind": "crystal_spire",
+        "trunk": 0.3,
+        "canopy": 3.4,
+        "spread": 2.3,
+        "girth": 0.25,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "growth": {
+          "species": "iceFan",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "world": "cryo",
+        "kind": "crystal_spire",
+        "trunk": 0.3,
+        "canopy": 3.4,
+        "spread": 2.3,
+        "girth": 0.25,
+        "wind": 0,
+        "colors": [
+          10139844,
+          12245472,
+          14477801
+        ]
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "tree-charCoral.glb",
+      "bytes": 32152,
+      "sha256": "2ff2046da4819cc976e1797f7b3d2297cf284a8ea901986418953feaacaefc0f",
+      "triangles": 332,
+      "meshes": 13,
+      "materials": 3,
+      "category": "tall-growth",
+      "world": "volcanic",
+      "species": "charCoral",
+      "stage": "mature",
+      "parameters": {
+        "kind": "crystal_spire",
+        "trunk": 1.8,
+        "canopy": 2.7,
+        "spread": 2.5,
+        "girth": 0.38,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "growth": {
+          "species": "charCoral",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "world": "volcanic",
+        "kind": "crystal_spire",
+        "trunk": 1.8,
+        "canopy": 2.7,
+        "spread": 2.5,
+        "girth": 0.38,
+        "wind": 0,
+        "colors": [
+          5130054,
+          7627610,
+          13804391
+        ]
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "tree-heatStalk.glb",
+      "bytes": 21532,
+      "sha256": "0ef28c149b3a0c55f79338c7f04a0643b37a0d36103203b7daca25ed4386e960",
+      "triangles": 642,
+      "meshes": 6,
+      "materials": 3,
+      "category": "tall-growth",
+      "world": "volcanic",
+      "species": "heatStalk",
+      "stage": "mature",
+      "parameters": {
+        "kind": "spore_bulb",
+        "trunk": 2.8,
+        "canopy": 1.6,
+        "spread": 1.2,
+        "girth": 0.28,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "growth": {
+          "species": "heatStalk",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "world": "volcanic",
+        "kind": "spore_bulb",
+        "trunk": 2.8,
+        "canopy": 1.6,
+        "spread": 1.2,
+        "girth": 0.28,
+        "wind": 0.24,
+        "colors": [
+          7628119,
+          10849122,
+          14005356
+        ]
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "tree-fungalParasol.glb",
+      "bytes": 55160,
+      "sha256": "b15a9eaec9ce1e3416f49bbe540764b6472d6c301a7448badb6880e13574d6b7",
+      "triangles": 1074,
+      "meshes": 9,
+      "materials": 3,
+      "category": "tall-growth",
+      "world": "biolum",
+      "species": "fungalParasol",
+      "stage": "mature",
+      "parameters": {
+        "kind": "fungal",
+        "trunk": 4.1,
+        "canopy": 1.7,
+        "spread": 3.5,
+        "girth": 0.5,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "growth": {
+          "species": "fungalParasol",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "world": "biolum",
+        "kind": "fungal",
+        "trunk": 4.1,
+        "canopy": 1.7,
+        "spread": 3.5,
+        "girth": 0.5,
+        "wind": 0.28,
+        "colors": [
+          10331540,
+          7442352,
+          11653827
+        ]
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "tree-sporeFan.glb",
+      "bytes": 18948,
+      "sha256": "4b30755d0d825c8798057e3671ef913728008eb660d340c64547ebb380a9083f",
+      "triangles": 230,
+      "meshes": 5,
+      "materials": 3,
+      "category": "tall-growth",
+      "world": "biolum",
+      "species": "sporeFan",
+      "stage": "mature",
+      "parameters": {
+        "kind": "spore_bulb",
+        "trunk": 1.6,
+        "canopy": 2.7,
+        "spread": 2.4,
+        "girth": 0.35,
+        "offA": 0,
+        "offB": 0,
+        "tint": 1,
+        "growth": {
+          "species": "sporeFan",
+          "age": 0.6,
+          "seed": 123456789
+        }
+      },
+      "family": {
+        "world": "biolum",
+        "kind": "spore_bulb",
+        "trunk": 1.6,
+        "canopy": 2.7,
+        "spread": 2.4,
+        "girth": 0.35,
+        "wind": 0.4,
+        "colors": [
+          8296084,
+          8632490,
+          12639680
+        ]
+      },
+      "runtime": "shared part instancing; exported nodes preserve editable modules; wind remains a runtime shader behavior"
+    },
+    {
+      "file": "plant-fern.glb",
+      "bytes": 27508,
+      "sha256": "68c681ee80a148b4a3c5805fc26406cf87b51a20884f4a9755924f2d1cac771d",
+      "triangles": 240,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "fern",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-reed.glb",
+      "bytes": 14756,
+      "sha256": "47938ace479fa3e1ad5ce954280c1df3a35db150367d8800d990df11ee9bace4",
+      "triangles": 122,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "reed",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-grass.glb",
+      "bytes": 6116,
+      "sha256": "dae9beda227ac65d837f4c9487dbbf2e45895e7e577be1c58fb666554c31121a",
+      "triangles": 42,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "grass",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-drygrass.glb",
+      "bytes": 14760,
+      "sha256": "5926517210c58617f0dbae19d8df57b416ca5fdafaed4583f75e65bdc08c8da6",
+      "triangles": 122,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "drygrass",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-rosette.glb",
+      "bytes": 14312,
+      "sha256": "bbadb0df7c8dfc8ee9932768079e0b7e0deae0f3201871129c011c2f7111b6b3",
+      "triangles": 118,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "rosette",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-bell.glb",
+      "bytes": 28960,
+      "sha256": "fd3d5d347f599625d405481482be66660d060b014b08ca7d4ee32d85abf99a10",
+      "triangles": 254,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "bell",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-spike.glb",
+      "bytes": 17764,
+      "sha256": "1b20d48d1bfbc86dd76b161819558d826705a2f9bd1db55b19f65c1b40e65d6e",
+      "triangles": 150,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "spike",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-shrub.glb",
+      "bytes": 21040,
+      "sha256": "3545bdbad911c2a90761c9f143b35745d96177f7bdf6c966b4e8591456352fb5",
+      "triangles": 180,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "shrub",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-mineralChips.glb",
+      "bytes": 12416,
+      "sha256": "deb1c9bdb0dc7bf844884c16433a4324f5331534bf6b24d03de7f49c5923c46f",
+      "triangles": 100,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "mineralChips",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-crystalSpray.glb",
+      "bytes": 10256,
+      "sha256": "47a2475e55aa8cbbe61e488de8098ccf081f65da185ca2894bd4d2c5c6d679de",
+      "triangles": 80,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "crystalSpray",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-riftGlass.glb",
+      "bytes": 18888,
+      "sha256": "2ac829a13d3bd7fe13a126c2d9e924437b4e6c9b44abf4212236d32587154a9a",
+      "triangles": 160,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "riftGlass",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-thornTuft.glb",
+      "bytes": 21012,
+      "sha256": "52f540486b0fd2abbbe6f82c7b7d832b82af69c6d2e76da7206a77fb00463ade",
+      "triangles": 180,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "thornTuft",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-desertRosette.glb",
+      "bytes": 13712,
+      "sha256": "c067692c8feefe81f39b7e1b8b0f5cb2b80faee9b847ae881aa6429ba49564c1",
+      "triangles": 112,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "desertRosette",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-seedPods.glb",
+      "bytes": 17160,
+      "sha256": "3a3db3a2af2987c3a792f68659cadecd9f878efa60d8a4a4fbb20a1f3db66c9f",
+      "triangles": 144,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "seedPods",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-frostLichen.glb",
+      "bytes": 14568,
+      "sha256": "5d9d818f47a91558a84c4bbe864f3b15f59706165f536b09e89a1f70ff18b49a",
+      "triangles": 120,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "frostLichen",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-iceNeedles.glb",
+      "bytes": 14568,
+      "sha256": "05e98fc531f5651dfb65dc961633645f873dd2c03ba5c1a6d9d166564b138c6b",
+      "triangles": 120,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "iceNeedles",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-snowBell.glb",
+      "bytes": 22308,
+      "sha256": "7439dc8f4b4f67f41ca2ae85aaa878c922aad4e235f099b3c306772cc8fa75d1",
+      "triangles": 192,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "snowBell",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-sulfurRosette.glb",
+      "bytes": 15876,
+      "sha256": "2251b90f53b3fbf952502f527402e938b343b98fe983b9d02eb59ebc7793b4af",
+      "triangles": 132,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "sulfurRosette",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-ashReed.glb",
+      "bytes": 34012,
+      "sha256": "c228cf355bba4992389afc7b88d508ef81bae4e30408fb582ed7ea0059d91e06",
+      "triangles": 300,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "ashReed",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-emberPolyps.glb",
+      "bytes": 41296,
+      "sha256": "8e4df160ecf5b7262334a1818304874aff90b005835c2d6fa273737477afa13c",
+      "triangles": 368,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "emberPolyps",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-glowMoss.glb",
+      "bytes": 21048,
+      "sha256": "18edfd3dfbe1c41a529fa92dc9bb4838cb7ca1fc3efcd38349116ab7d02fc500",
+      "triangles": 180,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "glowMoss",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-sporeCups.glb",
+      "bytes": 41292,
+      "sha256": "c93498ad536ba6abade7589e4612a150374579da80cac53126e3cf88ff03e8a6",
+      "triangles": 368,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "sporeCups",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    },
+    {
+      "file": "plant-fanMold.glb",
+      "bytes": 18884,
+      "sha256": "4712e6135f45effc6f5d73a8b757383006303f7870a7ed21abb940bda885e932",
+      "triangles": 160,
+      "meshes": 1,
+      "materials": 1,
+      "category": "understory",
+      "module": "fanMold",
+      "label": "Rooted plant",
+      "ports": {
+        "root": [
+          0,
+          0,
+          0
+        ]
+      },
+      "parameters": [
+        "module",
+        "height",
+        "spread",
+        "leafColor",
+        "flowerColor",
+        "windPhase"
+      ],
+      "runtime": "shared module instancing with height/spread/tint and wind-phase variation"
+    }
+  ]
+}

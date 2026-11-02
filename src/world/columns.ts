@@ -17,6 +17,10 @@ import { MAT, type MaterialId, Terrain } from './terrain';
 import { NATURAL_VOID_SCAN_LAYERS, NaturalCaves, type NaturalVoidKind, type NaturalVoidSample } from './caves';
 import { evaluatePentagonWonder, type PentagonWonderEvaluation } from './planetRecipe';
 
+const AURELIA_NO_WONDER: PentagonWonderEvaluation = {
+  ringLevel: -1, pentagonId: -1, heightDelta: 0, materialOverride: null, updraftAccel: 0, automationMultiplier: 1,
+};
+
 export interface ColumnEdit {
   solid: Uint32Array;
   placed: Uint32Array;
@@ -81,7 +85,7 @@ export class Columns {
     if (Number.isNaN(h)) {
       const c = this.geo.centers;
       h = this.terrain.heightAt(c[id * 3], c[id * 3 + 1], c[id * 3 + 2]);
-      if (this.terrain.archetype !== 'terran' && id >= 0 && id < 12) {
+      if (!this.terrain.expeditionWorld && this.terrain.archetype !== 'terran' && id >= 0 && id < 12) {
         const wonder = evaluatePentagonWonder(this.geo, id, this.terrain.config.pentagonWonder);
         h = Math.max(-35, Math.min(115, h + wonder.heightDelta));
       }
@@ -94,6 +98,7 @@ export class Columns {
 
   /** Evaluate Pentagon Wonder properties for `id` ("The Twelve Bells"). */
   pentagonWonderOf(id: number): PentagonWonderEvaluation {
+    if (this.terrain.aurelia || this.terrain.expeditionWorld) return AURELIA_NO_WONDER;
     return evaluatePentagonWonder(this.geo, id, this.terrain.config.pentagonWonder);
   }
 
@@ -209,7 +214,7 @@ export class Columns {
    * suspended high above the ground (`k < topLayerOf(id)`).
    */
   skyIslandRange(id: number): { topK: number; botK: number; isRim: boolean } | null {
-    if (!this.terrain.config.hasFloatingIslands) return null;
+    if (this.terrain.aurelia || this.terrain.expeditionWorld || !this.terrain.config.hasFloatingIslands) return null;
     const c = this.geo.centers;
     const h = this.heightOf(id);
     const sample = this.caves.sampleSkyIsland(c[id * 3], c[id * 3 + 1], c[id * 3 + 2], h);
@@ -283,7 +288,7 @@ export class Columns {
       const m = this.edits.get(id)?.mat?.[k];
       return (m || MAT.BUILT) as MaterialId;
     }
-    if (k >= this.layers.L - 1) return MAT.BEDROCK;
+    if (k >= this.layers.L - 1) return this.terrain.aurelia ? MAT.LIMESTONE : MAT.BEDROCK;
     const top = this.topLayerOf(id);
     const sky = this.skyIslandRange(id);
     if (sky && k >= sky.topK && k <= sky.botK) {
@@ -302,6 +307,28 @@ export class Columns {
     const depth = k - top;
     const c = this.geo.centers;
     const cx = c[id * 3], cy = c[id * 3 + 1], cz = c[id * 3 + 2];
+
+    if (this.terrain.aurelia) {
+      const surface = this.terrain.surfaceMaterial(h, cx, cy, cz);
+      if (depth <= 0) return this.seededEcoTiles.has(id) && h > 2.2 ? MAT.GRASS : surface;
+      if (depth <= 2 && surface === MAT.SEABED) return MAT.SEABED;
+      if (depth <= 1 && (surface === MAT.GRASS || surface === MAT.DIRT)) return MAT.DIRT;
+      return MAT.LIMESTONE;
+    }
+
+    if (this.terrain.expeditionWorld) {
+      const surface = this.terrain.surfaceMaterial(h,cx,cy,cz);
+      // Expedition planting increases the native growth population; it does not
+      // replace regolith, ice, basalt or fungal soil with an Earth grass cap.
+      if (depth <= 0) return surface;
+      if (depth <= 2 && surface === MAT.SEABED) return MAT.SEABED;
+      if (depth <= 2 && (surface === MAT.GRASS || surface === MAT.MYCELIUM)) return MAT.DIRT;
+      if (this.terrain.archetype === 'cryo') return MAT.ICE;
+      if (this.terrain.archetype === 'canyon') return depth < 8 ? MAT.TERRACOTTA : MAT.ROCK;
+      if (this.terrain.archetype === 'volcanic') return MAT.BASALT;
+      if (this.terrain.archetype === 'biolum') return MAT.LIMESTONE;
+      return surface === MAT.CRYSTAL && depth < 5 ? MAT.CRYSTAL : MAT.ROCK;
+    }
 
     if (depth <= 0) {
       if (this.seededEcoTiles.has(id)) {

@@ -1,12 +1,20 @@
 import type { Goldberg } from '../geo/goldberg';
 import type { Columns } from '../world/columns';
 import type { Trees } from '../world/trees';
+import { createExpeditionHabitat } from '../world/expeditionHabitat';
+import { worldSites } from '../world/expeditionWorlds';
 
 /**
  * Spawn on land near tile 0 (a pentagon): BFS outward for comfortable grass altitude,
  * preferring a treeless clearing at the edge of a wood so chop -> craft is in view.
  */
 export function findSpawnTile(geo: Goldberg, columns: Columns, trees: Trees): number {
+  const habitat = createExpeditionHabitat(geo, columns.terrain.config);
+  if (habitat) return habitat.spawnTile;
+  if (columns.terrain.expeditionWorld) {
+    const site = worldSites(columns.terrain.config)[0];
+    if (site) return geo.tileOf(...site.direction);
+  }
   const seen = new Set<number>([0]);
   const queue = [0];
   let fallback = -1;

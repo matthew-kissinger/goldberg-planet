@@ -2,6 +2,7 @@
 
 import { MAT } from '../world/terrain';
 import { hashInt01 } from '../util/prng';
+import type { PlanetArchetype } from '../world/planetConfig';
 
 function srgbToLinear(c: number): number {
   return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
@@ -31,6 +32,7 @@ const COLORS: Record<number, [number, number, number]> = {
   [MAT.CRYSTAL]: lin(0x6ce8e0),
   [MAT.MAGMA]: lin(0xff5a18),
   [MAT.MYCELIUM]: lin(0x28b89a),
+  [MAT.LIMESTONE]: lin(0xc8c3a4),
 };
 
 const VARIANT_RAMPS: Record<number, readonly [number, number, number][]> = {
@@ -49,6 +51,56 @@ const VARIANT_RAMPS: Record<number, readonly [number, number, number][]> = {
   [MAT.CRYSTAL]: [lin(0x54e2dc), lin(0x88f4ff), lin(0x7898ff), lin(0x60f8d0)],
   [MAT.MAGMA]: [lin(0xff4810), lin(0xff781c), lin(0xd82c08), lin(0xffa428)],
   [MAT.MYCELIUM]: [lin(0x22a88c), lin(0x34c8a8), lin(0x4298b8), lin(0x2ad89e)],
+  [MAT.LIMESTONE]: [lin(0xd7cfb0), lin(0xc9c4ab), lin(0xcfc7a9), lin(0xd7d0b7)],
+};
+
+// Authored swatches are converted once at module load. The same tile hashes
+// choose swatches in workers, close terrain, and the distant surface proxy.
+const WORLD_RAMPS: Partial<Record<PlanetArchetype, Record<number, readonly [number, number, number][]>>> = {
+  shattered: {
+    [MAT.ROCK]: [0x919398, 0xa3a09c, 0x777c86, 0x888b95].map(lin),
+    [MAT.DIRT]: [0x8d8988, 0x9d9891, 0x7f7c80].map(lin),
+    [MAT.SAND]: [0xb5b0a8, 0xa09d9a, 0xc0b9ad].map(lin),
+    [MAT.BASALT]: [0x565b64, 0x626771, 0x4c515c].map(lin),
+    [MAT.CRYSTAL]: [0x9db8c2, 0xb4c8d1, 0x90a4b7].map(lin),
+  },
+  canyon: {
+    [MAT.TERRACOTTA]: [0xbd774b, 0xd79b62, 0xa96643, 0xc78a57].map(lin),
+    [MAT.ROCK]: [0xc19466, 0xad825e, 0xd3ab79, 0xa97755].map(lin),
+    [MAT.SAND]: [0xe0c28e, 0xd3ac75, 0xe8ce9e].map(lin),
+    [MAT.DIRT]: [0xa47e51, 0xb48c5c, 0x8c7454].map(lin),
+    [MAT.GRASS]: [0x89945c, 0xa1a36c, 0x708259].map(lin),
+    [MAT.LIMESTONE]: [0xd8c3a0, 0xcab48d, 0xe2cfb0].map(lin),
+    [MAT.SEABED]: [0x718173, 0x8a8e74, 0x6b7a69].map(lin),
+  },
+  cryo: {
+    [MAT.SNOW]: [0xe9f0f3, 0xdde8ee, 0xf0f3f1, 0xd2e1ea].map(lin),
+    [MAT.ICE]: [0xa2cbd9, 0xbadce4, 0x83b2c8, 0x9bc3d6].map(lin),
+    [MAT.ROCK]: [0x768b9b, 0x91a0a8, 0x637a8d].map(lin),
+    [MAT.SEABED]: [0x597a87, 0x6e8b95, 0x526e7d].map(lin),
+    [MAT.CRYSTAL]: [0xb2dce6, 0xc7e6eb, 0x94c4d7].map(lin),
+  },
+  volcanic: {
+    // Basalt stays readable in ash light without making every stone emissive.
+    [MAT.BASALT]: [0x666168, 0x767078, 0x595861, 0x817970].map(lin),
+    [MAT.ROCK]: [0x8a807a, 0x766f72, 0x9a8d7e].map(lin),
+    [MAT.DIRT]: [0x9b8d7d, 0x8a7d73, 0xaaa08d].map(lin),
+    [MAT.SAND]: [0xb0a490, 0x9e9789, 0xc0b39a].map(lin),
+    [MAT.MAGMA]: [0xdf6635, 0xf4944c, 0xbe4c29].map(lin),
+    [MAT.BEDROCK]: [0x4e4b53, 0x59545b, 0x444750].map(lin),
+    [MAT.GRASS]: [0x8b9073, 0x9c9a7c, 0x7b866d].map(lin),
+    [MAT.SEABED]: [0x635851, 0x716256, 0x574e4e].map(lin),
+  },
+  biolum: {
+    [MAT.MYCELIUM]: [0x719e90, 0x879caa, 0x6d978c, 0x9690a7].map(lin),
+    [MAT.GRASS]: [0x668e7f, 0x7c9c8a, 0x6d8594].map(lin),
+    [MAT.DIRT]: [0x807587, 0x96838f, 0x727e81].map(lin),
+    [MAT.ROCK]: [0x8e859e, 0xa59aaf, 0x7d8697].map(lin),
+    [MAT.SAND]: [0xccbdc4, 0xdbcdd0, 0xb6b9bd].map(lin),
+    [MAT.SEABED]: [0x668d89, 0x729d94, 0x617b8c].map(lin),
+    [MAT.CRYSTAL]: [0x9bc5c4, 0xb4b4d4, 0x8bb8bd].map(lin),
+    [MAT.LIMESTONE]: [0xc4becb, 0xd7ccd4, 0xb4bcc2].map(lin),
+  },
 };
 
 /** tree & flora part colors (linear), tinted per tree by the mesher */
@@ -77,8 +129,8 @@ function mixColor(a: readonly number[], b: readonly number[], t: number, out: [n
  * texture-like variation without adding texture maps, material splits, or draw calls.
  * Pentagons retain a gentle warm/harmonic boost so the twelve of them are spottable.
  */
-export function materialColor(mat: number, tileId: number, isPentagon: boolean, out: Float32Array | number[], o = 0): void {
-  const ramp = VARIANT_RAMPS[mat] ?? [COLORS[mat] ?? COLORS[MAT.ROCK]];
+export function materialColor(mat: number, tileId: number, isPentagon: boolean, out: Float32Array | number[], o = 0, archetype: PlanetArchetype = 'terran'): void {
+  const ramp = WORLD_RAMPS[archetype]?.[mat] ?? VARIANT_RAMPS[mat] ?? [COLORS[mat] ?? COLORS[MAT.ROCK]];
   const pick = hashInt01(tileId * 1664525 + mat * 1013904223);
   const blend = hashInt01(tileId * 1103515245 + mat * 12345);
   const tintSeed = hashInt01(tileId * 374761393 + mat * 668265263);

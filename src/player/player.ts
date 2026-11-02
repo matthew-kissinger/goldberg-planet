@@ -16,16 +16,15 @@
 import type { Columns } from '../world/columns';
 import type { Layers } from '../world/layers';
 import type { Goldberg } from '../geo/goldberg';
+import { WALK_SPEED, SPRINT_SPEED } from './locomotion';
 
 export type MoveMode = 'walk' | 'fly' | 'plane';
 
-const EYE_HEIGHT = 1.65;
-const BODY_HEIGHT = 1.8;
-const STEP_UP = 1.35;
+const EYE_HEIGHT = 1.85;
+const BODY_HEIGHT = 2.05;
+const STEP_UP = .72;
 const DEFAULT_GRAVITY = 14;
 const JUMP_V = 7.4;
-const WALK_SPEED = 5.5;
-const SPRINT_SPEED = 9.5;
 const FLY_ACCEL = 55;
 const FLY_DRAG = 2.1;
 const FLY_BOOST = 3.2;
@@ -69,6 +68,7 @@ export class Player {
   throttle = PLANE_START;
   holdAGL = 30;                    // terrain-follow altitude the plane maintains when level
   inSpaceCruise = false;           // true when above karmanAGL in interplanetary flight
+  creative = false;
   hasOrbitalThruster = false;      // unlocked via crafting to boost interplanetary speed
   onPentagonWonder = false;        // true when standing/flying over one of the 12 Pentagon Wonders
   /** set for one frame when the plane stows itself (ground/water/wall contact) */
@@ -211,6 +211,7 @@ export class Player {
 
   /** Apply combat or hazard damage to Health. */
   takeDamage(amount: number): void {
+    if (this.creative) return;
     if (amount <= 0) return;
     this.health = Math.max(0, this.health - amount);
     if (this.health <= 0) {
@@ -225,6 +226,16 @@ export class Player {
     if (this.mode === 'plane') {
       this.mode = 'walk';
       this.inSpaceCruise = false;
+      // Stowing engages the craft's dismount brake. Keep a little movement,
+      // without transferring orbital velocity into a walking explorer.
+      const up = this.up();
+      const radial = this.vx * up[0] + this.vy * up[1] + this.vz * up[2];
+      const tangent = [this.vx - radial * up[0], this.vy - radial * up[1], this.vz - radial * up[2]];
+      const scale = Math.min(1, WALK_SPEED / Math.max(1e-9, Math.hypot(...tangent)));
+      const descent = Math.max(-8, Math.min(4, radial));
+      this.vx = tangent[0] * scale + up[0] * descent;
+      this.vy = tangent[1] * scale + up[1] * descent;
+      this.vz = tangent[2] * scale + up[2] * descent;
     }
   }
 
@@ -255,8 +266,9 @@ export class Player {
     this.onPentagonWonder = wonder.ringLevel >= 0;
 
     // Update environmental survival shield
+    if (this.creative) { this.health=this.maxHealth; this.hunger=100; this.suitShield=this.maxSuitShield; }
     const surv = cfg.survival;
-    if (this.inSafeAura || this.suitTier >= surv.requiredSuitTier || surv.hazardDrainPerSec <= 0) {
+    if (this.creative || this.inSafeAura || this.suitTier >= surv.requiredSuitTier || surv.hazardDrainPerSec <= 0) {
       this.suitShield = Math.min(this.maxSuitShield, this.suitShield + 16 * dt);
     } else {
       this.suitShield = Math.max(0, this.suitShield - surv.hazardDrainPerSec * dt);
@@ -264,7 +276,7 @@ export class Player {
 
     // Update Hunger & Well-Fed / Campfire Health Regeneration
     const hungerDrain = this.mode === 'walk' ? (input.sprint ? 0.32 : 0.14) : 0.08;
-    this.hunger = Math.max(0, this.hunger - hungerDrain * dt);
+    this.hunger = this.creative ? 100 : Math.max(0, this.hunger - hungerDrain * dt);
     if (this.hunger >= 70 || this.inSafeAura) {
       const regenRate = this.inSafeAura ? 5.0 : 2.4;
       this.health = Math.min(this.maxHealth, this.health + regenRate * dt);
@@ -276,7 +288,7 @@ export class Player {
 
     if (this.mode === 'plane') {
       // Check transition between atmospheric contour flight and 3D Interplanetary Space Cruise
-      if (!this.inSpaceCruise && agl > karmanAGL) {
+      if (!this.inSpaceCruise && agl > karmanAGL && (this.hasOrbitalThruster || this.creative)) {
         this.inSpaceCruise = true;
       } else if (this.inSpaceCruise && agl < karmanAGL * 0.78) {
         this.inSpaceCruise = false;
@@ -312,7 +324,7 @@ export class Player {
         if (wonder.updraftAccel > 0 && agl < karmanAGL) {
           this.holdAGL += wonder.updraftAccel * 0.65 * dt;
         }
-        this.holdAGL = Math.max(PLANE_AGL_MIN, Math.min(PLANE_AGL_MAX, this.holdAGL));
+        this.holdAGL = Math.max(PLANE_AGL_MIN, Math.min(this.hasOrbitalThruster || this.creative ? PLANE_AGL_MAX : karmanAGL * .6, this.holdAGL));
 
         const gHere = this.surfaceRadiusAt(ux, uy, uz);
         let vtx = this.vx - (this.vx * ux + this.vy * uy + this.vz * uz) * ux;
